@@ -1,6 +1,8 @@
 import { OpenAI } from "openai";
 import { MethodDefinition, SimilarityWarning } from "../core/types";
 import axios from "axios";
+import crypto from "crypto";
+import path from "path";
 
 // Vector database for storing embeddings locally
 interface VectorEntry {
@@ -10,6 +12,7 @@ interface VectorEntry {
   componentName: string;
   filePath: string;
   code: string;
+  codeHash: string;
 }
 
 export interface VectorSimilarityOptions {
@@ -63,7 +66,7 @@ export class VectorSimilarityService {
       options.similarityThreshold ||
       (process.env.SIMILARITY_THRESHOLD
         ? parseFloat(process.env.SIMILARITY_THRESHOLD)
-        : 0.6);
+        : 0.85);
   }
 
   /**
@@ -166,15 +169,25 @@ Code: ${method.code || ""}
     filePath: string
   ): Promise<void> {
     const vector = await this.generateEmbedding(method);
-    const id = `${componentName}_${method.name}_${filePath}`;
+    const codeHash = crypto
+      .createHash("md5")
+      .update(method.code || "")
+      .digest("hex");
+
+    // Normalize the file path to ensure consistent comparison
+    const normalizedPath = path.normalize(filePath);
+
+    // Create a unique ID that includes code hash to ensure uniqueness
+    const id = `${componentName}_${method.name}_${normalizedPath}_${codeHash}`;
 
     this.vectorDb.push({
       id,
       vector,
       methodName: method.name,
       componentName,
-      filePath,
+      filePath: normalizedPath,
       code: method.code || "",
+      codeHash,
     });
   }
 
@@ -188,14 +201,64 @@ Code: ${method.code || ""}
   ): Promise<SimilarityWarning[]> {
     // Generate vector for the current method
     const vector = await this.generateEmbedding(method);
-    const currentId = `${componentName}_${method.name}_${filePath}`;
+
+    // Generate the same hash as in addMethod
+    const codeHash = crypto
+      .createHash("md5")
+      .update(method.code || "")
+      .digest("hex");
+
+    // Normalize the file path to ensure consistent comparison
+    const normalizedPath = path.normalize(filePath);
+
+    // Create the same unique ID format as in addMethod
+    const currentId = `${componentName}_${method.name}_${normalizedPath}_${codeHash}`;
+    const methodNameLower = method.name.toLowerCase();
 
     const similarityResults: SimilarityWarning[] = [];
 
     // Compare with all vectors in the database
     for (const entry of this.vectorDb) {
-      // Skip comparing to itself
+      // Skip comparing to itself by ID
       if (entry.id === currentId) continue;
+
+      // Additional check: also skip if code hash is identical (same method in different places)
+      if (entry.codeHash === codeHash && entry.code === (method.code || ""))
+        continue;
+
+      // Skip methods with the same name from the same component in the same file
+      // This handles cases where a method might be processed multiple times with slight differences
+      if (
+        entry.componentName === componentName &&
+        entry.methodName === method.name &&
+        entry.filePath === normalizedPath
+      )
+        continue;
+
+      // Skip trivial methods (common utility functions with the same name)
+      const entryNameLower = entry.methodName.toLowerCase();
+      if (
+        methodNameLower === entryNameLower &&
+        [
+          "get",
+          "set",
+          "is",
+          "has",
+          "update",
+          "delete",
+          "create",
+          "handle",
+          "on",
+          "toggle",
+          "add",
+          "remove",
+        ].some((prefix) => methodNameLower.startsWith(prefix))
+      ) {
+        // Higher threshold for common utility methods with same name
+        const minThreshold = this.similarityThreshold + 0.1;
+        const similarity = this.cosineSimilarity(vector, entry.vector);
+        if (similarity < minThreshold) continue;
+      }
 
       const similarity = this.cosineSimilarity(vector, entry.vector);
 
@@ -208,6 +271,7 @@ Code: ${method.code || ""}
             similarity * 100
           )}% similar)`,
           filePath: entry.filePath,
+          code: entry.code,
         });
       }
     }
@@ -227,6 +291,13 @@ Code: ${method.code || ""}
     const enhancedMethods: MethodDefinition[] = [];
 
     for (const method of methods) {
+      // Ensure the method code is set
+      if (!method.code) {
+        console.warn(
+          `Method ${method.name} in ${componentName} has no code defined`
+        );
+      }
+
       // First check for similarity with existing methods
       const similarMethods = await this.findSimilarMethods(
         method,

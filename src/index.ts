@@ -1,6 +1,7 @@
 import { parseComponents } from "./core/parser";
 import { AiDescriptionGenerator } from "./ai/generator";
 import { generateDocumentation as generateDocUI } from "./ui/generator";
+import { CodebaseChatService } from "./ai/chat-service";
 import {
   ComponentDefinition,
   PropDefinition,
@@ -24,6 +25,8 @@ export interface DocumentationOptions extends ParserOptions {
   useOllama?: boolean;
   ollamaUrl?: string;
   ollamaModel?: string;
+  enableChat?: boolean;
+  chatModel?: string;
 }
 
 export {
@@ -31,6 +34,7 @@ export {
   parseComponents,
   AiDescriptionGenerator,
   generateDocUI,
+  CodebaseChatService,
 
   // Types
   ComponentDefinition,

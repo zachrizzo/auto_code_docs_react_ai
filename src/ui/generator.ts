@@ -124,6 +124,8 @@ async function generateIndexHtml(
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <!-- Marked library for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
   <!-- React 18 script tags - using production version -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -149,10 +151,15 @@ async function generateStyles(
   const css = `
 :root {
   --primary-color: #0070f3;
+  --primary-color-rgb: 0, 112, 243;
   --secondary-color: #0366d6;
+  --secondary-color-rgb: 3, 102, 214;
   --background-color: #ffffff;
+  --background-color-rgb: 255, 255, 255;
   --text-color: #333333;
+  --text-color-rgb: 51, 51, 51;
   --border-color: #e1e4e8;
+  --border-color-rgb: 225, 228, 232;
   --sidebar-bg: #f6f8fa;
   --code-bg: #f6f8fa;
   --header-bg: #ffffff;
@@ -165,10 +172,15 @@ async function generateStyles(
 
 [data-theme="dark"] {
   --primary-color: #58a6ff;
+  --primary-color-rgb: 88, 166, 255;
   --secondary-color: #1f6feb;
+  --secondary-color-rgb: 31, 111, 235;
   --background-color: #0d1117;
+  --background-color-rgb: 13, 17, 23;
   --text-color: #c9d1d9;
+  --text-color-rgb: 201, 209, 217;
   --border-color: #30363d;
+  --border-color-rgb: 48, 54, 61;
   --sidebar-bg: #161b22;
   --code-bg: #161b22;
   --header-bg: #161b22;
@@ -661,62 +673,105 @@ html, body {
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   z-index: 1000;
 }
 
 .similarity-modal-content {
-  background-color: var(--card-bg);
-  padding: 20px;
+  background-color: var(--background-color);
   border-radius: 8px;
-  max-width: 600px;
   width: 90%;
+  max-width: 1000px;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  position: relative;
+  padding: 2rem;
+  transition: all 0.3s ease;
+}
+
+.similarity-modal-content.expanded {
+  width: 95%;
+  max-width: 1200px;
+  max-height: 90vh;
+}
+
+.similarity-modal-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.expand-button {
+  margin-right: 0.5rem;
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.8rem;
 }
 
 .close-button {
-  float: right;
-  background: none;
+  background-color: #f44336;
+  color: white;
   border: none;
-  font-size: 20px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  color: var(--text-color);
+  font-size: 1rem;
 }
 
 .similarity-modal-score {
-  font-size: 24px;
+  display: inline-block;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
   font-weight: bold;
-  text-align: center;
-  margin: 10px 0 20px;
-  color: var(--accent-color);
 }
 
-.similarity-modal-methods {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
+.similarity-code-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
 }
 
-.similarity-source-method, .similarity-target-method {
-  flex: 1;
-  padding: 10px;
+.code-panel {
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.similarity-file-path {
-  font-size: 12px;
-  color: var(--muted-text);
-  margin-top: 5px;
+.code-panel h4 {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background-color: var(--code-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
 }
 
-.similarity-modal-reason {
-  padding: 10px;
-  background-color: var(--background-color);
-  border-radius: 4px;
+.code-block {
+  margin: 0;
+  padding: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  background-color: var(--code-bg);
+  white-space: pre-wrap;
+  font-family: monospace;
+}
+
+.similarity-modal-content.expanded .code-block {
+  max-height: 600px;
 }
 
 /* Similarity List */
@@ -779,6 +834,477 @@ html, body {
 .similarity-reason {
   padding-top: 5px;
 }
+
+/* Chat UI Styles */
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 200px);
+}
+
+/* Chat Bubble */
+.chat-bubble {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: linear-gradient(135deg, var(--primary-color), #4361ee);
+  color: white;
+  border-radius: 50px;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  z-index: 9999;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  font-weight: bold;
+  font-size: 17px;
+}
+
+.chat-bubble:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.chat-bubble-icon {
+  font-size: 24px;
+}
+
+/* Chat Widget */
+.chat-widget {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 450px;
+  height: 650px;
+  background-color: var(--background-color);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 9999;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--primary-color), #4361ee);
+  color: white;
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.close-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 5px 8px;
+  line-height: 1;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 20px;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color);
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background-color: rgba(var(--background-color-rgb), 0.98);
+}
+
+.chat-message {
+  max-width: 85%;
+  padding: 0.9rem 1.2rem;
+  border-radius: 12px;
+  line-height: 1.5;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+
+.chat-message:hover {
+  transform: translateY(-2px);
+}
+
+.user-message {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--primary-color), #4361ee);
+  color: white;
+}
+
+.assistant-message {
+  align-self: flex-start;
+  background-color: var(--code-bg);
+  border: 1px solid var(--border-color);
+}
+
+.message-content {
+  word-break: break-word;
+}
+
+.message-content.loading {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.message-content p {
+  margin: 0 0 0.5rem 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content code {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.1rem 0.2rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.message-content pre {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.chat-input {
+  display: flex;
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--background-color);
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 14px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  margin-right: 10px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.chat-input input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.25);
+}
+
+.chat-input button {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--primary-color), #4361ee);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.chat-input button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.chat-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.search-results {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.search-result {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--code-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.result-header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.similarity-score {
+  font-size: 0.8rem;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+}
+
+.result-path {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  background-color: var(--code-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.result-code {
+  margin: 0;
+  padding: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  background-color: var(--background-color);
+}
+
+.similarity-controls {
+  background-color: var(--code-bg);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.similarity-slider {
+  width: 100%;
+  height: 10px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border-color);
+  outline: none;
+  border-radius: 5px;
+}
+
+.similarity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.similarity-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Resolve button conflict issue */
+.similarity-modal .close-button,
+.similarity-modal .expand-button {
+  position: static; /* Override any absolute positioning */
+  float: none;
+  display: inline-block;
+  margin-left: 0.5rem;
+  z-index: 10;
+}
+
+.similarity-modal .close-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.compare-button-container {
+  margin-top: 0.75rem;
+  text-align: right;
+}
+
+.compare-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.compare-button:hover {
+  background-color: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.similarity-warning {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.similarity-warning:hover {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+/* Method cards and details */
+.method-card {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.method-card.has-warnings {
+  border-color: var(--warning-border);
+}
+
+.method-header {
+  padding: 1rem;
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.method-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.methods-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.generate-all-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.generate-all-btn:hover {
+  background-color: var(--secondary-color);
+  transform: translateY(-2px);
+}
+
+.generate-description-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background-color 0.2s;
+}
+
+.generate-description-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+.method-ai-description {
+  padding: 1rem;
+  background-color: rgba(var(--primary-color-rgb), 0.05);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.method-ai-description p {
+  margin: 0.5rem 0;
+}
+
+.method-ai-description h1,
+.method-ai-description h2,
+.method-ai-description h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.method-ai-description code {
+  background-color: var(--code-bg);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.method-ai-description pre code {
+  display: block;
+  padding: 0.75rem;
+  overflow: auto;
+}
 `;
 
   await fs.writeFile(stylesPath, css);
@@ -790,12 +1316,12 @@ html, body {
 async function generateMainJs(mainJsPath: string): Promise<void> {
   const jsContent = `
 // Main React application for documentation
-const { useState, useEffect, Fragment, useMemo } = React;
+const { useState, useEffect, Fragment, useMemo, useRef } = React;
 
 // Component to visualize similarity between functions
 function SimilarityGraph(props) {
   const components = props.components;
-  const [selectedSimilarity, setSelectedSimilarity] = useState(null);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.85);
   const allSimilarities = useMemo(() => {
     // Collect all similarity warnings
     const similarities = [];
@@ -808,7 +1334,9 @@ function SimilarityGraph(props) {
               similarities.push({
                 sourceComponent: component.name,
                 sourceMethod: method.name,
+                sourceCode: method.code || '',
                 targetName: warning.similarTo,
+                targetCode: warning.code || '',
                 filePath: warning.filePath,
                 score: warning.score,
                 reason: warning.reason
@@ -823,10 +1351,14 @@ function SimilarityGraph(props) {
     return similarities.sort((a, b) => b.score - a.score);
   }, [components]);
 
-  // Filter to show only similarities above 60%
-  const displayedSimilarities = allSimilarities.filter(sim => sim.score >= 0.6);
+  // Filter to show only similarities above the threshold
+  const displayedSimilarities = allSimilarities.filter(sim => sim.score >= similarityThreshold);
 
-  if (displayedSimilarities.length === 0) {
+  const handleThresholdChange = (e) => {
+    setSimilarityThreshold(parseFloat(e.target.value));
+  };
+
+  if (allSimilarities.length === 0) {
     return React.createElement("div", { className: "no-similarities" }, "No similar methods found");
   }
 
@@ -834,7 +1366,26 @@ function SimilarityGraph(props) {
     "div",
     { className: "similarity-graph-container" },
     React.createElement("h3", null, "Method Similarity Analysis"),
-    React.createElement("p", null, "Showing ", displayedSimilarities.length, " method similarities with 60%+ similarity score"),
+    React.createElement(
+      "div",
+      { className: "similarity-controls" },
+      React.createElement(
+        "label",
+        { htmlFor: "similarity-threshold" },
+        "Similarity Threshold: ", Math.round(similarityThreshold * 100) + "%"
+      ),
+      React.createElement("input", {
+        id: "similarity-threshold",
+        type: "range",
+        min: "0.5",
+        max: "1",
+        step: "0.05",
+        value: similarityThreshold,
+        onChange: handleThresholdChange,
+        className: "similarity-slider"
+      })
+    ),
+    React.createElement("p", null, "Showing ", displayedSimilarities.length, " of ", allSimilarities.length, " method similarities"),
     React.createElement(
       "div",
       { className: "similarity-list" },
@@ -844,7 +1395,7 @@ function SimilarityGraph(props) {
           {
             key: "sim-" + index,
             className: "similarity-card",
-            onClick: () => setSelectedSimilarity(similarity)
+            onClick: () => props.onSelectSimilarity && props.onSelectSimilarity(similarity)
           },
           React.createElement(
             "div",
@@ -876,57 +1427,180 @@ function SimilarityGraph(props) {
           )
         )
       )
-    ),
-    selectedSimilarity && React.createElement(
-      "div",
-      { className: "similarity-modal" },
+    )
+  );
+}
+
+// Chat interface component
+function CodebaseChat({ components }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+
+    const userMessage = { role: 'user', content: inputValue };
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      // Format the history for the API call
+      const messageHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Make API call to the chat endpoint
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          history: messageHistory,
+          query: userMessage.content
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get chat response');
+      }
+
+      const data = await response.json();
+
+      // Add assistant message with the response
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { role: 'assistant', content: data.response }
+      ]);
+
+      // Update search results
+      setSearchResults(data.searchResults || []);
+    } catch (error) {
+      console.error('Error in chat:', error);
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { role: 'assistant', content: 'Sorry, there was an error processing your request.' }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderMessage = (message, index) => {
+    return React.createElement(
+      'div',
+      {
+        key: index,
+        className: \`chat-message \${message.role === 'user' ? 'user-message' : 'assistant-message'}\`
+      },
       React.createElement(
-        "div",
-        { className: "similarity-modal-content" },
-        React.createElement(
-          "button",
-          {
-            className: "close-button",
-            onClick: () => setSelectedSimilarity(null)
-          },
-          "✕"
-        ),
-        React.createElement("h3", null, "Similarity Details"),
-        React.createElement(
-          "div",
-          { className: "similarity-modal-score" },
-          Math.round(selectedSimilarity.score * 100) + "% Similar"
-        ),
-        React.createElement(
-          "div",
-          { className: "similarity-modal-methods" },
-          React.createElement(
-            "div",
-            { className: "similarity-source-method" },
-            React.createElement(
-              "h4",
-              null,
-              selectedSimilarity.sourceComponent + "." + selectedSimilarity.sourceMethod
-            ),
-            React.createElement(
-              "div",
-              { className: "similarity-file-path" },
-              selectedSimilarity.filePath
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "similarity-target-method" },
-            React.createElement("h4", null, selectedSimilarity.targetName)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "similarity-modal-reason" },
-          React.createElement("strong", null, "Reason:"),
-          " " + selectedSimilarity.reason
-        )
+        'div',
+        { className: 'message-content' },
+        message.role === 'assistant'
+          ? React.createElement('div', { dangerouslySetInnerHTML: { __html: marked.parse(message.content) } })
+          : message.content
       )
+    );
+  };
+
+  const renderSearchResult = (result, index) => {
+    return React.createElement(
+      'div',
+      { key: index, className: 'search-result' },
+      React.createElement(
+        'div',
+        { className: 'result-header' },
+        React.createElement('h4', null,
+          result.componentName + (result.methodName ? \`.\${result.methodName}\` : '')
+        ),
+        React.createElement('span', { className: 'similarity-score' },
+          Math.round(result.similarity * 100) + '% Match'
+        )
+      ),
+      React.createElement('div', { className: 'result-path' }, result.filePath),
+      React.createElement(
+        'pre',
+        { className: 'result-code' },
+        React.createElement('code', null, result.code)
+      )
+    );
+  };
+
+  // Render the chat bubble button when closed
+  if (!isOpen) {
+    return React.createElement(
+      'div',
+      { className: 'chat-bubble', onClick: () => setIsOpen(true) },
+      React.createElement('span', { className: 'chat-bubble-icon' }, '💬'),
+      React.createElement('span', { className: 'chat-bubble-text' }, 'Ask AI')
+    );
+  }
+
+  // Render the chat interface when open
+  return React.createElement(
+    'div',
+    { className: 'chat-widget' },
+    React.createElement(
+      'div',
+      { className: 'chat-header' },
+      React.createElement('h3', null, 'AI Code Assistant'),
+      React.createElement(
+        'button',
+        { className: 'close-button', onClick: () => setIsOpen(false) },
+        '✕'
+      )
+    ),
+    React.createElement(
+      'div',
+      { className: 'chat-messages' },
+      messages.length === 0 && React.createElement(
+        'div',
+        { className: 'welcome-message' },
+        'Ask me anything about the codebase!'
+      ),
+      messages.map(renderMessage),
+      isLoading && React.createElement(
+        'div',
+        { className: 'chat-message assistant-message' },
+        React.createElement('div', { className: 'message-content loading' }, 'Thinking...')
+      ),
+      React.createElement('div', { ref: messagesEndRef })
+    ),
+    React.createElement(
+      'form',
+      { className: 'chat-input', onSubmit: handleSubmit },
+      React.createElement('input', {
+        type: 'text',
+        placeholder: 'Ask a question about the codebase...',
+        value: inputValue,
+        onChange: (e) => setInputValue(e.target.value),
+        disabled: isLoading
+      }),
+      React.createElement(
+        'button',
+        { type: 'submit', disabled: isLoading },
+        'Send'
+      )
+    ),
+    searchResults.length > 0 && React.createElement(
+      'div',
+      { className: 'search-results' },
+      React.createElement('h3', null, 'Relevant Code'),
+      searchResults.map(renderSearchResult)
     )
   );
 }
@@ -936,6 +1610,8 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('components');
+  const [selectedSimilarity, setSelectedSimilarity] = useState(null);
+  const [expandedView, setExpandedView] = useState(false);
 
   useEffect(() => {
     // Initialize with component data
@@ -948,64 +1624,214 @@ function App() {
     }
   }, []);
 
+  // Function to render similarity modal for both views
+  const renderSimilarityModal = (similarityData) => {
+    return React.createElement(
+      "div",
+      { className: "similarity-modal" },
+      React.createElement(
+        "div",
+        {
+          className: "similarity-modal-content" + (expandedView ? " expanded" : "")
+        },
+        React.createElement(
+          "div",
+          { className: "similarity-modal-header" },
+          React.createElement(
+            "button",
+            {
+              className: "expand-button",
+              onClick: () => setExpandedView(!expandedView)
+            },
+            expandedView ? "Collapse" : "Expand"
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "close-button",
+              onClick: () => {
+                setSelectedSimilarity(null);
+                setExpandedView(false);
+              }
+            },
+            "✕"
+          )
+        ),
+        React.createElement("h3", null, "Similarity Details"),
+        React.createElement(
+          "div",
+          { className: "similarity-modal-score" },
+          Math.round(similarityData.score * 100) + "% Similar"
+        ),
+        React.createElement(
+          "div",
+          { className: "similarity-code-comparison" },
+          React.createElement(
+            "div",
+            { className: "code-panel" },
+            React.createElement(
+              "h4",
+              null,
+              similarityData.sourceComponent + "." + similarityData.sourceMethod
+            ),
+            React.createElement(
+              "pre",
+              { className: "code-block" },
+              similarityData.sourceCode
+            )
+          ),
+          React.createElement(
+            "div",
+            { className: "code-panel" },
+            React.createElement(
+              "h4",
+              null,
+              similarityData.targetName
+            ),
+            React.createElement(
+              "pre",
+              { className: "code-block" },
+              similarityData.targetCode
+            )
+          )
+        )
+      )
+    );
+  }
+
   // Filter components based on search term
   const filteredComponents = components.filter(component =>
     component.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Function to render a similarity warning
-  const renderSimilarityWarning = (warning) => React.createElement(
-    "div",
-    { className: "similarity-warning" },
-    React.createElement(
-      "div",
-      { className: "similarity-header" },
-      React.createElement(
-        "span",
-        { className: "similarity-badge" },
-        Math.round(warning.score * 100) + "% Similar"
-      ),
-      React.createElement(
-        "span",
-        { className: "similarity-name" },
-        warning.similarTo
-      )
-    ),
-    React.createElement("div", { className: "similarity-reason" }, warning.reason),
-    React.createElement("div", { className: "similarity-file" }, warning.filePath)
-  );
-
-  // Function to render a method with similarity warnings
-  const renderMethod = (method, componentName) => {
-    const hasSimilarities = method.similarityWarnings && method.similarityWarnings.length > 0;
+  // Function to render a similarity warning with enhanced functionality
+  const renderSimilarityWarning = (warning, sourceComponent, sourceMethod, sourceCode) => {
+    const similarityData = {
+      sourceComponent: sourceComponent,
+      sourceMethod: sourceMethod,
+      sourceCode: sourceCode || "",
+      targetName: warning.similarTo,
+      targetCode: warning.code || "",
+      filePath: warning.filePath,
+      score: warning.score,
+      reason: warning.reason
+    };
 
     return React.createElement(
       "div",
       {
-        className: "method " + (hasSimilarities ? "has-similarities" : ""),
-        key: method.name
+        className: "similarity-warning",
+        onClick: (e) => {
+          e.stopPropagation();
+          setSelectedSimilarity(similarityData);
+        }
       },
       React.createElement(
         "div",
-        { className: "method-header" },
+        { className: "similarity-header" },
         React.createElement(
-          "h4",
-          { className: "method-name" },
-          method.name,
-          hasSimilarities && React.createElement(
-            "span",
-            {
-              className: "method-similarity-badge",
-              title: "Has similar methods"
-            },
-            method.similarityWarnings.length
-          )
+          "span",
+          { className: "similarity-badge" },
+          Math.round(warning.score * 100) + "% Similar"
         ),
         React.createElement(
-          "div",
-          { className: "method-signature" },
-          "(" + method.params.map(p => p.name + ": " + p.type).join(", ") + ")",
-          method && method.returnType && ": " + method.returnType
+          "span",
+          { className: "similarity-name" },
+          warning.similarTo
+        )
+      ),
+      React.createElement("div", { className: "similarity-reason" }, warning.reason),
+      React.createElement("div", { className: "similarity-file" }, warning.filePath),
+      React.createElement(
+        "div",
+        { className: "compare-button-container" },
+        React.createElement(
+          "button",
+          {
+            className: "compare-button",
+            onClick: (e) => {
+              e.stopPropagation();
+              setSelectedSimilarity(similarityData);
+            }
+          },
+          "Compare Code"
+        )
+      )
+    );
+  };
+
+  // Function to render a method
+  const renderMethod = (method, componentName) => {
+    // Skip methods with no code
+    if (!method.code || method.code.trim() === '') {
+      return null;
+    }
+
+    const hasSimilarities = method.similarityWarnings && method.similarityWarnings.length > 0;
+
+    return React.createElement(
+      'div',
+      {
+        className: 'method-card' + (hasSimilarities ? ' has-warnings' : ''),
+        'data-method': method.name,
+        'data-component': componentName
+      },
+      React.createElement(
+        'div',
+        { className: 'method-header' },
+        React.createElement('h3', null, method.name),
+        React.createElement(
+          'div',
+          { className: 'method-controls' },
+          React.createElement(
+            'button',
+            {
+              className: 'generate-description-btn',
+              onClick: (e) => {
+                e.preventDefault();
+                // Define an inner function that has access to the correct component and method
+                (async () => {
+                  try {
+                    // Show a loading indicator
+                    const methodElement = e.currentTarget.closest('.method-card');
+                    let descriptionEl = methodElement.querySelector('.method-ai-description');
+
+                    if (!descriptionEl) {
+                      descriptionEl = document.createElement('div');
+                      descriptionEl.className = 'method-ai-description';
+                      methodElement.querySelector('.method-header').after(descriptionEl);
+                    }
+
+                    descriptionEl.innerHTML = 'Generating description...';
+
+                    const response = await fetch('/api/chat', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        history: [],
+                        query: "Generate a concise, technical description of this " + componentName + "." + method.name + " method: \\n\\n" + method.code
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to generate description');
+                    }
+
+                    const data = await response.json();
+
+                    // Use the marked library to parse markdown
+                    descriptionEl.innerHTML = window.marked.parse(data.response);
+                  } catch (error) {
+                    console.error('Error generating description:', error);
+                    alert('Failed to generate description. Please try again later.');
+                  }
+                })();
+              }
+            },
+            '✨ Generate Description'
+          )
         )
       ),
       method.description && React.createElement(
@@ -1020,7 +1846,7 @@ function App() {
         method.similarityWarnings.map((warning, i) => React.createElement(
           "div",
           { key: "similarity-" + i, className: "similarity-item" },
-          renderSimilarityWarning(warning)
+          renderSimilarityWarning(warning, componentName, method.name, method.code)
         ))
       ),
       method.code && React.createElement(
@@ -1159,7 +1985,78 @@ function App() {
     component.methods && component.methods.length > 0 && React.createElement(
       "div",
       { className: "component-section" },
-      React.createElement("h3", null, "Methods"),
+      React.createElement(
+        "div",
+        { className: "methods-header" },
+        React.createElement("h3", null, "Methods"),
+        React.createElement(
+          "button",
+          {
+            className: "generate-all-btn",
+            onClick: async () => {
+              if (!component.methods || component.methods.length === 0) return;
+
+              // Get all method elements
+              const methodCards = document.querySelectorAll('.method-card');
+
+              for (const methodCard of methodCards) {
+                // Extract method name and component name from data attributes
+                const methodName = methodCard.getAttribute('data-method');
+                const componentName = methodCard.getAttribute('data-component');
+
+                if (!methodName || !componentName) continue;
+
+                // Find the method in the component's methods array
+                const method = component.methods.find(m => m.name === methodName);
+                if (!method || !method.code) continue;
+
+                try {
+                  // Show a loading indicator
+                  let descriptionEl = methodCard.querySelector('.method-ai-description');
+                  if (!descriptionEl) {
+                    descriptionEl = document.createElement('div');
+                    descriptionEl.className = 'method-ai-description';
+                    methodCard.querySelector('.method-header').after(descriptionEl);
+                  }
+                  descriptionEl.innerHTML = 'Generating description...';
+
+                  // Make API call
+                  const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      history: [],
+                      query: "Generate a concise, technical description of this " + componentName + "." + methodName + " method: \\n\\n" + method.code
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error('Failed to generate description');
+                  }
+
+                  const data = await response.json();
+
+                  // Update the description with the result
+                  descriptionEl.innerHTML = window.marked.parse(data.response);
+                } catch (error) {
+                  console.error("Error generating description for " + methodName + ":", error);
+                  // Show error in the description element if it exists
+                  const descriptionEl = methodCard.querySelector('.method-ai-description');
+                  if (descriptionEl) {
+                    descriptionEl.innerHTML = 'Error generating description. Please try again.';
+                  }
+                }
+
+                // Add a small delay between requests to avoid overwhelming the server
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+          },
+          "✨ Generate All Descriptions"
+        )
+      ),
       React.createElement(
         "div",
         { className: "methods-list" },
@@ -1249,15 +2146,19 @@ function App() {
         ) : React.createElement(
           "div",
           { className: "similarities-view" },
-          React.createElement(SimilarityGraph, { components: components })
+          React.createElement(SimilarityGraph, { components: components, onSelectSimilarity: setSelectedSimilarity })
         )
       )
     ),
+    // Show modal if a similarity is selected
+    selectedSimilarity && renderSimilarityModal(selectedSimilarity),
     React.createElement(
       "footer",
       { className: "app-footer" },
       React.createElement("p", null, "Generated with Recursive React Docs AI")
-    )
+    ),
+    // Add the floating chat bubble
+    React.createElement(CodebaseChat, { components: components })
   );
 }
 

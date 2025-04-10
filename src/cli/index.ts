@@ -13,6 +13,7 @@ import {
   generateDocumentation,
   DocumentationOptions,
   parseComponents,
+  ComponentDefinition,
 } from "../index";
 import { AiDescriptionGenerator } from "../ai/generator";
 import { DocumentationConfig } from "../core/types";
@@ -75,6 +76,17 @@ program
     "--ollama-model <model>",
     "Model to use with Ollama",
     process.env.OLLAMA_MODEL || "nomic-embed-text:latest"
+  )
+  .option("--enable-chat", "Enable chat functionality", true)
+  .option(
+    "--chat-model <model>",
+    "Model to use for chat",
+    process.env.CHAT_MODEL || "gemma3:27b"
+  )
+  .option(
+    "--port <number>",
+    "Port to use for the server",
+    process.env.PORT || "3000"
   )
   .action(async (rootDir: string, options: any) => {
     try {
@@ -189,67 +201,61 @@ program
         description: options.description,
         theme: (options.theme as "light" | "dark" | "auto") || "light",
         openBrowser: options.open,
-        port: options.port ? parseInt(options.port) : 8080,
+        port: options.port ? parseInt(options.port) : 3000,
         apiKey: options.apiKey,
         similarityThreshold: similarityThreshold,
         useOllama: options.useOllama,
         ollamaUrl: options.ollamaUrl,
         ollamaModel: options.ollamaModel,
+        enableChat: options.enableChat,
+        chatModel: options.chatModel,
       });
       spinner.succeed(`Documentation generated at ${chalk.green(outputPath)}`);
 
-      // // Open browser if enabled
-      // if (options.open) {
-      //   const port = parseInt(options.port, 10) || 3000;
-      //   spinner.start(`Starting server on port ${port}`);
-      //
-      //   const server = http.createServer((req, res) => {
-      //     // Handle URL parameters
-      //     const url = req.url?.split("?")[0] || "";
-      //     const filePath = path.join(outputPath, url || "index.html");
-      //
-      //     fs.readFile(filePath, (err, data) => {
-      //       if (err) {
-      //         res.writeHead(404);
-      //         res.end("File not found");
-      //         return;
-      //       }
-      //
-      //       // Set content type based on file extension
-      //       const ext = path.extname(filePath).toLowerCase();
-      //       const contentType =
-      //         {
-      //           ".html": "text/html",
-      //           ".js": "text/javascript",
-      //           ".css": "text/css",
-      //           ".json": "application/json",
-      //           ".png": "image/png",
-      //           ".jpg": "image/jpg",
-      //           ".gif": "image/gif",
-      //         }[ext] || "text/plain";
-      //
-      //       res.writeHead(200, { "Content-Type": contentType });
-      //       res.end(data);
-      //     });
-      //   });
-      //
-      //   server.listen(port);
-      //   spinner.succeed(`Server started at http://localhost:${port}`);
-      //   await openBrowser(`http://localhost:${port}`);
-      //   console.log(
-      //     `${chalk.green(
-      //       "✓"
-      //     )} Done! You can view your documentation at ${chalk.cyan(outputPath)}`
-      //   );
-      //   console.log(chalk.yellow("Press Ctrl+C to stop the server"));
-      // } else {
-      // Always log the command to view, as the shell script handles serving/opening
-      console.log(
-        chalk.green("✨"),
-        chalk.white(`To view the documentation, run:`),
-        chalk.cyan(`npx http-server ${outputPath} -o -p <port>`)
-      );
-      // }
+      // Add enableChat option
+      options.enableChat =
+        options.enableChat !== undefined ? options.enableChat : true;
+
+      // Start server if open is enabled
+      if (options.open) {
+        spinner.start(`Starting server on port ${options.port || 3000}...`);
+        const parsedPort = options.port ? parseInt(options.port, 10) : 3000;
+
+        const server = await startServer(outputPath, parsedPort, components, {
+          rootDir: absoluteRootDir,
+          componentPath: options.component,
+          apiKey: options.apiKey,
+          useOllama: options.useOllama,
+          ollamaUrl: options.ollamaUrl,
+          ollamaModel: options.ollamaModel,
+          enableChat: options.enableChat,
+          chatModel: options.chatModel,
+        });
+
+        spinner.succeed(`Server started at http://localhost:${parsedPort}`);
+        await openBrowser(`http://localhost:${parsedPort}`);
+
+        console.log(
+          `${chalk.green(
+            "✓"
+          )} Done! You can view your documentation at ${chalk.cyan(
+            `http://localhost:${parsedPort}`
+          )}`
+        );
+        console.log(chalk.yellow("Press Ctrl+C to stop the server"));
+
+        // Add event listener for cleanup
+        process.on("SIGINT", () => {
+          server.close();
+          process.exit(0);
+        });
+      } else {
+        console.log(
+          chalk.green("✨"),
+          chalk.white(`To view the documentation, run:`),
+          chalk.cyan(`npx http-server ${outputPath} -o -p <port>`)
+        );
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -274,3 +280,106 @@ async function openBrowser(url: string) {
 
 // Get version from package.json
 const packageJsonPath = path.join(__dirname, "../../package.json");
+
+// Create and start a server to serve the documentation
+async function startServer(
+  outputPath: string,
+  port: number,
+  components: ComponentDefinition[],
+  options: DocumentationOptions
+): Promise<http.Server> {
+  const { apiKey, useOllama, ollamaUrl, ollamaModel, chatModel } = options;
+
+  // Create a chat service if enabled
+  let chatService: any = null;
+  if (options.enableChat) {
+    const { CodebaseChatService } = await import("../ai/chat-service");
+    chatService = new CodebaseChatService(components, {
+      apiKey,
+      useOllama,
+      ollamaUrl,
+      ollamaModel,
+      chatModel,
+    });
+  }
+
+  const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url || "", true);
+    const pathname = parsedUrl.pathname || "";
+
+    // Handle API requests
+    if (pathname === "/api/chat" && req.method === "POST" && chatService) {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on("end", async () => {
+        try {
+          const { history, query } = JSON.parse(body);
+
+          const result = await chatService.chat(history, query);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          console.error("Error handling chat request:", error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Internal server error" }));
+        }
+      });
+
+      return;
+    }
+
+    // Handle static file requests
+    const filePath = path.join(
+      outputPath,
+      pathname === "/" ? "index.html" : pathname
+    );
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        // If the file doesn't exist, serve index.html (for SPA routing)
+        if (err.code === "ENOENT" && !pathname.includes(".")) {
+          fs.readFile(path.join(outputPath, "index.html"), (err, data) => {
+            if (err) {
+              res.writeHead(404);
+              res.end("Not Found");
+              return;
+            }
+
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end(data);
+          });
+          return;
+        }
+
+        res.writeHead(404);
+        res.end("Not Found");
+        return;
+      }
+
+      // Set content type based on file extension
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType =
+        {
+          ".html": "text/html",
+          ".js": "text/javascript",
+          ".css": "text/css",
+          ".json": "application/json",
+          ".png": "image/png",
+          ".jpg": "image/jpg",
+          ".gif": "image/gif",
+        }[ext] || "text/plain";
+
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(data);
+    });
+  });
+
+  server.listen(port);
+  console.log(`Server started at http://localhost:${port}`);
+
+  return server;
+}

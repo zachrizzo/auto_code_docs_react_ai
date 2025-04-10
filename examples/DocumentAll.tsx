@@ -17,6 +17,7 @@ import RecursiveExamples, {
 } from './RecursiveExamples';
 import UseRecursiveExamples from './UseRecursiveExamples';
 import FibonacciExample, { fibonacci } from './Fibonacci';
+import HealthcareDashboard, { Patient, MedicalRecord, PatientStatus, Department } from './HealthcareDashboard';
 
 /**
  * This component brings together all the components, functions and examples
@@ -33,6 +34,48 @@ const DocumentAll: React.FC = () => {
         { id: '1', text: 'Example comment', author: 'User', replies: [] }
     ];
 
+    // Demo patient for healthcare dashboard
+    const demoPatient: Patient = {
+        id: 'P1001',
+        name: 'John Doe',
+        age: 45,
+        gender: 'male',
+        status: 'admitted',
+        department: 'cardiology',
+        roomNumber: '301',
+        assignedDoctor: 'Dr. Smith',
+        admissionDate: '2023-05-15',
+        expectedDischargeDate: '2023-05-22',
+        diagnosis: 'Hypertension',
+        medicalRecords: [
+            {
+                id: 'REC1001',
+                type: 'lab',
+                date: '2023-05-16',
+                description: 'Comprehensive Metabolic Panel',
+                provider: 'Dr. Johnson',
+                values: [
+                    {
+                        name: 'Glucose',
+                        value: 95,
+                        unit: 'mg/dL',
+                        normalRange: { min: 70, max: 100 }
+                    }
+                ]
+            }
+        ],
+        insurance: {
+            provider: 'Blue Cross',
+            policyNumber: 'BC12345',
+            coveragePercentage: 80
+        },
+        emergencyContact: {
+            name: 'Jane Doe',
+            relationship: 'Spouse',
+            phone: '(555) 123-4567'
+        }
+    };
+
     // This component is never actually rendered, it just exists to document everything
     return (
         <div>
@@ -41,14 +84,48 @@ const DocumentAll: React.FC = () => {
             {/* Standard App Components */}
             <App title="Example App" showRecursiveExamples={true} />
             <Todo
-                initialTodos={[{ id: '1', text: 'Test Todo', completed: false }]}
+                initialTodos={[
+                    {
+                        id: '1',
+                        text: 'Test Todo',
+                        completed: false,
+                        priority: 'high',
+                        category: 'work',
+                        dueDate: '2023-06-30',
+                        createdAt: '2023-06-01'
+                    }
+                ]}
                 onTodoAdded={(todo) => console.log(todo)}
                 title="Example Todos"
+                darkMode={false}
+                enableStorage={true}
             />
             <TodoItem
-                todo={{ id: '1', text: 'Test Todo', completed: false }}
+                todo={{
+                    id: '1',
+                    text: 'Test Todo',
+                    completed: false,
+                    priority: 'high',
+                    category: 'work',
+                    dueDate: '2023-06-30',
+                    createdAt: '2023-06-01'
+                }}
                 onToggle={() => { }}
                 onDelete={() => { }}
+                onUpdatePriority={() => { }}
+                onUpdateCategory={() => { }}
+                onUpdateDueDate={() => { }}
+                onAddNotes={() => { }}
+                categories={['work', 'personal', 'shopping', 'health', 'other']}
+            />
+
+            {/* Healthcare Dashboard Example */}
+            <HealthcareDashboard
+                initialPatients={[demoPatient]}
+                adminMode={true}
+                currentUser="Dr. Administrator"
+                departmentFilter="cardiology"
+                onPatientSelect={(patient) => console.log(`Selected patient: ${patient.id}`)}
             />
 
             {/* Recursive Examples */}

@@ -11,6 +11,7 @@ export interface SimilarityWarning {
   score: number;
   reason: string;
   filePath: string;
+  code?: string;
 }
 
 export interface ComponentDefinition {
