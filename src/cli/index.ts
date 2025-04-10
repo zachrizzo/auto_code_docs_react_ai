@@ -2,6 +2,7 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import * as fsExtra from "fs-extra";
 import * as http from "http";
 import { Command } from "commander";
 import * as url from "url";
@@ -88,6 +89,14 @@ program
     "Port to use for the server",
     process.env.PORT || "3000"
   )
+  .option("-p, --port <port>", "Port to serve documentation")
+  .option("-s, --similarity <threshold>", "Similarity threshold")
+  .option("--use-ollama", "Use Ollama for embeddings")
+  .option("--ollama-url <url>", "URL for Ollama server")
+  .option("--ollama-model <model>", "Model for Ollama")
+  .option("--enable-chat", "Enable chat functionality (default: true)")
+  .option("--chat-model <model>", "Model for chat functionality")
+  .option("--cache-dir <path>", "Path to cache directory for documentation")
   .action(async (rootDir: string, options: any) => {
     try {
       const spinner = ora("Generating documentation...").start();
@@ -161,8 +170,21 @@ program
           spinner.info("Skipping AI description generation.");
         } else {
           try {
+            // Default cache path or user specified
+            const cacheDir =
+              options.cacheDir || path.join(process.cwd(), ".docs-cache");
+            const cachePath = path.join(cacheDir, "docs-cache.json");
+
+            // Ensure cache directory exists
+            try {
+              await fsExtra.mkdirp(cacheDir);
+            } catch (error) {
+              // Ignore directory already exists errors
+            }
+
             const aiGenerator = new AiDescriptionGenerator({
               apiKey,
+              cachePath,
             });
 
             const enhancedComponents =

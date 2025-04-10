@@ -27,6 +27,7 @@ export interface DocumentationOptions extends ParserOptions {
   ollamaModel?: string;
   enableChat?: boolean;
   chatModel?: string;
+  cachePath?: string; // Path for documentation cache
 }
 
 export {
@@ -69,6 +70,7 @@ export async function generateDocumentation(
     useOllama = false, // Use Ollama for local embeddings instead of OpenAI
     ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434",
     ollamaModel = process.env.OLLAMA_MODEL || "nomic-embed-text:latest", // Default from shell script
+    cachePath = path.join(process.cwd(), ".docs-cache", "docs-cache.json"), // Default cache path
   } = options;
 
   // Parse components
@@ -108,6 +110,18 @@ export async function generateDocumentation(
     openBrowser,
     port,
   });
+
+  // If API key is provided, enhance components with AI descriptions
+  if (apiKey) {
+    const aiGenerator = new AiDescriptionGenerator({
+      apiKey,
+      cachePath,
+      model: options.chatModel,
+    });
+
+    // Enhance with descriptions
+    await aiGenerator.enhanceComponentsWithDescriptions(uniqueComponents);
+  }
 
   return absoluteOutputDir;
 }
