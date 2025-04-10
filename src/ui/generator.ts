@@ -124,15 +124,15 @@ async function generateIndexHtml(
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- React 18 script tags - using production version -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 </head>
 <body>
   <div id="app"></div>
 
   <script src="data.js"></script>
-  <script src="main.js" type="text/babel"></script>
+  <script src="main.js"></script>
 </body>
 </html>`;
 
@@ -793,7 +793,8 @@ async function generateMainJs(mainJsPath: string): Promise<void> {
 const { useState, useEffect, Fragment, useMemo } = React;
 
 // Component to visualize similarity between functions
-function SimilarityGraph({ components }) {
+function SimilarityGraph(props) {
+  const components = props.components;
   const [selectedSimilarity, setSelectedSimilarity] = useState(null);
   const allSimilarities = useMemo(() => {
     // Collect all similarity warnings
@@ -826,59 +827,107 @@ function SimilarityGraph({ components }) {
   const displayedSimilarities = allSimilarities.filter(sim => sim.score >= 0.6);
 
   if (displayedSimilarities.length === 0) {
-    return <div className="no-similarities">No similar methods found</div>;
+    return React.createElement("div", { className: "no-similarities" }, "No similar methods found");
   }
 
-  return (
-    <div className="similarity-graph-container">
-      <h3>Method Similarity Analysis</h3>
-      <p>Showing {displayedSimilarities.length} method similarities with 60%+ similarity score</p>
-
-      <div className="similarity-list">
-        {displayedSimilarities.map((similarity, index) => (
-          <div
-            key={\`sim-\${index}\`}
-            className="similarity-card"
-            onClick={() => setSelectedSimilarity(similarity)}
-          >
-            <div className="similarity-header">
-              <span className="similarity-score">{Math.round(similarity.score * 100)}%</span>
-              <span className="similarity-title">
-                {similarity.sourceComponent}.{similarity.sourceMethod} ↔ {similarity.targetName}
-              </span>
-            </div>
-            <div className="similarity-details">
-              <div className="similarity-source">From: {similarity.filePath}</div>
-              <div className="similarity-reason">{similarity.reason}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {selectedSimilarity && (
-        <div className="similarity-modal">
-          <div className="similarity-modal-content">
-            <button className="close-button" onClick={() => setSelectedSimilarity(null)}>✕</button>
-            <h3>Similarity Details</h3>
-            <div className="similarity-modal-score">
-              {Math.round(selectedSimilarity.score * 100)}% Similar
-            </div>
-            <div className="similarity-modal-methods">
-              <div className="similarity-source-method">
-                <h4>{selectedSimilarity.sourceComponent}.{selectedSimilarity.sourceMethod}</h4>
-                <div className="similarity-file-path">{selectedSimilarity.filePath}</div>
-              </div>
-              <div className="similarity-target-method">
-                <h4>{selectedSimilarity.targetName}</h4>
-              </div>
-            </div>
-            <div className="similarity-modal-reason">
-              <strong>Reason:</strong> {selectedSimilarity.reason}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+  return React.createElement(
+    "div",
+    { className: "similarity-graph-container" },
+    React.createElement("h3", null, "Method Similarity Analysis"),
+    React.createElement("p", null, "Showing ", displayedSimilarities.length, " method similarities with 60%+ similarity score"),
+    React.createElement(
+      "div",
+      { className: "similarity-list" },
+      displayedSimilarities.map((similarity, index) =>
+        React.createElement(
+          "div",
+          {
+            key: "sim-" + index,
+            className: "similarity-card",
+            onClick: () => setSelectedSimilarity(similarity)
+          },
+          React.createElement(
+            "div",
+            { className: "similarity-header" },
+            React.createElement(
+              "span",
+              { className: "similarity-score" },
+              Math.round(similarity.score * 100) + "%"
+            ),
+            React.createElement(
+              "span",
+              { className: "similarity-title" },
+              similarity.sourceComponent + "." + similarity.sourceMethod + " ↔ " + similarity.targetName
+            )
+          ),
+          React.createElement(
+            "div",
+            { className: "similarity-details" },
+            React.createElement(
+              "div",
+              { className: "similarity-source" },
+              "From: " + similarity.filePath
+            ),
+            React.createElement(
+              "div",
+              { className: "similarity-reason" },
+              similarity.reason
+            )
+          )
+        )
+      )
+    ),
+    selectedSimilarity && React.createElement(
+      "div",
+      { className: "similarity-modal" },
+      React.createElement(
+        "div",
+        { className: "similarity-modal-content" },
+        React.createElement(
+          "button",
+          {
+            className: "close-button",
+            onClick: () => setSelectedSimilarity(null)
+          },
+          "✕"
+        ),
+        React.createElement("h3", null, "Similarity Details"),
+        React.createElement(
+          "div",
+          { className: "similarity-modal-score" },
+          Math.round(selectedSimilarity.score * 100) + "% Similar"
+        ),
+        React.createElement(
+          "div",
+          { className: "similarity-modal-methods" },
+          React.createElement(
+            "div",
+            { className: "similarity-source-method" },
+            React.createElement(
+              "h4",
+              null,
+              selectedSimilarity.sourceComponent + "." + selectedSimilarity.sourceMethod
+            ),
+            React.createElement(
+              "div",
+              { className: "similarity-file-path" },
+              selectedSimilarity.filePath
+            )
+          ),
+          React.createElement(
+            "div",
+            { className: "similarity-target-method" },
+            React.createElement("h4", null, selectedSimilarity.targetName)
+          )
+        ),
+        React.createElement(
+          "div",
+          { className: "similarity-modal-reason" },
+          React.createElement("strong", null, "Reason:"),
+          " " + selectedSimilarity.reason
+        )
+      )
+    )
   );
 }
 
@@ -890,7 +939,13 @@ function App() {
 
   useEffect(() => {
     // Initialize with component data
-    setComponents(window.COMPONENT_DATA || []);
+    console.log("Mounting App component");
+    if (window.COMPONENT_DATA) {
+      console.log("Found component data:", window.COMPONENT_DATA.length, "components");
+      setComponents(window.COMPONENT_DATA);
+    } else {
+      console.error("No component data found - window.COMPONENT_DATA is undefined");
+    }
   }, []);
 
   // Filter components based on search term
@@ -899,61 +954,80 @@ function App() {
   );
 
   // Function to render a similarity warning
-  const renderSimilarityWarning = (warning) => (
-    <div className="similarity-warning">
-      <div className="similarity-header">
-        <span className="similarity-badge">
-          {Math.round(warning.score * 100)}% Similar
-        </span>
-        <span className="similarity-name">{warning.similarTo}</span>
-      </div>
-      <div className="similarity-reason">{warning.reason}</div>
-      <div className="similarity-file">{warning.filePath}</div>
-    </div>
+  const renderSimilarityWarning = (warning) => React.createElement(
+    "div",
+    { className: "similarity-warning" },
+    React.createElement(
+      "div",
+      { className: "similarity-header" },
+      React.createElement(
+        "span",
+        { className: "similarity-badge" },
+        Math.round(warning.score * 100) + "% Similar"
+      ),
+      React.createElement(
+        "span",
+        { className: "similarity-name" },
+        warning.similarTo
+      )
+    ),
+    React.createElement("div", { className: "similarity-reason" }, warning.reason),
+    React.createElement("div", { className: "similarity-file" }, warning.filePath)
   );
 
   // Function to render a method with similarity warnings
   const renderMethod = (method, componentName) => {
     const hasSimilarities = method.similarityWarnings && method.similarityWarnings.length > 0;
 
-    return (
-      <div className={\`method \${hasSimilarities ? 'has-similarities' : ''}\`} key={method.name}>
-        <div className="method-header">
-          <h4 className="method-name">
-            {method.name}
-            {hasSimilarities &&
-              <span className="method-similarity-badge" title="Has similar methods">
-                {method.similarityWarnings.length}
-              </span>
-            }
-          </h4>
-          <div className="method-signature">
-            ({method.params.map(p => \`\${p.name}: \${p.type}\`).join(', ')})
-            {method && method.returnType && \`: \${method.returnType}\`}
-          </div>
-        </div>
-
-        {method.description &&
-          <div className="method-description">{method.description}</div>
-        }
-
-        {hasSimilarities && (
-          <div className="method-similarities">
-            <h5>Similar Methods:</h5>
-            {method.similarityWarnings.map((warning, i) => (
-              <div key={\`similarity-\${i}\`} className="similarity-item">
-                {renderSimilarityWarning(warning)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {method.code && (
-          <pre className="method-code">
-            <code className="language-javascript">{method.code}</code>
-          </pre>
-        )}
-      </div>
+    return React.createElement(
+      "div",
+      {
+        className: "method " + (hasSimilarities ? "has-similarities" : ""),
+        key: method.name
+      },
+      React.createElement(
+        "div",
+        { className: "method-header" },
+        React.createElement(
+          "h4",
+          { className: "method-name" },
+          method.name,
+          hasSimilarities && React.createElement(
+            "span",
+            {
+              className: "method-similarity-badge",
+              title: "Has similar methods"
+            },
+            method.similarityWarnings.length
+          )
+        ),
+        React.createElement(
+          "div",
+          { className: "method-signature" },
+          "(" + method.params.map(p => p.name + ": " + p.type).join(", ") + ")",
+          method && method.returnType && ": " + method.returnType
+        )
+      ),
+      method.description && React.createElement(
+        "div",
+        { className: "method-description" },
+        method.description
+      ),
+      hasSimilarities && React.createElement(
+        "div",
+        { className: "method-similarities" },
+        React.createElement("h5", null, "Similar Methods:"),
+        method.similarityWarnings.map((warning, i) => React.createElement(
+          "div",
+          { key: "similarity-" + i, className: "similarity-item" },
+          renderSimilarityWarning(warning)
+        ))
+      ),
+      method.code && React.createElement(
+        "pre",
+        { className: "method-code" },
+        React.createElement("code", { className: "language-javascript" }, method.code)
+      )
     );
   };
 
@@ -962,193 +1036,266 @@ function App() {
     const hasMethodsWithSimilarities = component.methods &&
       component.methods.some(m => m.similarityWarnings && m.similarityWarnings.length > 0);
 
-    return (
-      <div
-        className={\`component-card \${hasMethodsWithSimilarities ? 'has-similarities' : ''}\`}
-        key={component.name}
-        onClick={() => setSelectedComponent(component)}
-      >
-        <h3 className="component-name">
-          {component.name}
-          {hasMethodsWithSimilarities &&
-            <span className="similarity-indicator" title="Contains similar methods">⚠</span>
-          }
-        </h3>
-        {component.description &&
-          <p className="component-description">{component.description}</p>
-        }
-        <div className="component-meta">
-          <span className="meta-item">
-            Props: <strong>{component.props.length}</strong>
-          </span>
-          <span className="meta-item">
-            Methods: <strong>{component.methods ? component.methods.length : 0}</strong>
-          </span>
-          {hasMethodsWithSimilarities && (
-            <span className="meta-item warning">
-              Similar Methods Found
-            </span>
-          )}
-        </div>
-      </div>
+    return React.createElement(
+      "div",
+      {
+        className: "component-card " + (hasMethodsWithSimilarities ? "has-similarities" : ""),
+        key: component.name,
+        onClick: () => setSelectedComponent(component)
+      },
+      React.createElement(
+        "h3",
+        { className: "component-name" },
+        component.name,
+        hasMethodsWithSimilarities && React.createElement(
+          "span",
+          {
+            className: "similarity-indicator",
+            title: "Contains similar methods"
+          },
+          "⚠"
+        )
+      ),
+      component.description && React.createElement(
+        "p",
+        { className: "component-description" },
+        component.description
+      ),
+      React.createElement(
+        "div",
+        { className: "component-meta" },
+        React.createElement(
+          "span",
+          { className: "meta-item" },
+          "Props: ",
+          React.createElement("strong", null, component.props.length)
+        ),
+        React.createElement(
+          "span",
+          { className: "meta-item" },
+          "Methods: ",
+          React.createElement("strong", null, component.methods ? component.methods.length : 0)
+        ),
+        hasMethodsWithSimilarities && React.createElement(
+          "span",
+          { className: "meta-item warning" },
+          "Similar Methods Found"
+        )
+      )
     );
   };
 
   // Render component details
-  const renderComponentDetails = (component) => (
-    <div className="component-details">
-      <div className="details-header">
-        <button className="back-button" onClick={() => setSelectedComponent(null)}>
-          ← Back to Components
-        </button>
-        <h2 className="component-title">{component.name}</h2>
-      </div>
-
-      {component.description && (
-        <div className="component-description">
-          <p>{component.description}</p>
-        </div>
-      )}
-
-      <div className="component-filepath">
-        <strong>File:</strong> {component.filePath}
-      </div>
-
-      {component.props.length > 0 && (
-        <div className="component-section">
-          <h3>Props</h3>
-          <table className="props-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Required</th>
-                <th>Default</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {component.props.map(prop => (
-                <tr key={prop.name}>
-                  <td className="prop-name">{prop.name}</td>
-                  <td className="prop-type"><code>{prop.type}</code></td>
-                  <td className="prop-required">{prop.required ? '✓' : ''}</td>
-                  <td className="prop-default">
-                    {prop.defaultValue !== undefined ? <code>{String(prop.defaultValue)}</code> : ''}
-                  </td>
-                  <td className="prop-description">{prop.description || ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {component.methods && component.methods.length > 0 && (
-        <div className="component-section">
-          <h3>Methods</h3>
-          <div className="methods-list">
-            {component.methods.map(method => renderMethod(method, component.name))}
-          </div>
-        </div>
-      )}
-
-      {component.sourceCode && (
-        <div className="component-section">
-          <h3>Source Code</h3>
-          <pre className="source-code">
-            <code className="language-javascript">{component.sourceCode}</code>
-          </pre>
-        </div>
-      )}
-    </div>
+  const renderComponentDetails = (component) => React.createElement(
+    "div",
+    { className: "component-details" },
+    React.createElement(
+      "div",
+      { className: "details-header" },
+      React.createElement(
+        "button",
+        {
+          className: "back-button",
+          onClick: () => setSelectedComponent(null)
+        },
+        "← Back to Components"
+      ),
+      React.createElement("h2", { className: "component-title" }, component.name)
+    ),
+    component.description && React.createElement(
+      "div",
+      { className: "component-description" },
+      React.createElement("p", null, component.description)
+    ),
+    React.createElement(
+      "div",
+      { className: "component-filepath" },
+      React.createElement("strong", null, "File:"),
+      " " + component.filePath
+    ),
+    component.props.length > 0 && React.createElement(
+      "div",
+      { className: "component-section" },
+      React.createElement("h3", null, "Props"),
+      React.createElement(
+        "table",
+        { className: "props-table" },
+        React.createElement(
+          "thead",
+          null,
+          React.createElement(
+            "tr",
+            null,
+            React.createElement("th", null, "Name"),
+            React.createElement("th", null, "Type"),
+            React.createElement("th", null, "Required"),
+            React.createElement("th", null, "Default"),
+            React.createElement("th", null, "Description")
+          )
+        ),
+        React.createElement(
+          "tbody",
+          null,
+          component.props.map(prop => React.createElement(
+            "tr",
+            { key: prop.name },
+            React.createElement("td", { className: "prop-name" }, prop.name),
+            React.createElement(
+              "td",
+              { className: "prop-type" },
+              React.createElement("code", null, prop.type)
+            ),
+            React.createElement("td", { className: "prop-required" }, prop.required ? "✓" : ""),
+            React.createElement(
+              "td",
+              { className: "prop-default" },
+              prop.defaultValue !== undefined ? React.createElement("code", null, String(prop.defaultValue)) : ""
+            ),
+            React.createElement("td", { className: "prop-description" }, prop.description || "")
+          ))
+        )
+      )
+    ),
+    component.methods && component.methods.length > 0 && React.createElement(
+      "div",
+      { className: "component-section" },
+      React.createElement("h3", null, "Methods"),
+      React.createElement(
+        "div",
+        { className: "methods-list" },
+        component.methods.map(method => renderMethod(method, component.name))
+      )
+    ),
+    component.sourceCode && React.createElement(
+      "div",
+      { className: "component-section" },
+      React.createElement("h3", null, "Source Code"),
+      React.createElement(
+        "pre",
+        { className: "source-code" },
+        React.createElement("code", { className: "language-javascript" }, component.sourceCode)
+      )
+    )
   );
 
   // Render the main app
-  return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1 className="app-title">React Component Documentation</h1>
-        <div className="app-actions">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search components..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="theme-toggle">
-            <button onClick={() => document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark')}>
-              Toggle Theme
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="app-content">
-        {selectedComponent ? (
-          renderComponentDetails(selectedComponent)
-        ) : (
-          <Fragment>
-            <div className="tabs">
-              <button
-                className={\`tab-button \${activeTab === 'components' ? 'active' : ''}\`}
-                onClick={() => setActiveTab('components')}
-              >
-                Components
-              </button>
-              <button
-                className={\`tab-button \${activeTab === 'similarities' ? 'active' : ''}\`}
-                onClick={() => setActiveTab('similarities')}
-              >
-                Function Similarities
-              </button>
-            </div>
-
-            {activeTab === 'components' ? (
-              <div className="components-grid">
-                {filteredComponents.length > 0 ? (
-                  filteredComponents.map(component => renderComponent(component))
-                ) : (
-                  <div className="no-results">No components found</div>
-                )}
-              </div>
-            ) : (
-              <div className="similarities-view">
-                <SimilarityGraph components={components} />
-              </div>
-            )}
-          </Fragment>
-        )}
-      </div>
-
-      <footer className="app-footer">
-        <p>Generated with Recursive React Docs AI</p>
-      </footer>
-    </div>
+  return React.createElement(
+    "div",
+    { className: "app-container" },
+    React.createElement(
+      "header",
+      { className: "app-header" },
+      React.createElement("h1", { className: "app-title" }, "React Component Documentation"),
+      React.createElement(
+        "div",
+        { className: "app-actions" },
+        React.createElement(
+          "div",
+          { className: "search-box" },
+          React.createElement("input", {
+            type: "text",
+            placeholder: "Search components...",
+            value: searchTerm,
+            onChange: e => setSearchTerm(e.target.value)
+          })
+        ),
+        React.createElement(
+          "div",
+          { className: "theme-toggle" },
+          React.createElement(
+            "button",
+            {
+              onClick: () => document.documentElement.setAttribute(
+                'data-theme',
+                document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+              )
+            },
+            "Toggle Theme"
+          )
+        )
+      )
+    ),
+    React.createElement(
+      "div",
+      { className: "app-content" },
+      selectedComponent ? renderComponentDetails(selectedComponent) : React.createElement(
+        Fragment,
+        null,
+        React.createElement(
+          "div",
+          { className: "tabs" },
+          React.createElement(
+            "button",
+            {
+              className: "tab-button " + (activeTab === 'components' ? 'active' : ''),
+              onClick: () => setActiveTab('components')
+            },
+            "Components"
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "tab-button " + (activeTab === 'similarities' ? 'active' : ''),
+              onClick: () => setActiveTab('similarities')
+            },
+            "Function Similarities"
+          )
+        ),
+        activeTab === 'components' ? React.createElement(
+          "div",
+          { className: "components-grid" },
+          filteredComponents.length > 0 ? filteredComponents.map(component => renderComponent(component)) :
+            React.createElement("div", { className: "no-results" }, "No components found")
+        ) : React.createElement(
+          "div",
+          { className: "similarities-view" },
+          React.createElement(SimilarityGraph, { components: components })
+        )
+      )
+    ),
+    React.createElement(
+      "footer",
+      { className: "app-footer" },
+      React.createElement("p", null, "Generated with Recursive React Docs AI")
+    )
   );
 }
 
-// Create React DOM Root
-const root = ReactDOM.createRoot(document.getElementById("app"));
-
-// Render the React app
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-
-// Initialize syntax highlighting
+// Wait for DOM to be ready before rendering
 document.addEventListener('DOMContentLoaded', function() {
+  // For React 18
+  try {
+    const root = ReactDOM.createRoot(document.getElementById('app'));
+    root.render(
+      React.createElement(React.StrictMode, null,
+        React.createElement(App, null)
+      )
+    );
+    console.log("React app mounted with createRoot");
+  } catch (e) {
+    console.error("Error using createRoot:", e);
+
+    // Fallback to React 17 method
+    try {
+      ReactDOM.render(
+        React.createElement(React.StrictMode, null,
+          React.createElement(App, null)
+        ),
+        document.getElementById('app')
+      );
+      console.log("React app mounted with ReactDOM.render");
+    } catch (e) {
+      console.error("React rendering failed:", e);
+      document.getElementById('app').innerHTML = '<div class="error"><h1>Error Loading Documentation</h1><p>Check the console for details.</p></div>';
+    }
+  }
+
+  // Initialize syntax highlighting
   document.querySelectorAll('pre code').forEach((block) => {
     hljs.highlightElement(block);
   });
-});
 
-// Add tooltip functionality
-document.addEventListener('DOMContentLoaded', function() {
+  // Add tooltip functionality
   const addTooltips = () => {
     document.querySelectorAll('[data-tooltip]').forEach(element => {
       element.addEventListener('mouseenter', function() {

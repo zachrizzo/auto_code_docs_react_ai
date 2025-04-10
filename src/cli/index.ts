@@ -59,7 +59,7 @@ program
   .option(
     "--similarity-threshold <number>",
     "Threshold for function similarity detection (0.0-1.0)",
-    "0.8"
+    process.env.SIMILARITY_THRESHOLD || "0.6"
   )
   .option(
     "--use-ollama",
@@ -68,11 +68,13 @@ program
   )
   .option(
     "--ollama-url <url>",
-    "URL for Ollama API (default: http://localhost:11434)"
+    "URL for Ollama API",
+    process.env.OLLAMA_URL || "http://localhost:11434"
   )
   .option(
     "--ollama-model <model>",
-    "Model to use with Ollama (default: gemma3:27b)"
+    "Model to use with Ollama",
+    process.env.OLLAMA_MODEL || "nomic-embed-text:latest"
   )
   .action(async (rootDir: string, options: any) => {
     try {

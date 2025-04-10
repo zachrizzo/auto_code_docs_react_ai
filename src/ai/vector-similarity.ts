@@ -27,16 +27,22 @@ export class VectorSimilarityService {
   private similarityThreshold: number;
   private model: string;
   private useOllama: boolean;
-  private ollamaUrl: string = "http://localhost:11434";
-  private ollamaModel: string = "gemma3:27b";
+  private ollamaUrl: string =
+    process.env.OLLAMA_URL || "http://localhost:11434";
+  private ollamaModel: string =
+    process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
 
   constructor(options: VectorSimilarityOptions) {
     this.useOllama = options.useOllama || false;
 
     if (this.useOllama) {
       // Use Ollama for local embeddings
-      this.ollamaUrl = options.ollamaUrl || "http://localhost:11434";
-      this.ollamaModel = options.ollamaModel || "gemma3:27b"; // Default model - this should be available on most Ollama installs
+      this.ollamaUrl =
+        options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
+      this.ollamaModel =
+        options.ollamaModel ||
+        process.env.OLLAMA_MODEL ||
+        "nomic-embed-text:latest";
       this.model = "ollama";
       console.log(
         `Using local embeddings with Ollama (${this.ollamaModel}) at ${this.ollamaUrl}`
@@ -53,7 +59,11 @@ export class VectorSimilarityService {
       this.model = options.model || "text-embedding-3-small";
     }
 
-    this.similarityThreshold = options.similarityThreshold || 0.8;
+    this.similarityThreshold =
+      options.similarityThreshold ||
+      (process.env.SIMILARITY_THRESHOLD
+        ? parseFloat(process.env.SIMILARITY_THRESHOLD)
+        : 0.6);
   }
 
   /**

@@ -19,6 +19,12 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
+# Export environment variables for Node.js code
+export OLLAMA_URL="$OLLAMA_URL"
+export OLLAMA_MODEL="$OLLAMA_MODEL"
+export SIMILARITY_THRESHOLD="$SIMILARITY_THRESHOLD"
+export PORT="$PORT"
+
 # Find a free port starting from PORT
 find_free_port() {
   local port=$PORT
@@ -31,6 +37,7 @@ find_free_port() {
 
 # Make sure we capture only the port number without any stderr messages
 PORT=$(find_free_port)
+export PORT="$PORT"
 echo "🔍 Using port $PORT for server"
 
 # If using Ollama, check if it's running and model is available

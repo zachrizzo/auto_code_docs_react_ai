@@ -57,12 +57,14 @@ export async function generateDocumentation(
     description = "Auto-generated documentation for React components",
     theme = "light",
     openBrowser = false,
-    port = 8080,
+    port = process.env.PORT ? parseInt(process.env.PORT) : 3000,
     apiKey = process.env.OPENAI_API_KEY, // Use environment variable if available
-    similarityThreshold = 0.6, // Set default similarity threshold to 60%
+    similarityThreshold = process.env.SIMILARITY_THRESHOLD
+      ? parseFloat(process.env.SIMILARITY_THRESHOLD)
+      : 0.6,
     useOllama = false, // Use Ollama for local embeddings instead of OpenAI
-    ollamaUrl = "http://localhost:11434", // Default Ollama URL
-    ollamaModel = "gemma3:27b", // Default model for Ollama
+    ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434",
+    ollamaModel = process.env.OLLAMA_MODEL || "nomic-embed-text:latest", // Default from shell script
   } = options;
 
   // Parse components
