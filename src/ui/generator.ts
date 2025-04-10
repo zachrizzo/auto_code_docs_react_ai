@@ -96,10 +96,53 @@ async function generateDataFile(
   outputPath: string
 ): Promise<void> {
   const dataJsPath = path.join(outputPath, "data.js");
-  const componentData = JSON.stringify(components, null, 2);
+
+  // Ensure the data is serializable and handle circular references
+  const safeComponents = components.map((comp) => {
+    // Create a clean copy without circular references
+    const cleanComp = { ...comp };
+
+    // Remove potential circular references from any object properties
+    Object.keys(cleanComp).forEach((key) => {
+      const value = (cleanComp as any)[key];
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        // Convert complex objects to strings to avoid circular references
+        if (value.fileName) {
+          (cleanComp as any)[key] = value.fileName;
+        } else {
+          try {
+            // Try to convert to string representation
+            (cleanComp as any)[key] = JSON.stringify(value);
+          } catch (e) {
+            // If it fails, use a placeholder
+            (cleanComp as any)[key] = `[Object ${key}]`;
+          }
+        }
+      }
+    });
+
+    return cleanComp;
+  });
+
+  // Safely stringify the component data
+  let componentData;
+  try {
+    componentData = JSON.stringify(safeComponents, null, 2);
+    console.log(`Successfully serialized ${safeComponents.length} components`);
+  } catch (error) {
+    console.error("Error serializing components:", error);
+    componentData = "[]"; // Fallback to empty array if serialization fails
+  }
 
   const dataJs = `// Auto-generated component data
-window.COMPONENT_DATA = ${componentData};`;
+try {
+  console.log("Loading component data...");
+  window.COMPONENT_DATA = ${componentData};
+  console.log("Loaded ${safeComponents.length} components");
+} catch (error) {
+  console.error("Error setting component data:", error);
+  window.COMPONENT_DATA = [];
+}`;
 
   await fs.writeFile(dataJsPath, dataJs);
 }
@@ -114,7 +157,7 @@ async function generateIndexHtml(
   theme: string
 ): Promise<void> {
   const html = `<!DOCTYPE html>
-<html lang="en" data-theme="${theme}">
+<html lang="en" data-theme="${theme}" class="${theme === "dark" ? "dark" : ""}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -126,15 +169,115 @@ async function generateIndexHtml(
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
   <!-- Marked library for markdown rendering -->
   <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
-  <!-- React 18 script tags - using production version -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-</head>
-<body>
-  <div id="app"></div>
+  <!-- Add TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Global error handler
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error('Global error caught:', message, 'at', source, lineno, colno);
+      console.error('Error object:', error);
+      document.getElementById('app').innerHTML =
+        '<div style="color:red; padding:20px;">' +
+        '<h2>Error Occurred</h2>' +
+        '<p><strong>Message:</strong> ' + message + '</p>' +
+        '<p><strong>Location:</strong> ' + source + ' line ' + lineno + ', col ' + colno + '</p>' +
+        '</div>';
+      return true;
+    };
 
-  <script src="data.js"></script>
-  <script src="main.js"></script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            border: "rgb(var(--border-color-rgb) / <alpha-value>)",
+            input: "rgb(var(--border-color-rgb) / <alpha-value>)",
+            ring: "rgb(var(--primary-color-rgb) / <alpha-value>)",
+            background: "rgb(var(--background-color-rgb) / <alpha-value>)",
+            foreground: "rgb(var(--text-color-rgb) / <alpha-value>)",
+            primary: {
+              DEFAULT: "rgb(var(--primary-color-rgb) / <alpha-value>)",
+              foreground: "white",
+            },
+            secondary: {
+              DEFAULT: "rgb(var(--secondary-color-rgb) / <alpha-value>)",
+              foreground: "white",
+            },
+            destructive: {
+              DEFAULT: "rgb(220 38 38 / <alpha-value>)",
+              foreground: "white",
+            },
+            muted: {
+              DEFAULT: "rgb(var(--border-color-rgb) / <alpha-value>)",
+              foreground: "rgb(var(--text-color-rgb) / 0.7)",
+            },
+            accent: {
+              DEFAULT: "rgb(var(--border-color-rgb) / <alpha-value>)",
+              foreground: "rgb(var(--text-color-rgb) / <alpha-value>)",
+            },
+            card: {
+              DEFAULT: "rgb(var(--background-color-rgb) / <alpha-value>)",
+              foreground: "rgb(var(--text-color-rgb) / <alpha-value>)",
+            },
+            popover: {
+              DEFAULT: "rgb(var(--background-color-rgb) / <alpha-value>)",
+              foreground: "rgb(var(--text-color-rgb) / <alpha-value>)",
+            },
+          },
+          borderRadius: {
+            lg: "0.5rem",
+            md: "calc(0.5rem - 2px)",
+            sm: "calc(0.5rem - 4px)",
+          },
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div id="app">
+    <div style="padding: 20px; text-align: center;">
+      <h2>Loading Documentation...</h2>
+      <p>If this message persists, check the browser console for errors.</p>
+    </div>
+  </div>
+
+  <!-- React 18 script tags - using development version for better error messages -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <script>
+    // Verify React is loaded correctly before loading app scripts
+    if (!window.React || !window.ReactDOM) {
+      console.error('React or ReactDOM failed to load');
+      document.getElementById('app').innerHTML = '<div style="color:red; padding:20px;"><h2>Error: React libraries not loaded</h2><p>Check your network connection and try again.</p></div>';
+    } else {
+      console.log('React loaded successfully, version:', React.version);
+      console.log('ReactDOM loaded successfully');
+
+      // Load app scripts only if React loaded properly
+      const dataScript = document.createElement('script');
+      dataScript.src = 'data.js';
+      dataScript.onload = function() {
+        console.log('data.js loaded');
+        const mainScript = document.createElement('script');
+        mainScript.src = 'main.js';
+        mainScript.onload = function() {
+          console.log('main.js loaded');
+        };
+        mainScript.onerror = function() {
+          console.error('Failed to load main.js');
+          document.getElementById('app').innerHTML = '<div style="color:red; padding:20px;"><h2>Error: Failed to load application code</h2><p>The main.js file could not be loaded. Try refreshing the page.</p></div>';
+        };
+        document.body.appendChild(mainScript);
+      };
+      dataScript.onerror = function() {
+        console.error('Failed to load data.js');
+        document.getElementById('app').innerHTML = '<div style="color:red; padding:20px;"><h2>Error: Failed to load component data</h2><p>The data.js file could not be loaded. Try refreshing the page.</p></div>';
+      };
+      document.body.appendChild(dataScript);
+    }
+  </script>
 </body>
 </html>`;
 
@@ -1316,919 +1459,755 @@ html, body {
 async function generateMainJs(mainJsPath: string): Promise<void> {
   const jsContent = `
 // Main React application for documentation
-const { useState, useEffect, Fragment, useMemo, useRef } = React;
+console.log('Initializing React application...');
 
-// Component to visualize similarity between functions
-function SimilarityGraph(props) {
-  const components = props.components;
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.85);
-  const allSimilarities = useMemo(() => {
-    // Collect all similarity warnings
-    const similarities = [];
-
-    components.forEach(component => {
-      if (component.methods) {
-        component.methods.forEach(method => {
-          if (method.similarityWarnings && method.similarityWarnings.length > 0) {
-            method.similarityWarnings.forEach(warning => {
-              similarities.push({
-                sourceComponent: component.name,
-                sourceMethod: method.name,
-                sourceCode: method.code || '',
-                targetName: warning.similarTo,
-                targetCode: warning.code || '',
-                filePath: warning.filePath,
-                score: warning.score,
-                reason: warning.reason
-              });
-            });
-          }
-        });
-      }
-    });
-
-    // Sort by similarity score (highest first)
-    return similarities.sort((a, b) => b.score - a.score);
-  }, [components]);
-
-  // Filter to show only similarities above the threshold
-  const displayedSimilarities = allSimilarities.filter(sim => sim.score >= similarityThreshold);
-
-  const handleThresholdChange = (e) => {
-    setSimilarityThreshold(parseFloat(e.target.value));
-  };
-
-  if (allSimilarities.length === 0) {
-    return React.createElement("div", { className: "no-similarities" }, "No similar methods found");
-  }
-
-  return React.createElement(
-    "div",
-    { className: "similarity-graph-container" },
-    React.createElement("h3", null, "Method Similarity Analysis"),
-    React.createElement(
-      "div",
-      { className: "similarity-controls" },
-      React.createElement(
-        "label",
-        { htmlFor: "similarity-threshold" },
-        "Similarity Threshold: ", Math.round(similarityThreshold * 100) + "%"
-      ),
-      React.createElement("input", {
-        id: "similarity-threshold",
-        type: "range",
-        min: "0.5",
-        max: "1",
-        step: "0.05",
-        value: similarityThreshold,
-        onChange: handleThresholdChange,
-        className: "similarity-slider"
-      })
-    ),
-    React.createElement("p", null, "Showing ", displayedSimilarities.length, " of ", allSimilarities.length, " method similarities"),
-    React.createElement(
-      "div",
-      { className: "similarity-list" },
-      displayedSimilarities.map((similarity, index) =>
-        React.createElement(
-          "div",
-          {
-            key: "sim-" + index,
-            className: "similarity-card",
-            onClick: () => props.onSelectSimilarity && props.onSelectSimilarity(similarity)
-          },
-          React.createElement(
-            "div",
-            { className: "similarity-header" },
-            React.createElement(
-              "span",
-              { className: "similarity-score" },
-              Math.round(similarity.score * 100) + "%"
-            ),
-            React.createElement(
-              "span",
-              { className: "similarity-title" },
-              similarity.sourceComponent + "." + similarity.sourceMethod + " ↔ " + similarity.targetName
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "similarity-details" },
-            React.createElement(
-              "div",
-              { className: "similarity-source" },
-              "From: " + similarity.filePath
-            ),
-            React.createElement(
-              "div",
-              { className: "similarity-reason" },
-              similarity.reason
-            )
-          )
-        )
-      )
-    )
-  );
+// Ensure React and ReactDOM are loaded
+if (!window.React || !window.ReactDOM) {
+  const errorMessage = !window.React ? 'React not loaded' : 'ReactDOM not loaded';
+  console.error(errorMessage + '. Cannot initialize application.');
+  document.getElementById('app').innerHTML = '<div style="color:red; padding:20px;"><h2>Error: ' + errorMessage + '</h2><p>Check your network connection and reload the page.</p></div>';
+  throw new Error(errorMessage);
 }
 
-// Chat interface component
-function CodebaseChat({ components }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const messagesEndRef = useRef(null);
+// Access React hooks and features
+const { useState, useEffect, Fragment, useMemo, useRef, createContext, useContext } = React;
+const ReactDOM = window.ReactDOM;
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+// Common utility for merging classNames
+const cn = (...classes) => classes.filter(Boolean).join(' ');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
+// Import shadcn components
+const { Button, buttonVariants } = (() => {
+  // Implementation from button.tsx
+  const buttonVariants = (options) => {
+    const { variant = 'default', size = 'default', className = '' } = options || {};
 
-    const userMessage = { role: 'user', content: inputValue };
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
+    // Base classes
+    let classes = "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
-    try {
-      // Format the history for the API call
-      const messageHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
+    // Variant classes
+    if (variant === 'default') classes += " bg-primary text-primary-foreground hover:bg-primary/90";
+    else if (variant === 'destructive') classes += " bg-destructive text-destructive-foreground hover:bg-destructive/90";
+    else if (variant === 'outline') classes += " border border-input bg-background hover:bg-accent hover:text-accent-foreground";
+    else if (variant === 'secondary') classes += " bg-secondary text-secondary-foreground hover:bg-secondary/80";
+    else if (variant === 'ghost') classes += " hover:bg-accent hover:text-accent-foreground";
+    else if (variant === 'link') classes += " text-primary underline-offset-4 hover:underline";
 
-      // Make API call to the chat endpoint
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          history: messageHistory,
-          query: userMessage.content
-        }),
-      });
+    // Size classes
+    if (size === 'default') classes += " h-10 px-4 py-2";
+    else if (size === 'sm') classes += " h-9 rounded-md px-3";
+    else if (size === 'lg') classes += " h-11 rounded-md px-8";
+    else if (size === 'icon') classes += " h-10 w-10";
 
-      if (!response.ok) {
-        throw new Error('Failed to get chat response');
-      }
-
-      const data = await response.json();
-
-      // Add assistant message with the response
-      setMessages(prevMessages => [
-        ...prevMessages,
-        { role: 'assistant', content: data.response }
-      ]);
-
-      // Update search results
-      setSearchResults(data.searchResults || []);
-    } catch (error) {
-      console.error('Error in chat:', error);
-      setMessages(prevMessages => [
-        ...prevMessages,
-        { role: 'assistant', content: 'Sorry, there was an error processing your request.' }
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+    return cn(classes, className);
   };
 
-  const renderMessage = (message, index) => {
+  const Button = ({ children, className, variant, size, onClick, ...props }) => {
     return React.createElement(
-      'div',
+      'button',
       {
-        key: index,
-        className: \`chat-message \${message.role === 'user' ? 'user-message' : 'assistant-message'}\`
+        className: buttonVariants({ variant, size, className }),
+        onClick,
+        ...props
       },
-      React.createElement(
-        'div',
-        { className: 'message-content' },
-        message.role === 'assistant'
-          ? React.createElement('div', { dangerouslySetInnerHTML: { __html: marked.parse(message.content) } })
-          : message.content
-      )
+      children
     );
   };
 
-  const renderSearchResult = (result, index) => {
-    return React.createElement(
-      'div',
-      { key: index, className: 'search-result' },
-      React.createElement(
-        'div',
-        { className: 'result-header' },
-        React.createElement('h4', null,
-          result.componentName + (result.methodName ? \`.\${result.methodName}\` : '')
-        ),
-        React.createElement('span', { className: 'similarity-score' },
-          Math.round(result.similarity * 100) + '% Match'
-        )
-      ),
-      React.createElement('div', { className: 'result-path' }, result.filePath),
-      React.createElement(
-        'pre',
-        { className: 'result-code' },
-        React.createElement('code', null, result.code)
-      )
-    );
-  };
+  return { Button, buttonVariants };
+})();
 
-  // Render the chat bubble button when closed
-  if (!isOpen) {
-    return React.createElement(
-      'div',
-      { className: 'chat-bubble', onClick: () => setIsOpen(true) },
-      React.createElement('span', { className: 'chat-bubble-icon' }, '💬'),
-      React.createElement('span', { className: 'chat-bubble-text' }, 'Ask AI')
-    );
-  }
+// Import shadcn card components
+const { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } = (() => {
+  const Card = ({ children, className, ...props }) =>
+    React.createElement('div', {
+      className: cn("rounded-lg border bg-card text-card-foreground shadow-sm", className),
+      ...props
+    }, children);
 
-  // Render the chat interface when open
-  return React.createElement(
-    'div',
-    { className: 'chat-widget' },
-    React.createElement(
-      'div',
-      { className: 'chat-header' },
-      React.createElement('h3', null, 'AI Code Assistant'),
-      React.createElement(
-        'button',
-        { className: 'close-button', onClick: () => setIsOpen(false) },
-        '✕'
-      )
-    ),
-    React.createElement(
-      'div',
-      { className: 'chat-messages' },
-      messages.length === 0 && React.createElement(
-        'div',
-        { className: 'welcome-message' },
-        'Ask me anything about the codebase!'
-      ),
-      messages.map(renderMessage),
-      isLoading && React.createElement(
-        'div',
-        { className: 'chat-message assistant-message' },
-        React.createElement('div', { className: 'message-content loading' }, 'Thinking...')
-      ),
-      React.createElement('div', { ref: messagesEndRef })
-    ),
-    React.createElement(
-      'form',
-      { className: 'chat-input', onSubmit: handleSubmit },
-      React.createElement('input', {
-        type: 'text',
-        placeholder: 'Ask a question about the codebase...',
-        value: inputValue,
-        onChange: (e) => setInputValue(e.target.value),
-        disabled: isLoading
-      }),
-      React.createElement(
-        'button',
-        { type: 'submit', disabled: isLoading },
-        'Send'
-      )
-    ),
-    searchResults.length > 0 && React.createElement(
-      'div',
-      { className: 'search-results' },
-      React.createElement('h3', null, 'Relevant Code'),
-      searchResults.map(renderSearchResult)
-    )
-  );
-}
+  const CardHeader = ({ children, className, ...props }) =>
+    React.createElement('div', {
+      className: cn("flex flex-col space-y-1.5 p-6", className),
+      ...props
+    }, children);
 
-function App() {
-  const [components, setComponents] = useState([]);
-  const [selectedComponent, setSelectedComponent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('components');
-  const [selectedSimilarity, setSelectedSimilarity] = useState(null);
-  const [expandedView, setExpandedView] = useState(false);
+  const CardTitle = ({ children, className, ...props }) =>
+    React.createElement('h3', {
+      className: cn("text-2xl font-semibold leading-none tracking-tight", className),
+      ...props
+    }, children);
 
-  useEffect(() => {
-    // Initialize with component data
-    console.log("Mounting App component");
-    if (window.COMPONENT_DATA) {
-      console.log("Found component data:", window.COMPONENT_DATA.length, "components");
-      setComponents(window.COMPONENT_DATA);
-    } else {
-      console.error("No component data found - window.COMPONENT_DATA is undefined");
-    }
-  }, []);
+  const CardDescription = ({ children, className, ...props }) =>
+    React.createElement('p', {
+      className: cn("text-sm text-muted-foreground", className),
+      ...props
+    }, children);
 
-  // Function to render similarity modal for both views
-  const renderSimilarityModal = (similarityData) => {
-    return React.createElement(
-      "div",
-      { className: "similarity-modal" },
-      React.createElement(
-        "div",
-        {
-          className: "similarity-modal-content" + (expandedView ? " expanded" : "")
-        },
-        React.createElement(
-          "div",
-          { className: "similarity-modal-header" },
-          React.createElement(
-            "button",
-            {
-              className: "expand-button",
-              onClick: () => setExpandedView(!expandedView)
-            },
-            expandedView ? "Collapse" : "Expand"
-          ),
-          React.createElement(
-            "button",
-            {
-              className: "close-button",
-              onClick: () => {
-                setSelectedSimilarity(null);
-                setExpandedView(false);
-              }
-            },
-            "✕"
-          )
-        ),
-        React.createElement("h3", null, "Similarity Details"),
-        React.createElement(
-          "div",
-          { className: "similarity-modal-score" },
-          Math.round(similarityData.score * 100) + "% Similar"
-        ),
-        React.createElement(
-          "div",
-          { className: "similarity-code-comparison" },
-          React.createElement(
-            "div",
-            { className: "code-panel" },
-            React.createElement(
-              "h4",
-              null,
-              similarityData.sourceComponent + "." + similarityData.sourceMethod
-            ),
-            React.createElement(
-              "pre",
-              { className: "code-block" },
-              similarityData.sourceCode
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "code-panel" },
-            React.createElement(
-              "h4",
-              null,
-              similarityData.targetName
-            ),
-            React.createElement(
-              "pre",
-              { className: "code-block" },
-              similarityData.targetCode
-            )
-          )
-        )
-      )
-    );
-  }
+  const CardContent = ({ children, className, ...props }) =>
+    React.createElement('div', {
+      className: cn("p-6 pt-0", className),
+      ...props
+    }, children);
 
-  // Filter components based on search term
-  const filteredComponents = components.filter(component =>
-    component.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const CardFooter = ({ children, className, ...props }) =>
+    React.createElement('div', {
+      className: cn("flex items-center p-6 pt-0", className),
+      ...props
+    }, children);
 
-  // Function to render a similarity warning with enhanced functionality
-  const renderSimilarityWarning = (warning, sourceComponent, sourceMethod, sourceCode) => {
-    const similarityData = {
-      sourceComponent: sourceComponent,
-      sourceMethod: sourceMethod,
-      sourceCode: sourceCode || "",
-      targetName: warning.similarTo,
-      targetCode: warning.code || "",
-      filePath: warning.filePath,
-      score: warning.score,
-      reason: warning.reason
+  return { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
+})();
+
+// Import shadcn tabs components
+const { Tabs, TabsList, TabsTrigger, TabsContent } = (() => {
+  const Tabs = ({ children, value, onValueChange, defaultValue, className, ...props }) => {
+    const [activeTab, setActiveTab] = useState(defaultValue || value);
+
+    useEffect(() => {
+      if (value !== undefined) {
+        setActiveTab(value);
+      }
+    }, [value]);
+
+    const handleValueChange = (newValue) => {
+      setActiveTab(newValue);
+      if (onValueChange) {
+        onValueChange(newValue);
+      }
     };
 
     return React.createElement(
-      "div",
-      {
-        className: "similarity-warning",
-        onClick: (e) => {
-          e.stopPropagation();
-          setSelectedSimilarity(similarityData);
+      'div',
+      { className: cn("data-[state=active]:bg-muted", className), ...props },
+      React.Children.map(children, child => {
+        // Clone TabsList and TabsContent with needed props
+        if (child.type === TabsList || child.type === TabsContent) {
+          return React.cloneElement(child, { activeTab, onSelect: handleValueChange });
         }
-      },
-      React.createElement(
-        "div",
-        { className: "similarity-header" },
-        React.createElement(
-          "span",
-          { className: "similarity-badge" },
-          Math.round(warning.score * 100) + "% Similar"
-        ),
-        React.createElement(
-          "span",
-          { className: "similarity-name" },
-          warning.similarTo
-        )
-      ),
-      React.createElement("div", { className: "similarity-reason" }, warning.reason),
-      React.createElement("div", { className: "similarity-file" }, warning.filePath),
-      React.createElement(
-        "div",
-        { className: "compare-button-container" },
-        React.createElement(
-          "button",
-          {
-            className: "compare-button",
-            onClick: (e) => {
-              e.stopPropagation();
-              setSelectedSimilarity(similarityData);
-            }
-          },
-          "Compare Code"
-        )
-      )
+        return child;
+      })
     );
   };
 
-  // Function to render a method
-  const renderMethod = (method, componentName) => {
-    // Skip methods with no code
-    if (!method.code || method.code.trim() === '') {
-      return null;
-    }
+  const TabsList = ({ children, activeTab, onSelect, className, ...props }) => {
+    return React.createElement(
+      'div',
+      { className: cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className), ...props },
+      React.Children.map(children, child => {
+        if (child.type === TabsTrigger) {
+          return React.cloneElement(child, { active: activeTab === child.props.value, onSelect });
+        }
+        return child;
+      })
+    );
+  };
 
-    const hasSimilarities = method.similarityWarnings && method.similarityWarnings.length > 0;
+  const TabsTrigger = ({ children, value, active, onSelect, className, ...props }) => {
+    return React.createElement(
+      'button',
+      {
+        className: cn("inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          active ? "bg-background text-foreground shadow-sm" : "hover:bg-background/30",
+          className
+        ),
+        onClick: () => onSelect(value),
+        ...props
+      },
+      children
+    );
+  };
+
+  const TabsContent = ({ children, value, activeTab, className, ...props }) => {
+    const isActive = activeTab === value;
 
     return React.createElement(
       'div',
       {
-        className: 'method-card' + (hasSimilarities ? ' has-warnings' : ''),
-        'data-method': method.name,
-        'data-component': componentName
+        className: cn("mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          isActive ? "block" : "hidden",
+          className
+        ),
+        ...props
       },
-      React.createElement(
-        'div',
-        { className: 'method-header' },
-        React.createElement('h3', null, method.name),
-        React.createElement(
-          'div',
-          { className: 'method-controls' },
-          React.createElement(
-            'button',
-            {
-              className: 'generate-description-btn',
-              onClick: (e) => {
-                e.preventDefault();
-                // Define an inner function that has access to the correct component and method
-                (async () => {
-                  try {
-                    // Show a loading indicator
-                    const methodElement = e.currentTarget.closest('.method-card');
-                    let descriptionEl = methodElement.querySelector('.method-ai-description');
-
-                    if (!descriptionEl) {
-                      descriptionEl = document.createElement('div');
-                      descriptionEl.className = 'method-ai-description';
-                      methodElement.querySelector('.method-header').after(descriptionEl);
-                    }
-
-                    descriptionEl.innerHTML = 'Generating description...';
-
-                    const response = await fetch('/api/chat', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        history: [],
-                        query: "Generate a concise, technical description of this " + componentName + "." + method.name + " method: \\n\\n" + method.code
-                      }),
-                    });
-
-                    if (!response.ok) {
-                      throw new Error('Failed to generate description');
-                    }
-
-                    const data = await response.json();
-
-                    // Use the marked library to parse markdown
-                    descriptionEl.innerHTML = window.marked.parse(data.response);
-                  } catch (error) {
-                    console.error('Error generating description:', error);
-                    alert('Failed to generate description. Please try again later.');
-                  }
-                })();
-              }
-            },
-            '✨ Generate Description'
-          )
-        )
-      ),
-      method.description && React.createElement(
-        "div",
-        { className: "method-description" },
-        method.description
-      ),
-      hasSimilarities && React.createElement(
-        "div",
-        { className: "method-similarities" },
-        React.createElement("h5", null, "Similar Methods:"),
-        method.similarityWarnings.map((warning, i) => React.createElement(
-          "div",
-          { key: "similarity-" + i, className: "similarity-item" },
-          renderSimilarityWarning(warning, componentName, method.name, method.code)
-        ))
-      ),
-      method.code && React.createElement(
-        "pre",
-        { className: "method-code" },
-        React.createElement("code", { className: "language-javascript" }, method.code)
-      )
+      children
     );
   };
 
-  // Function to render a component
-  const renderComponent = (component) => {
-    const hasMethodsWithSimilarities = component.methods &&
-      component.methods.some(m => m.similarityWarnings && m.similarityWarnings.length > 0);
+  return { Tabs, TabsList, TabsTrigger, TabsContent };
+})();
 
+// Import shadcn separator component
+const Separator = ({ className, orientation = "horizontal", ...props }) => {
+  return React.createElement(
+    'div',
+    {
+      className: cn(
+        "shrink-0 bg-border",
+        orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+        className
+      ),
+      ...props
+    }
+  );
+};
+
+// Import shadcn ScrollArea component
+const { ScrollArea, ScrollBar } = (() => {
+  const ScrollArea = ({ children, className, ...props }) => {
     return React.createElement(
-      "div",
+      'div',
       {
-        className: "component-card " + (hasMethodsWithSimilarities ? "has-similarities" : ""),
-        key: component.name,
-        onClick: () => setSelectedComponent(component)
+        className: cn("relative overflow-hidden", className),
+        ...props
       },
-      React.createElement(
-        "h3",
-        { className: "component-name" },
-        component.name,
-        hasMethodsWithSimilarities && React.createElement(
-          "span",
-          {
-            className: "similarity-indicator",
-            title: "Contains similar methods"
-          },
-          "⚠"
-        )
-      ),
-      component.description && React.createElement(
-        "p",
-        { className: "component-description" },
-        component.description
-      ),
-      React.createElement(
-        "div",
-        { className: "component-meta" },
-        React.createElement(
-          "span",
-          { className: "meta-item" },
-          "Props: ",
-          React.createElement("strong", null, component.props.length)
-        ),
-        React.createElement(
-          "span",
-          { className: "meta-item" },
-          "Methods: ",
-          React.createElement("strong", null, component.methods ? component.methods.length : 0)
-        ),
-        hasMethodsWithSimilarities && React.createElement(
-          "span",
-          { className: "meta-item warning" },
-          "Similar Methods Found"
-        )
-      )
+      [
+        React.createElement('div', { className: "h-full w-full rounded-[inherit] overflow-y-auto", key: "viewport" }, children),
+        React.createElement(ScrollBar, { orientation: "vertical", key: "scrollbar" })
+      ]
     );
   };
 
-  // Render component details
-  const renderComponentDetails = (component) => React.createElement(
-    "div",
-    { className: "component-details" },
-    React.createElement(
-      "div",
-      { className: "details-header" },
-      React.createElement(
-        "button",
-        {
-          className: "back-button",
-          onClick: () => setSelectedComponent(null)
-        },
-        "← Back to Components"
-      ),
-      React.createElement("h2", { className: "component-title" }, component.name)
-    ),
-    component.description && React.createElement(
-      "div",
-      { className: "component-description" },
-      React.createElement("p", null, component.description)
-    ),
-    React.createElement(
-      "div",
-      { className: "component-filepath" },
-      React.createElement("strong", null, "File:"),
-      " " + component.filePath
-    ),
-    component.props.length > 0 && React.createElement(
-      "div",
-      { className: "component-section" },
-      React.createElement("h3", null, "Props"),
-      React.createElement(
-        "table",
-        { className: "props-table" },
-        React.createElement(
-          "thead",
-          null,
-          React.createElement(
-            "tr",
-            null,
-            React.createElement("th", null, "Name"),
-            React.createElement("th", null, "Type"),
-            React.createElement("th", null, "Required"),
-            React.createElement("th", null, "Default"),
-            React.createElement("th", null, "Description")
-          )
+  const ScrollBar = ({ orientation = "vertical", className, ...props }) => {
+    return React.createElement(
+      'div',
+      {
+        className: cn(
+          "flex touch-none select-none transition-colors",
+          orientation === "vertical" ? "h-full w-2.5 border-l border-l-transparent p-[1px]" : "h-2.5 flex-col border-t border-t-transparent p-[1px]",
+          className
         ),
-        React.createElement(
-          "tbody",
-          null,
-          component.props.map(prop => React.createElement(
-            "tr",
-            { key: prop.name },
-            React.createElement("td", { className: "prop-name" }, prop.name),
-            React.createElement(
-              "td",
-              { className: "prop-type" },
-              React.createElement("code", null, prop.type)
-            ),
-            React.createElement("td", { className: "prop-required" }, prop.required ? "✓" : ""),
-            React.createElement(
-              "td",
-              { className: "prop-default" },
-              prop.defaultValue !== undefined ? React.createElement("code", null, String(prop.defaultValue)) : ""
-            ),
-            React.createElement("td", { className: "prop-description" }, prop.description || "")
-          ))
-        )
-      )
-    ),
-    component.methods && component.methods.length > 0 && React.createElement(
-      "div",
-      { className: "component-section" },
+        ...props
+      },
+      React.createElement('div', { className: "relative flex-1 rounded-full bg-border" })
+    );
+  };
+
+  return { ScrollArea, ScrollBar };
+})();
+
+// Import shadcn Avatar component
+const { Avatar, AvatarImage, AvatarFallback } = (() => {
+  const Avatar = ({ children, className, ...props }) => {
+    return React.createElement(
+      'div',
+      {
+        className: cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className),
+        ...props
+      },
+      children
+    );
+  };
+
+  const AvatarImage = ({ src, alt = "", className, ...props }) => {
+    return React.createElement(
+      'img',
+      {
+        src,
+        alt,
+        className: cn("aspect-square h-full w-full", className),
+        ...props
+      }
+    );
+  };
+
+  const AvatarFallback = ({ children, className, ...props }) => {
+    return React.createElement(
+      'div',
+      {
+        className: cn("flex h-full w-full items-center justify-center rounded-full bg-muted", className),
+        ...props
+      },
+      children
+    );
+  };
+
+  return { Avatar, AvatarImage, AvatarFallback };
+})();
+
+// Import shadcn Badge component
+const Badge = ({ children, variant = "default", className, ...props }) => {
+  return React.createElement(
+    'div',
+    {
+      className: cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        variant === "default" && "border-transparent bg-primary text-primary-foreground",
+        variant === "secondary" && "border-transparent bg-secondary text-secondary-foreground",
+        variant === "destructive" && "border-transparent bg-destructive text-destructive-foreground",
+        variant === "outline" && "text-foreground",
+        className
+      ),
+      ...props
+    },
+    children
+  );
+};
+
+// Define custom components using the shadcn components
+const ComponentCard = ({ component, onClick }) => {
+  return React.createElement(
+    Card,
+    { className: 'w-full mb-4 hover:shadow-md transition-shadow' },
+    [
       React.createElement(
-        "div",
-        { className: "methods-header" },
-        React.createElement("h3", null, "Methods"),
-        React.createElement(
-          "button",
-          {
-            className: "generate-all-btn",
-            onClick: async () => {
-              if (!component.methods || component.methods.length === 0) return;
-
-              // Get all method elements
-              const methodCards = document.querySelectorAll('.method-card');
-
-              for (const methodCard of methodCards) {
-                // Extract method name and component name from data attributes
-                const methodName = methodCard.getAttribute('data-method');
-                const componentName = methodCard.getAttribute('data-component');
-
-                if (!methodName || !componentName) continue;
-
-                // Find the method in the component's methods array
-                const method = component.methods.find(m => m.name === methodName);
-                if (!method || !method.code) continue;
-
-                try {
-                  // Show a loading indicator
-                  let descriptionEl = methodCard.querySelector('.method-ai-description');
-                  if (!descriptionEl) {
-                    descriptionEl = document.createElement('div');
-                    descriptionEl.className = 'method-ai-description';
-                    methodCard.querySelector('.method-header').after(descriptionEl);
-                  }
-                  descriptionEl.innerHTML = 'Generating description...';
-
-                  // Make API call
-                  const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      history: [],
-                      query: "Generate a concise, technical description of this " + componentName + "." + methodName + " method: \\n\\n" + method.code
-                    }),
-                  });
-
-                  if (!response.ok) {
-                    throw new Error('Failed to generate description');
-                  }
-
-                  const data = await response.json();
-
-                  // Update the description with the result
-                  descriptionEl.innerHTML = window.marked.parse(data.response);
-                } catch (error) {
-                  console.error("Error generating description for " + methodName + ":", error);
-                  // Show error in the description element if it exists
-                  const descriptionEl = methodCard.querySelector('.method-ai-description');
-                  if (descriptionEl) {
-                    descriptionEl.innerHTML = 'Error generating description. Please try again.';
-                  }
-                }
-
-                // Add a small delay between requests to avoid overwhelming the server
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-            }
-          },
-          "✨ Generate All Descriptions"
+        CardHeader,
+        { className: 'pb-2', key: 'header' },
+        [
+          React.createElement(
+            CardTitle,
+            {
+              className: 'text-xl flex items-center justify-between',
+              key: 'title'
+            },
+            [
+              component.name,
+              React.createElement(
+                Badge,
+                {
+                  variant: 'secondary',
+                  key: 'badge'
+                },
+                component.type || 'Component'
+              )
+            ]
+          ),
+          component.description && React.createElement(
+            CardDescription,
+            { key: 'desc' },
+            component.description
+          )
+        ]
+      ),
+      React.createElement(
+        CardContent,
+        { key: 'content' },
+        component.props && component.props.length > 0 && React.createElement(
+          'div',
+          { className: 'mb-3', key: 'props' },
+          [
+            React.createElement('h4', { className: 'text-sm font-medium mb-1', key: 'props-title' },
+              \`Props (\${component.props.length})\`
+            ),
+            React.createElement(
+              'ul',
+              { className: 'text-sm list-disc pl-5', key: 'props-list' },
+              component.props.length > 0 ? [
+                ...component.props.slice(0, 3).map((prop, index) =>
+                  React.createElement(
+                    'li',
+                    { key: index, className: 'text-muted-foreground' },
+                    prop.name + (prop.required ? ' *' : '')
+                  )
+                ),
+                component.props.length > 3 && React.createElement(
+                  'li',
+                  { className: 'text-muted-foreground', key: 'more' },
+                  \`+ \${component.props.length - 3} more\`
+                )
+              ] : []
+            )
+          ]
         )
       ),
       React.createElement(
-        "div",
-        { className: "methods-list" },
-        component.methods.map(method => renderMethod(method, component.name))
+        CardFooter,
+        { key: 'footer' },
+        React.createElement(
+          Button,
+          {
+            variant: 'outline',
+            size: 'sm',
+            onClick: () => onClick(component)
+          },
+          'View Details'
+        )
       )
-    ),
-    component.sourceCode && React.createElement(
-      "div",
-      { className: "component-section" },
-      React.createElement("h3", null, "Source Code"),
-      React.createElement(
-        "pre",
-        { className: "source-code" },
-        React.createElement("code", { className: "language-javascript" }, component.sourceCode)
+    ]
+  );
+};
+
+// SidebarNav component
+const SidebarNav = ({ components, onSelect, selectedComponent }) => {
+  return React.createElement(
+    ScrollArea,
+    { className: 'h-[calc(100vh-8rem)]' },
+    React.createElement(
+      'div',
+      { className: 'space-y-1 p-2' },
+      components.map(component =>
+        React.createElement(
+          Button,
+          {
+            key: component.name,
+            variant: selectedComponent?.name === component.name ? "secondary" : "ghost",
+            className: "w-full justify-start text-left",
+            onClick: () => onSelect(component)
+          },
+          component.name
+        )
       )
     )
   );
+};
 
-  // Render the main app
+// PropertyTable component
+const PropertyTable = ({ properties }) => {
+  if (!properties || properties.length === 0) {
+    return React.createElement('p', { className: 'text-muted-foreground text-sm' }, 'No properties available');
+  }
+
   return React.createElement(
-    "div",
-    { className: "app-container" },
+    'div',
+    { className: 'border rounded-md overflow-hidden' },
     React.createElement(
-      "header",
-      { className: "app-header" },
-      React.createElement("h1", { className: "app-title" }, "React Component Documentation"),
-      React.createElement(
-        "div",
-        { className: "app-actions" },
+      'table',
+      { className: 'min-w-full divide-y divide-border' },
+      [
         React.createElement(
-          "div",
-          { className: "search-box" },
-          React.createElement("input", {
-            type: "text",
-            placeholder: "Search components...",
-            value: searchTerm,
-            onChange: e => setSearchTerm(e.target.value)
-          })
+          'thead',
+          { className: 'bg-muted/50', key: 'thead' },
+          React.createElement(
+            'tr',
+            {},
+            [
+              React.createElement('th', { className: 'px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider', key: 'th-name' }, 'Name'),
+              React.createElement('th', { className: 'px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider', key: 'th-type' }, 'Type'),
+              React.createElement('th', { className: 'px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider', key: 'th-default' }, 'Default'),
+              React.createElement('th', { className: 'px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider', key: 'th-desc' }, 'Description')
+            ]
+          )
         ),
         React.createElement(
-          "div",
-          { className: "theme-toggle" },
+          'tbody',
+          { className: 'bg-card divide-y divide-border', key: 'tbody' },
+          properties.map((prop, index) =>
+            React.createElement(
+              'tr',
+              { key: index, className: index % 2 === 0 ? 'bg-muted/20' : 'bg-card' },
+              [
+                React.createElement(
+                  'td',
+                  { className: 'px-4 py-2 text-sm font-mono whitespace-nowrap', key: 'td-name' },
+                  [
+                    prop.name,
+                    prop.required && React.createElement('span', { className: 'text-destructive ml-1', key: 'required' }, '*')
+                  ]
+                ),
+                React.createElement('td', { className: 'px-4 py-2 text-sm font-mono', key: 'td-type' }, prop.type),
+                React.createElement('td', { className: 'px-4 py-2 text-sm font-mono', key: 'td-default' }, prop.defaultValue || '-'),
+                React.createElement('td', { className: 'px-4 py-2 text-sm', key: 'td-desc' }, prop.description || '-')
+              ]
+            )
+          )
+        )
+      ]
+    )
+  );
+};
+
+// MethodDisplay component
+const MethodDisplay = ({ method }) => {
+  return React.createElement(
+    Card,
+    { className: 'mb-4' },
+    [
+      React.createElement(
+        CardHeader,
+        { className: 'pb-2', key: 'header' },
+        [
           React.createElement(
-            "button",
-            {
-              onClick: () => document.documentElement.setAttribute(
-                'data-theme',
-                document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
-              )
-            },
-            "Toggle Theme"
+            CardTitle,
+            { className: 'text-lg font-mono', key: 'title' },
+            \`\${method.name}()\`
+          ),
+          method.ai?.description && React.createElement(
+            CardDescription,
+            { key: 'desc' },
+            method.ai.description
+          )
+        ]
+      ),
+      React.createElement(
+        CardContent,
+        { key: 'content' },
+        method.code && React.createElement(
+          'div',
+          { className: 'rounded-md bg-muted p-4 my-2 overflow-auto' },
+          React.createElement(
+            'pre',
+            { className: 'text-sm font-mono' },
+            React.createElement('code', {}, method.code)
           )
         )
       )
-    ),
-    React.createElement(
-      "div",
-      { className: "app-content" },
-      selectedComponent ? renderComponentDetails(selectedComponent) : React.createElement(
-        Fragment,
-        null,
-        React.createElement(
-          "div",
-          { className: "tabs" },
+    ]
+  );
+};
+
+// ComponentDetail component
+const ComponentDetail = ({ component }) => {
+  return React.createElement(
+    'div',
+    { className: 'space-y-6' },
+    [
+      React.createElement(
+        'div',
+        { key: 'header' },
+        [
+          React.createElement('h1', { className: 'text-2xl font-bold', key: 'title' }, component.name),
+          component.description && React.createElement('p', { className: 'text-muted-foreground mt-1', key: 'desc' }, component.description)
+        ]
+      ),
+      component.ai?.summary && React.createElement(
+        Card,
+        { key: 'ai-summary' },
+        [
           React.createElement(
-            "button",
-            {
-              className: "tab-button " + (activeTab === 'components' ? 'active' : ''),
-              onClick: () => setActiveTab('components')
-            },
-            "Components"
+            CardHeader,
+            { key: 'ai-header' },
+            React.createElement(CardTitle, {}, 'AI Summary')
           ),
           React.createElement(
-            "button",
-            {
-              className: "tab-button " + (activeTab === 'similarities' ? 'active' : ''),
-              onClick: () => setActiveTab('similarities')
-            },
-            "Function Similarities"
+            CardContent,
+            { key: 'ai-content' },
+            React.createElement('p', {}, component.ai.summary)
           )
-        ),
-        activeTab === 'components' ? React.createElement(
-          "div",
-          { className: "components-grid" },
-          filteredComponents.length > 0 ? filteredComponents.map(component => renderComponent(component)) :
-            React.createElement("div", { className: "no-results" }, "No components found")
-        ) : React.createElement(
-          "div",
-          { className: "similarities-view" },
-          React.createElement(SimilarityGraph, { components: components, onSelectSimilarity: setSelectedSimilarity })
+        ]
+      ),
+      React.createElement(
+        Tabs,
+        { defaultValue: 'props', className: 'w-full', key: 'tabs' },
+        [
+          React.createElement(
+            TabsList,
+            { className: 'mb-4', key: 'tabs-list' },
+            [
+              React.createElement(TabsTrigger, { value: 'props', key: 'tab-props' }, 'Props'),
+              React.createElement(TabsTrigger, { value: 'methods', key: 'tab-methods' }, 'Methods'),
+              React.createElement(TabsTrigger, { value: 'children', key: 'tab-children' }, 'Child Components')
+            ]
+          ),
+          React.createElement(
+            TabsContent,
+            { value: 'props', key: 'tab-content-props' },
+            component.props && component.props.length > 0
+              ? React.createElement(PropertyTable, { properties: component.props })
+              : React.createElement('p', { className: 'text-muted-foreground' }, 'No props available')
+          ),
+          React.createElement(
+            TabsContent,
+            { value: 'methods', key: 'tab-content-methods' },
+            component.methods && component.methods.length > 0
+              ? React.createElement(
+                  'div',
+                  {},
+                  component.methods.map((method, index) => React.createElement(MethodDisplay, { key: index, method }))
+                )
+              : React.createElement('p', { className: 'text-muted-foreground' }, 'No methods available')
+          ),
+          React.createElement(
+            TabsContent,
+            { value: 'children', key: 'tab-content-children' },
+            component.childComponents && component.childComponents.length > 0
+              ? React.createElement(
+                  'div',
+                  { className: 'grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3' },
+                  component.childComponents.map((child, index) => React.createElement(ComponentCard, { key: index, component: child, onClick: () => {} }))
+                )
+              : React.createElement('p', { className: 'text-muted-foreground' }, 'No child components available')
+          )
+        ]
+      )
+    ]
+  );
+};
+
+// Main App component
+function App() {
+  const [components, setComponents] = useState(window.COMPONENT_DATA || []);
+  const [selectedComponent, setSelectedComponent] = useState(null);
+  const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    // Highlight.js initialization
+    if (window.hljs) {
+      document.querySelectorAll('pre code').forEach((block) => {
+        window.hljs.highlightElement(block);
+      });
+    }
+  }, [selectedComponent]);
+
+  const filteredComponents = useMemo(() => {
+    if (!searchQuery.trim()) return components;
+    const lowerQuery = searchQuery.toLowerCase();
+    return components.filter(
+      component =>
+        component.name.toLowerCase().includes(lowerQuery) ||
+        (component.description && component.description.toLowerCase().includes(lowerQuery))
+    );
+  }, [components, searchQuery]);
+
+  const toggleDarkMode = () => {
+    const isDark = !darkMode;
+    setDarkMode(isDark);
+
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  };
+
+  const handleSelectComponent = (component) => {
+    setSelectedComponent(component);
+    // On mobile, scroll to top when selecting a component
+    if (window.innerWidth < 768) {
+      window.scrollTo(0, 0);
+    }
+  };
+
+  return React.createElement(
+    'div',
+    { className: 'flex flex-col min-h-screen' },
+    [
+      // Header
+      React.createElement(
+        'header',
+        { className: 'border-b sticky top-0 z-40 bg-background', key: 'header' },
+        React.createElement(
+          'div',
+          { className: 'container flex h-16 items-center justify-between py-4' },
+          [
+            React.createElement('h1', { className: 'text-2xl font-bold', key: 'title' }, 'React Component Documentation'),
+            React.createElement(
+              'div',
+              { className: 'flex items-center gap-2', key: 'controls' },
+              [
+                React.createElement(
+                  'div',
+                  { className: 'relative w-full md:w-60', key: 'search' },
+                  React.createElement(
+                    'input',
+                    {
+                      type: 'text',
+                      placeholder: 'Search components...',
+                      className: 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                      value: searchQuery,
+                      onChange: (e) => setSearchQuery(e.target.value)
+                    }
+                  )
+                ),
+                React.createElement(
+                  Button,
+                  {
+                    variant: 'outline',
+                    size: 'icon',
+                    onClick: toggleDarkMode,
+                    key: 'theme-toggle'
+                  },
+                  React.createElement(
+                    'span',
+                    { className: 'sr-only' },
+                    'Toggle theme'
+                  )
+                )
+              ]
+            )
+          ]
+        )
+      ),
+
+      // Main content
+      React.createElement(
+        'div',
+        { className: 'container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10 py-6', key: 'main' },
+        [
+          // Sidebar
+          React.createElement(
+            'aside',
+            { className: 'fixed top-20 z-30 -ml-2 hidden h-[calc(100vh-5rem)] w-full shrink-0 md:sticky md:block', key: 'sidebar' },
+            [
+              React.createElement('h2', { className: 'mb-2 px-4 text-lg font-semibold tracking-tight', key: 'sidebar-title' }, 'Components'),
+              React.createElement(
+                SidebarNav,
+                {
+                  components: filteredComponents,
+                  onSelect: handleSelectComponent,
+                  selectedComponent
+                }
+              )
+            ]
+          ),
+
+          // Main content area
+          React.createElement(
+            'main',
+            { className: 'relative', key: 'content' },
+            selectedComponent
+              ? React.createElement(ComponentDetail, { component: selectedComponent })
+              : React.createElement(
+                  'div',
+                  { className: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3' },
+                  filteredComponents.map((component) =>
+                    React.createElement(ComponentCard, {
+                      key: component.name,
+                      component,
+                      onClick: handleSelectComponent
+                    })
+                  )
+                )
+          )
+        ]
+      ),
+
+      // Footer
+      React.createElement(
+        'footer',
+        { className: 'border-t py-6 md:py-0', key: 'footer' },
+        React.createElement(
+          'div',
+          { className: 'container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row' },
+          [
+            React.createElement(
+              'p',
+              { className: 'text-center text-sm leading-loose text-muted-foreground md:text-left', key: 'copyright' },
+              'Built with Recursive React Docs AI. © ' + new Date().getFullYear()
+            ),
+            React.createElement(
+              'div',
+              { className: 'flex items-center gap-4', key: 'links' },
+              React.createElement(
+                'a',
+                { href: 'https://github.com', className: 'text-sm text-muted-foreground underline-offset-4 hover:underline' },
+                'GitHub'
+              )
+            )
+          ]
         )
       )
-    ),
-    // Show modal if a similarity is selected
-    selectedSimilarity && renderSimilarityModal(selectedSimilarity),
-    React.createElement(
-      "footer",
-      { className: "app-footer" },
-      React.createElement("p", null, "Generated with Recursive React Docs AI")
-    ),
-    // Add the floating chat bubble
-    React.createElement(CodebaseChat, { components: components })
+    ]
   );
 }
 
-// Wait for DOM to be ready before rendering
-document.addEventListener('DOMContentLoaded', function() {
-  // For React 18
-  try {
-    const root = ReactDOM.createRoot(document.getElementById('app'));
-    root.render(
-      React.createElement(React.StrictMode, null,
-        React.createElement(App, null)
-      )
-    );
-    console.log("React app mounted with createRoot");
-  } catch (e) {
-    console.error("Error using createRoot:", e);
-
-    // Fallback to React 17 method
-    try {
-      ReactDOM.render(
-        React.createElement(React.StrictMode, null,
-          React.createElement(App, null)
-        ),
-        document.getElementById('app')
-      );
-      console.log("React app mounted with ReactDOM.render");
-    } catch (e) {
-      console.error("React rendering failed:", e);
-      document.getElementById('app').innerHTML = '<div class="error"><h1>Error Loading Documentation</h1><p>Check the console for details.</p></div>';
-    }
+// Render the application
+try {
+  const rootElement = document.getElementById('app');
+  if (rootElement) {
+    ReactDOM.createRoot(rootElement).render(React.createElement(App));
+  } else {
+    console.error('Root element #app not found');
   }
-
-  // Initialize syntax highlighting
-  document.querySelectorAll('pre code').forEach((block) => {
-    hljs.highlightElement(block);
-  });
-
-  // Add tooltip functionality
-  const addTooltips = () => {
-    document.querySelectorAll('[data-tooltip]').forEach(element => {
-      element.addEventListener('mouseenter', function() {
-        const tooltip = document.createElement('div');
-        tooltip.className = 'tooltip';
-        tooltip.textContent = this.getAttribute('data-tooltip');
-        document.body.appendChild(tooltip);
-
-        const rect = this.getBoundingClientRect();
-        tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
-        tooltip.style.top = (rect.top - tooltip.offsetHeight - 5) + 'px';
-
-        this.addEventListener('mouseleave', function() {
-          document.body.removeChild(tooltip);
-        }, { once: true });
-      });
-    });
-  };
-
-  // Initial setup
-  setTimeout(addTooltips, 1000);
-
-  // Refresh tooltips when tab changes or component is selected
-  const observer = new MutationObserver(function(mutations) {
-    setTimeout(addTooltips, 500);
-  });
-
-  observer.observe(document.getElementById('app'), {
-    childList: true,
-    subtree: true
-  });
-});
+} catch (error) {
+  console.error('Error rendering application:', error);
+  document.getElementById('app').innerHTML =
+    '<div style="color:red; padding:20px;">' +
+    '<h2>Error Rendering Application</h2>' +
+    '<p>' + (error.message || 'Unknown error') + '</p>' +
+    '</div>';
+}
 `;
 
   await fs.writeFile(mainJsPath, jsContent);

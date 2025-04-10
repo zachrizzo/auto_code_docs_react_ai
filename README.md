@@ -24,6 +24,78 @@ Generate documentation for your React project:
 npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
 ```
 
+## Using as an npm package
+
+You can install and use this package in your own projects in several ways:
+
+### Installation
+
+```bash
+# Install from npm
+npm install recursive-react-docs-ai
+
+# Or using yarn
+yarn add recursive-react-docs-ai
+
+# Or using pnpm
+pnpm add recursive-react-docs-ai
+```
+
+### Usage in your project
+
+Once installed, you can use it in your project in three ways:
+
+1. **Using the CLI**:
+
+```bash
+# Using npx
+npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
+
+# Or if installed globally
+docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
+```
+
+2. **Using the UI script**:
+
+```bash
+# Will generate docs and start the UI server
+npx docs-ui
+```
+
+3. **Using the API programmatically**:
+
+```javascript
+// In your script.js or script.ts
+import { generateDocumentation } from "recursive-react-docs-ai";
+
+async function generateDocs() {
+  const outputPath = await generateDocumentation({
+    rootDir: "./your-project",
+    componentPath: "src/App.jsx",
+    outputDir: "docs",
+    apiKey: "YOUR_OPENAI_API_KEY", // Optional, use if you want AI-powered descriptions
+    // Other options as needed
+  });
+
+  console.log(`Documentation generated at ${outputPath}`);
+}
+
+generateDocs().catch(console.error);
+```
+
+### Using with npm scripts
+
+Add convenient scripts to your project's package.json:
+
+```json
+{
+  "scripts": {
+    "docs": "docs-by-zach generate -r . -c src/App.jsx",
+    "docs:ai": "docs-by-zach generate -r . -c src/App.jsx --ai $OPENAI_API_KEY"
+  }
+}
+```
+
 ## Command Options
 
 | Option                            | Description                                                         |
@@ -156,3 +228,60 @@ console.log(`Documentation generated at ${outputPath}`);
 MIT
 
 # auto_code_docs_react_ai
+
+## For Package Maintainers: Publishing to npm
+
+If you want to publish this package to npm to make it available for others:
+
+1. **Prepare for publication**:
+
+   Ensure all files are set up correctly:
+
+   - `package.json` has the correct name, version, description, and entry points
+   - `.npmignore` excludes files not needed in the package
+   - The `files` field in package.json includes all necessary files
+
+2. **Test the package**:
+
+   ```bash
+   # Build the package
+   npm run build
+
+   # Create a tarball for testing
+   npm pack
+   ```
+
+   This will create a `.tgz` file that you can install in another project for testing:
+
+   ```bash
+   # In a test project
+   npm install /path/to/recursive-react-docs-ai-0.1.0.tgz
+   ```
+
+3. **Publish to npm**:
+
+   ```bash
+   # Login to npm (if not already logged in)
+   npm login
+
+   # Publish the package
+   npm publish
+   ```
+
+4. **Update the package**:
+
+   When making updates, increment the version in package.json following semantic versioning:
+
+   - Patch (0.1.x): Bug fixes and minor changes
+   - Minor (0.x.0): New features, backward compatible
+   - Major (x.0.0): Breaking changes
+
+   ```bash
+   # Update the version
+   npm version patch|minor|major
+
+   # Publish the updated version
+   npm publish
+   ```
+
+Remember to make sure the CLI works correctly with the `docs-by-zach` and `docs-ui` commands by testing them before publishing.

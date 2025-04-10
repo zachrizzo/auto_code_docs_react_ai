@@ -14,15 +14,22 @@ export interface SimilarityWarning {
   code?: string;
 }
 
+export interface AIGeneratedContent {
+  summary?: string;
+  description?: string;
+}
+
 export interface ComponentDefinition {
   name: string;
   description?: string;
+  type?: string;
   props: PropDefinition[];
   filePath: string;
   sourceCode?: string;
   childComponents?: ComponentDefinition[];
   methods?: MethodDefinition[];
   similarityWarnings?: SimilarityWarning[];
+  ai?: AIGeneratedContent;
 }
 
 export interface MethodDefinition {
@@ -37,6 +44,7 @@ export interface MethodDefinition {
   returnDescription?: string;
   code?: string;
   similarityWarnings?: SimilarityWarning[];
+  ai?: AIGeneratedContent;
 }
 
 export interface ParserOptions {
