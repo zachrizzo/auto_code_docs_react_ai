@@ -15,7 +15,8 @@
     "prepare": "npm run build",
     "example": "ts-node examples/example-usage.ts",
     "docs-ui": "bash ./generate-and-run-docs.sh",
-    "docs-ollama": "bash ./generate-docs-with-ollama.sh"
+    "docs-ollama": "bash ./generate-and-run-docs.sh --use-ollama",
+    "docs": "bash ./generate-and-run-docs.sh"
   },
   "keywords": [
     "react",

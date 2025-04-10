@@ -196,57 +196,58 @@ program
       });
       spinner.succeed(`Documentation generated at ${chalk.green(outputPath)}`);
 
-      // Open browser if enabled
-      if (options.open) {
-        const port = parseInt(options.port, 10) || 3000;
-        spinner.start(`Starting server on port ${port}`);
-
-        const server = http.createServer((req, res) => {
-          // Handle URL parameters
-          const url = req.url?.split("?")[0] || "";
-          const filePath = path.join(outputPath, url || "index.html");
-
-          fs.readFile(filePath, (err, data) => {
-            if (err) {
-              res.writeHead(404);
-              res.end("File not found");
-              return;
-            }
-
-            // Set content type based on file extension
-            const ext = path.extname(filePath).toLowerCase();
-            const contentType =
-              {
-                ".html": "text/html",
-                ".js": "text/javascript",
-                ".css": "text/css",
-                ".json": "application/json",
-                ".png": "image/png",
-                ".jpg": "image/jpg",
-                ".gif": "image/gif",
-              }[ext] || "text/plain";
-
-            res.writeHead(200, { "Content-Type": contentType });
-            res.end(data);
-          });
-        });
-
-        server.listen(port);
-        spinner.succeed(`Server started at http://localhost:${port}`);
-        await openBrowser(`http://localhost:${port}`);
-        console.log(
-          `${chalk.green(
-            "✓"
-          )} Done! You can view your documentation at ${chalk.cyan(outputPath)}`
-        );
-        console.log(chalk.yellow("Press Ctrl+C to stop the server"));
-      } else {
-        console.log(
-          chalk.green("✨"),
-          chalk.white(`To view the documentation, run:`),
-          chalk.cyan(`npx http-server ${outputPath} -o`)
-        );
-      }
+      // // Open browser if enabled
+      // if (options.open) {
+      //   const port = parseInt(options.port, 10) || 3000;
+      //   spinner.start(`Starting server on port ${port}`);
+      //
+      //   const server = http.createServer((req, res) => {
+      //     // Handle URL parameters
+      //     const url = req.url?.split("?")[0] || "";
+      //     const filePath = path.join(outputPath, url || "index.html");
+      //
+      //     fs.readFile(filePath, (err, data) => {
+      //       if (err) {
+      //         res.writeHead(404);
+      //         res.end("File not found");
+      //         return;
+      //       }
+      //
+      //       // Set content type based on file extension
+      //       const ext = path.extname(filePath).toLowerCase();
+      //       const contentType =
+      //         {
+      //           ".html": "text/html",
+      //           ".js": "text/javascript",
+      //           ".css": "text/css",
+      //           ".json": "application/json",
+      //           ".png": "image/png",
+      //           ".jpg": "image/jpg",
+      //           ".gif": "image/gif",
+      //         }[ext] || "text/plain";
+      //
+      //       res.writeHead(200, { "Content-Type": contentType });
+      //       res.end(data);
+      //     });
+      //   });
+      //
+      //   server.listen(port);
+      //   spinner.succeed(`Server started at http://localhost:${port}`);
+      //   await openBrowser(`http://localhost:${port}`);
+      //   console.log(
+      //     `${chalk.green(
+      //       "✓"
+      //     )} Done! You can view your documentation at ${chalk.cyan(outputPath)}`
+      //   );
+      //   console.log(chalk.yellow("Press Ctrl+C to stop the server"));
+      // } else {
+      // Always log the command to view, as the shell script handles serving/opening
+      console.log(
+        chalk.green("✨"),
+        chalk.white(`To view the documentation, run:`),
+        chalk.cyan(`npx http-server ${outputPath} -o -p <port>`)
+      );
+      // }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -261,10 +262,11 @@ program.parse(process.argv);
 // Function to dynamically import open
 async function openBrowser(url: string) {
   try {
-    const openModule = await import("open");
-    await openModule.default(url);
+    // Use dynamic import() which works with both CJS and ESM
+    const { default: open } = await import("open");
+    await open(url);
   } catch (error) {
-    console.error("Failed to open browser:", error);
+    console.error(`Failed to open browser at ${url}:`, error);
   }
 }
 
