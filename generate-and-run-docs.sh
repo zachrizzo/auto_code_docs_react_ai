@@ -23,15 +23,14 @@ done
 find_free_port() {
   local port=$PORT
   while lsof -i:$port >/dev/null 2>&1; do
-    # Echo status messages to standard error (stderr) so they don't get captured by $()
     echo "Port $port is already in use, trying next port..." >&2
     ((port++))
   done
-  # Echo only the final port number to standard output (stdout)
-  echo $port
+  echo "$port"
 }
 
-PORT=$(find_free_port | tail -n 1)
+# Make sure we capture only the port number without any stderr messages
+PORT=$(find_free_port)
 echo "🔍 Using port $PORT for server"
 
 # If using Ollama, check if it's running and model is available
@@ -96,4 +95,5 @@ fi
 echo "🚀 Starting HTTP server on port $PORT..."
 cd docs
 echo "📊 Documentation is available at: http://localhost:$PORT"
-npx http-server -p $PORT --cors -c-1 -o
+# Explicitly add the path, port, and options as separate arguments to avoid type conversion issues
+npx http-server ./ -p "$PORT" --cors -c-1 -o
