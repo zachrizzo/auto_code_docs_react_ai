@@ -39,6 +39,9 @@ npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_
 | `--ai <apiKey>`                   | OpenAI API key for generating descriptions                          |
 | `--similarity-threshold <number>` | Threshold for function similarity detection (0.0-1.0, default: 0.8) |
 | `--theme <theme>`                 | Theme for documentation (light, dark, auto)                         |
+| `--use-ollama`                    | Use Ollama for local embeddings instead of OpenAI                   |
+| `--ollama-url <url>`              | URL for Ollama API (default: http://localhost:11434)                |
+| `--ollama-model <model>`          | Model to use with Ollama (default: gemma3:27b)                      |
 
 ## Function Similarity Detection
 
@@ -74,6 +77,40 @@ The similarity visualization tab shows connections between functions that are fu
 
 3. Open the generated documentation and navigate to the "Function Similarities" tab to view the visualization.
 
+### Using Ollama for Local Embeddings
+
+You can now use [Ollama](https://ollama.ai) for generating embeddings locally without requiring an OpenAI API key:
+
+1. [Install Ollama](https://ollama.ai/download) on your machine
+2. Start the Ollama server: `ollama serve`
+3. Pull a model that supports embeddings: `ollama pull gemma3:27b` (or another model of your choice)
+4. Generate documentation using Ollama:
+
+   ```bash
+   # Using the CLI
+   npx docs-by-zach generate -r ./your-project -c src/App.jsx --use-ollama
+
+   # Or using the provided script
+   ./generate-docs-with-ollama.sh
+   ```
+
+5. You can customize the Ollama settings:
+
+   ```bash
+   npx docs-by-zach generate -r ./your-project -c src/App.jsx \
+     --use-ollama \
+     --ollama-url "http://localhost:11434" \
+     --ollama-model "gemma3:27b" \
+     --similarity-threshold 0.6
+   ```
+
+Benefits of using Ollama:
+
+- Completely local and private analysis
+- No API keys or internet connection required
+- Free to use without limitations
+- Support for various embedding models
+
 ## API Usage
 
 You can also use the library programmatically:
@@ -84,18 +121,31 @@ import {
   generateDocumentation,
 } from "recursive-react-docs-ai";
 
-// Parse components with similarity detection
-const components = await parseComponents({
+// Option 1: Parse components with OpenAI similarity detection
+const componentsWithOpenAI = await parseComponents({
   rootDir: "./your-project",
   componentPath: "src/App.jsx",
   apiKey: "YOUR_OPENAI_API_KEY",
   similarityThreshold: 0.8,
 });
 
-// Generate documentation
-const outputPath = await generateDocumentation(components, {
+// Option 2: Parse components with Ollama for local embeddings
+const componentsWithOllama = await parseComponents({
+  rootDir: "./your-project",
+  componentPath: "src/App.jsx",
+  useOllama: true,
+  ollamaUrl: "http://localhost:11434", // Default Ollama URL
+  ollamaModel: "gemma3:27b", // Model to use for embeddings
+  similarityThreshold: 0.6,
+});
+
+// Generate documentation (works with either approach)
+const outputPath = await generateDocumentation({
+  componentPath: "src/App.jsx",
+  rootDir: "./your-project",
   outputDir: "docs",
   theme: "light",
+  // Include either apiKey or useOllama options here
 });
 
 console.log(`Documentation generated at ${outputPath}`);
@@ -104,4 +154,5 @@ console.log(`Documentation generated at ${outputPath}`);
 ## License
 
 MIT
+
 # auto_code_docs_react_ai

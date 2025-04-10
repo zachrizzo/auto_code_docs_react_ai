@@ -1,0 +1,51 @@
+# Source files
+src/
+
+# Examples
+examples/
+
+# Tests
+__tests__/
+tests/
+*.test.ts
+*.spec.ts
+
+# Config files
+tsconfig.json
+jest.config.js
+.eslintrc
+.eslintignore
+.prettierrc
+.prettierignore
+
+# Docs
+docs/
+example-docs/
+todoitem-docs/
+
+# Git files
+.git/
+.github/
+.gitignore
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.*
+
+# Other
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Do not ignore these files
+!generate-and-run-docs.sh
