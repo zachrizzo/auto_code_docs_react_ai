@@ -64,8 +64,8 @@ program
     process.env.SIMILARITY_THRESHOLD || "0.6"
   )
   .option(
-    "--use-ollama",
-    "Use Ollama for local embeddings instead of OpenAI",
+    "--use-openai",
+    "Use OpenAI instead of Ollama for embeddings (requires API key)",
     false
   )
   .option(
@@ -91,11 +91,6 @@ program
   )
   .option("-p, --port <port>", "Port to serve documentation")
   .option("-s, --similarity <threshold>", "Similarity threshold")
-  .option("--use-ollama", "Use Ollama for embeddings")
-  .option("--ollama-url <url>", "URL for Ollama server")
-  .option("--ollama-model <model>", "Model for Ollama")
-  .option("--enable-chat", "Enable chat functionality (default: true)")
-  .option("--chat-model <model>", "Model for chat functionality")
   .option("--cache-dir <path>", "Path to cache directory for documentation")
   .action(async (rootDir: string, options: any) => {
     try {
@@ -226,7 +221,7 @@ program
         port: options.port ? parseInt(options.port) : 3000,
         apiKey: options.apiKey,
         similarityThreshold: similarityThreshold,
-        useOllama: options.useOllama,
+        useOpenAI: options.useOpenAI,
         ollamaUrl: options.ollamaUrl,
         ollamaModel: options.ollamaModel,
         enableChat: options.enableChat,
@@ -247,21 +242,25 @@ program
           rootDir: absoluteRootDir,
           componentPath: options.component,
           apiKey: options.apiKey,
-          useOllama: options.useOllama,
+          useOpenAI: options.useOpenAI,
           ollamaUrl: options.ollamaUrl,
           ollamaModel: options.ollamaModel,
           enableChat: options.enableChat,
           chatModel: options.chatModel,
         });
 
-        spinner.succeed(`Server started at http://localhost:${parsedPort}`);
-        await openBrowser(`http://localhost:${parsedPort}`);
+        // Get the actual port used (in case it was changed due to port rotation)
+        const address = server.address() as { port: number };
+        const actualPort = address ? address.port : parsedPort;
+
+        spinner.succeed(`Server started at http://localhost:${actualPort}`);
+        await openBrowser(`http://localhost:${actualPort}`);
 
         console.log(
           `${chalk.green(
             "✓"
           )} Done! You can view your documentation at ${chalk.cyan(
-            `http://localhost:${parsedPort}`
+            `http://localhost:${actualPort}`
           )}`
         );
         console.log(chalk.yellow("Press Ctrl+C to stop the server"));
@@ -293,8 +292,8 @@ program.parse(process.argv);
 async function openBrowser(url: string) {
   try {
     // Use dynamic import() which works with both CJS and ESM
-    const { default: open } = await import("open");
-    await open(url);
+    const open = await import("open");
+    await open.default(url);
   } catch (error) {
     console.error(`Failed to open browser at ${url}:`, error);
   }
@@ -310,7 +309,13 @@ async function startServer(
   components: ComponentDefinition[],
   options: DocumentationOptions
 ): Promise<http.Server> {
-  const { apiKey, useOllama, ollamaUrl, ollamaModel, chatModel } = options;
+  const {
+    apiKey,
+    useOpenAI = false,
+    ollamaUrl,
+    ollamaModel,
+    chatModel,
+  } = options;
 
   // Create a chat service if enabled
   let chatService: any = null;
@@ -318,90 +323,135 @@ async function startServer(
     const { CodebaseChatService } = await import("../ai/chat-service");
     chatService = new CodebaseChatService(components, {
       apiKey,
-      useOllama,
+      useOpenAI,
       ollamaUrl,
       ollamaModel,
       chatModel,
     });
   }
 
-  const server = http.createServer((req, res) => {
-    const parsedUrl = url.parse(req.url || "", true);
-    const pathname = parsedUrl.pathname || "";
+  // Function to try starting the server on a specific port
+  const tryStartServer = (portToUse: number): Promise<http.Server> => {
+    return new Promise((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        const parsedUrl = url.parse(req.url || "", true);
+        const pathname = parsedUrl.pathname || "";
 
-    // Handle API requests
-    if (pathname === "/api/chat" && req.method === "POST" && chatService) {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk.toString();
-      });
-
-      req.on("end", async () => {
-        try {
-          const { history, query } = JSON.parse(body);
-
-          const result = await chatService.chat(history, query);
-
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(result));
-        } catch (error) {
-          console.error("Error handling chat request:", error);
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Internal server error" }));
-        }
-      });
-
-      return;
-    }
-
-    // Handle static file requests
-    const filePath = path.join(
-      outputPath,
-      pathname === "/" ? "index.html" : pathname
-    );
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        // If the file doesn't exist, serve index.html (for SPA routing)
-        if (err.code === "ENOENT" && !pathname.includes(".")) {
-          fs.readFile(path.join(outputPath, "index.html"), (err, data) => {
-            if (err) {
-              res.writeHead(404);
-              res.end("Not Found");
-              return;
-            }
-
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(data);
+        // Handle API requests
+        if (pathname === "/api/chat" && req.method === "POST" && chatService) {
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk.toString();
           });
+
+          req.on("end", async () => {
+            try {
+              const { history, query } = JSON.parse(body);
+
+              const result = await chatService.chat(history, query);
+
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify(result));
+            } catch (error) {
+              console.error("Error handling chat request:", error);
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Internal server error" }));
+            }
+          });
+
           return;
         }
 
-        res.writeHead(404);
-        res.end("Not Found");
-        return;
-      }
+        // Handle static file requests
+        const filePath = path.join(
+          outputPath,
+          pathname === "/" ? "index.html" : pathname
+        );
 
-      // Set content type based on file extension
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType =
-        {
-          ".html": "text/html",
-          ".js": "text/javascript",
-          ".css": "text/css",
-          ".json": "application/json",
-          ".png": "image/png",
-          ".jpg": "image/jpg",
-          ".gif": "image/gif",
-        }[ext] || "text/plain";
+        fs.readFile(filePath, (err, data) => {
+          if (err) {
+            // If the file doesn't exist, serve index.html (for SPA routing)
+            if (err.code === "ENOENT" && !pathname.includes(".")) {
+              fs.readFile(path.join(outputPath, "index.html"), (err, data) => {
+                if (err) {
+                  res.writeHead(404);
+                  res.end("Not Found");
+                  return;
+                }
 
-      res.writeHead(200, { "Content-Type": contentType });
-      res.end(data);
+                res.writeHead(200, { "Content-Type": "text/html" });
+                res.end(data);
+              });
+              return;
+            }
+
+            res.writeHead(404);
+            res.end("Not Found");
+            return;
+          }
+
+          // Set content type based on file extension
+          const ext = path.extname(filePath).toLowerCase();
+          const contentType =
+            {
+              ".html": "text/html",
+              ".js": "text/javascript",
+              ".css": "text/css",
+              ".json": "application/json",
+              ".png": "image/png",
+              ".jpg": "image/jpg",
+              ".gif": "image/gif",
+            }[ext] || "text/plain";
+
+          res.writeHead(200, { "Content-Type": contentType });
+          res.end(data);
+        });
+      });
+
+      // Handle server errors
+      server.on("error", (err: any) => {
+        if (err.code === "EADDRINUSE") {
+          // Port is in use, reject with a specific error
+          reject({ code: "EADDRINUSE", port: portToUse });
+        } else {
+          // Some other error occurred
+          reject(err);
+        }
+      });
+
+      // Start listening on the port
+      server.listen(portToUse, () => {
+        console.log(`Server started at http://localhost:${portToUse}`);
+        resolve(server);
+      });
     });
-  });
+  };
 
-  server.listen(port);
-  console.log(`Server started at http://localhost:${port}`);
+  // Try to start the server on the specified port, and if that fails, try other ports
+  const maxPortAttempts = 10; // Try up to 10 ports
+  let currentPort = port;
+  let attempts = 0;
 
-  return server;
+  while (attempts < maxPortAttempts) {
+    try {
+      return await tryStartServer(currentPort);
+    } catch (error: any) {
+      if (error.code === "EADDRINUSE") {
+        // Port is in use, try the next port
+        attempts++;
+        currentPort++;
+        console.log(
+          `Port ${error.port} is in use, trying port ${currentPort}...`
+        );
+      } else {
+        // Some other error occurred, rethrow it
+        throw error;
+      }
+    }
+  }
+
+  // If we reach here, we've exhausted all port attempts
+  throw new Error(
+    `Unable to start server after trying ${maxPortAttempts} different ports.`
+  );
 }

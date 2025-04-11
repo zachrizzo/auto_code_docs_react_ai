@@ -18,6 +18,7 @@ interface VectorEntry {
 export interface VectorSimilarityOptions {
   apiKey?: string;
   useOllama?: boolean;
+  useOpenAI?: boolean;
   ollamaUrl?: string;
   ollamaModel?: string;
   similarityThreshold?: number; // Default 0.8 (80%)
@@ -36,7 +37,13 @@ export class VectorSimilarityService {
     process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
 
   constructor(options: VectorSimilarityOptions) {
-    this.useOllama = options.useOllama || false;
+    // Use useOpenAI if explicitly set, otherwise use !useOllama
+    const useOpenAI =
+      options.useOpenAI !== undefined
+        ? options.useOpenAI
+        : !(options.useOllama || false);
+
+    this.useOllama = !useOpenAI;
 
     if (this.useOllama) {
       // Use Ollama for local embeddings
@@ -53,7 +60,7 @@ export class VectorSimilarityService {
     } else {
       // Use OpenAI for embeddings
       if (!options.apiKey) {
-        throw new Error("API key is required when not using Ollama");
+        throw new Error("API key is required when using OpenAI");
       }
 
       this.openai = new OpenAI({

@@ -6,6 +6,7 @@ import axios from "axios";
 export interface ChatServiceOptions {
   apiKey?: string;
   useOllama?: boolean;
+  useOpenAI?: boolean;
   ollamaUrl?: string;
   ollamaModel?: string;
   chatModel?: string;
@@ -38,12 +39,19 @@ export class CodebaseChatService {
 
   constructor(components: ComponentDefinition[], options: ChatServiceOptions) {
     this.components = components;
-    this.useOllama = options.useOllama || false;
+
+    // Use useOpenAI if explicitly set, otherwise use !useOllama
+    const useOpenAI =
+      options.useOpenAI !== undefined
+        ? options.useOpenAI
+        : !(options.useOllama || false);
+
+    this.useOllama = !useOpenAI;
 
     // Initialize vector service for embeddings and similarity search
     this.vectorService = new VectorSimilarityService({
       apiKey: options.apiKey,
-      useOllama: options.useOllama,
+      useOllama: this.useOllama,
       ollamaUrl: options.ollamaUrl,
       ollamaModel: options.ollamaModel,
     });
@@ -64,7 +72,7 @@ export class CodebaseChatService {
     } else {
       // Use OpenAI for chat completions
       if (!options.apiKey) {
-        throw new Error("API key is required when not using Ollama");
+        throw new Error("API key is required when using OpenAI");
       }
 
       this.openai = new OpenAI({

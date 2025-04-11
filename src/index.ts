@@ -28,6 +28,7 @@ export interface DocumentationOptions extends ParserOptions {
   enableChat?: boolean;
   chatModel?: string;
   cachePath?: string; // Path for documentation cache
+  useOpenAI?: boolean; // New flag to explicitly use OpenAI instead of Ollama
 }
 
 export {
@@ -67,7 +68,8 @@ export async function generateDocumentation(
     similarityThreshold = process.env.SIMILARITY_THRESHOLD
       ? parseFloat(process.env.SIMILARITY_THRESHOLD)
       : 0.6,
-    useOllama = false, // Use Ollama for local embeddings instead of OpenAI
+    useOpenAI = false, // Default to not using OpenAI
+    useOllama = !useOpenAI, // Use Ollama by default
     ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434",
     ollamaModel = process.env.OLLAMA_MODEL || "nomic-embed-text:latest", // Default from shell script
     cachePath = path.join(process.cwd(), ".docs-cache", "docs-cache.json"), // Default cache path
@@ -111,8 +113,8 @@ export async function generateDocumentation(
     port,
   });
 
-  // If API key is provided, enhance components with AI descriptions
-  if (apiKey) {
+  // If explicitly using OpenAI and API key is provided, enhance components with AI descriptions
+  if (useOpenAI && apiKey) {
     const aiGenerator = new AiDescriptionGenerator({
       apiKey,
       cachePath,
