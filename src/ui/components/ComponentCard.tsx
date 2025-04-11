@@ -1,10 +1,6 @@
 import React from 'react';
-import { Badge } from './ui/Badge';
-import { Card } from './ui/Card';
-import { CardContent } from './ui/Card';
-import { CardDescription } from './ui/Card';
-import { CardHeader } from './ui/Card';
-import { CardTitle } from './ui/Card';
+import { Badge } from './ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 interface ComponentCardProps {
     component: any;
@@ -12,9 +8,12 @@ interface ComponentCardProps {
 }
 
 export const ComponentCard: React.FC<ComponentCardProps> = ({ component, onClick }) => {
-    const { name, description, type, fileName, props = [], similarityScore } = component;
+    // Use displayName if available, otherwise use name
+    const displayName = component.displayName || component.name;
 
-    const requiredProps = props.filter(p => p.required).length;
+    const { description, type, fileName, props = [], similarityScore } = component;
+
+    const requiredProps = props.filter((p: { required: boolean }) => p.required).length;
     const hasChildren = component.childComponents && component.childComponents.length > 0;
     const hasSimilarities = similarityScore && similarityScore > 0.7;
 
@@ -23,7 +22,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({ component, onClick
             <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">
-                        {name}
+                        {displayName}
                         {hasSimilarities && (
                             <span className="similarity-indicator ml-2" title={`Similarity score: ${Math.round(similarityScore * 100)}%`}>
                                 <svg className="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20">

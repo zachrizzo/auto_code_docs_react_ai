@@ -122,25 +122,120 @@ export const PropertyTable: React.FC<PropertyTableProps> = ({ properties }) => {
 };
 
 interface MethodDisplayProps {
-    method: any; // Using any for simplicity, ideally would be properly typed
+    method: {
+        name: string;
+        code?: string;
+        ai?: {
+            description?: string;
+        };
+        params?: Array<{
+            name: string;
+            type: string;
+        }>;
+        returnType?: string;
+        similarityWarnings?: Array<{
+            similarTo: string;
+            score: number;
+            reason: string;
+            filePath: string;
+            code?: string;
+        }>;
+    };
 }
 
-// Method display with shadcn/ui
+// Method display with shadcn/ui - ENHANCED
 export const MethodDisplay: React.FC<MethodDisplayProps> = ({ method }) => {
+    const [copied, setCopied] = React.useState(false);
+    const [expanded, setExpanded] = React.useState(false);
+
+    const hasSimilarMethods = method.similarityWarnings && method.similarityWarnings.length > 0;
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(method.code || '');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
-        <Card className="mb-4">
+        <Card className={`mb-4 ${hasSimilarMethods ? 'border-amber-300 dark:border-amber-700' : ''}`}>
             <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-mono">{method.name}()</CardTitle>
+                <CardTitle className="text-lg font-mono flex justify-between items-center">
+                    <div className="flex items-center">
+                        {method.name}()
+                        {hasSimilarMethods && (
+                            <span className="ml-2 text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-100 rounded-full">
+                                Similar code detected
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleCopy}
+                            className="text-xs text-muted-foreground hover:text-primary"
+                        >
+                            {copied ? "Copied!" : "Copy"}
+                        </button>
+                        {hasSimilarMethods && (
+                            <button
+                                onClick={() => setExpanded(!expanded)}
+                                className="text-xs text-muted-foreground hover:text-primary"
+                            >
+                                {expanded ? "Hide details" : "View similarities"}
+                            </button>
+                        )}
+                    </div>
+                </CardTitle>
                 {method.ai?.description && (
                     <CardDescription>{method.ai.description}</CardDescription>
                 )}
+                <div className="mt-2 bg-muted rounded p-2 text-xs font-mono">
+                    {method.name}(
+                    {method.params && method.params.map((param, i: number) => (
+                        <span key={param.name}>
+                            {i > 0 && ', '}
+                            <span className="text-blue-600 dark:text-blue-400">{param.name}</span>
+                            <span>: </span>
+                            <span className="text-green-600 dark:text-green-400">{param.type}</span>
+                        </span>
+                    ))}
+                    ): <span className="text-purple-600 dark:text-purple-400">{method.returnType || 'void'}</span>
+                </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
                 {method.code && (
-                    <div className="rounded-md bg-muted p-4 my-2 overflow-auto">
+                    <div className="rounded-md bg-muted p-4 overflow-auto relative">
                         <pre className="text-sm font-mono">
                             <code>{method.code}</code>
                         </pre>
+                    </div>
+                )}
+
+                {hasSimilarMethods && expanded && (
+                    <div className="mt-4 space-y-3">
+                        <h4 className="text-sm font-semibold text-muted-foreground">Similar Methods Found</h4>
+                        {method.similarityWarnings && method.similarityWarnings.map((similarMethod, idx: number) => (
+                            <div key={idx} className="border rounded-md p-3 bg-muted/20">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="font-semibold text-sm">
+                                        {similarMethod.similarTo}
+                                    </span>
+                                    <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-100 rounded-full">
+                                        {Math.round(similarMethod.score * 100)}% match
+                                    </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">{similarMethod.reason}</p>
+
+                                {similarMethod.code && (
+                                    <div className="rounded-md bg-muted p-3 overflow-auto text-xs">
+                                        <pre className="font-mono"><code>{similarMethod.code}</code></pre>
+                                    </div>
+                                )}
+
+                                <div className="text-xs text-muted-foreground mt-2">
+                                    From: {similarMethod.filePath}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </CardContent>

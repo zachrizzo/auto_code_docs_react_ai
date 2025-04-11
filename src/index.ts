@@ -133,13 +133,66 @@ function deduplicateComponents(
   components: ComponentDefinition[]
 ): ComponentDefinition[] {
   const seen = new Map<string, ComponentDefinition>();
+  const result: ComponentDefinition[] = [];
 
+  // Helper function to recursively process components and their children
+  function processComponent(
+    component: ComponentDefinition
+  ): ComponentDefinition {
+    const key = `${component.name}:${component.filePath}`;
+
+    // Process child components recursively
+    if (component.childComponents && component.childComponents.length > 0) {
+      const uniqueChildren: ComponentDefinition[] = [];
+      const childNameSet = new Set<string>();
+
+      for (const child of component.childComponents) {
+        const childKey = `${child.name}:${child.filePath}`;
+
+        // Only add this child if we haven't already seen it at this level
+        if (!childNameSet.has(childKey)) {
+          childNameSet.add(childKey);
+          uniqueChildren.push(processComponent(child));
+        }
+      }
+
+      // Replace with deduplicated children
+      component.childComponents = uniqueChildren;
+    }
+
+    return component;
+  }
+
+  // First pass: collect all unique components by name + file path
   for (const component of components) {
     const key = `${component.name}:${component.filePath}`;
+
+    // If this is a new component, add it to our seen map
     if (!seen.has(key)) {
       seen.set(key, component);
+    } else {
+      // If we've seen it before, keep the one with more information
+      const existing = seen.get(key)!;
+
+      // Choose the better component (prefer ones with more details)
+      const currentHasMoreInfo =
+        (component.description && !existing.description) ||
+        (component.props?.length || 0) > (existing.props?.length || 0) ||
+        (component.methods?.length || 0) > (existing.methods?.length || 0);
+
+      if (currentHasMoreInfo) {
+        seen.set(key, component);
+      }
     }
   }
 
-  return Array.from(seen.values());
+  // Process all top-level components and deduplicate their children
+  for (const component of seen.values()) {
+    result.push(processComponent(component));
+  }
+
+  console.log(`Initial components: ${components.length}`);
+  console.log(`After deduplication: ${result.length}`);
+
+  return result;
 }

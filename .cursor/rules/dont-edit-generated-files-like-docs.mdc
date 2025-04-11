@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+never edit the generated files to fix problems. Remember, all of the generated files will be changed when we rerun the script so you need to edit the generator.
+[generator.ts](mdc:src/ai/generator.ts)
+

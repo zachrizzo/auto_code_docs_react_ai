@@ -67,4 +67,7 @@ export interface DocumentationConfig {
   outputDir?: string;
   openBrowser?: boolean;
   port?: number;
+  showCode?: boolean;
+  showMethods?: boolean;
+  showSimilarity?: boolean;
 }

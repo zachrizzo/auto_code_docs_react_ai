@@ -8,6 +8,11 @@ SIMILARITY_THRESHOLD=0.6
 PORT=3000
 ENABLE_CHAT=true
 CHAT_MODEL="gemma3:27b"
+SHOW_CODE=true
+SHOW_METHODS=true
+SHOW_SIMILARITY=true
+# Mock API key for demo purposes
+OPENAI_API_KEY="sk-mock-api-key-for-demo-purposes-only"
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -19,9 +24,18 @@ while [[ "$#" -gt 0 ]]; do
     --port) PORT="$2"; shift 2 ;;
     --enable-chat) ENABLE_CHAT="$2"; shift 2 ;;
     --chat-model) CHAT_MODEL="$2"; shift 2 ;;
+    --show-code) SHOW_CODE="$2"; shift 2 ;;
+    --show-methods) SHOW_METHODS="$2"; shift 2 ;;
+    --show-similarity) SHOW_SIMILARITY="$2"; shift 2 ;;
+    --api-key) OPENAI_API_KEY="$2"; shift 2 ;;
     *) echo "Unknown parameter: $1"; exit 1 ;;
   esac
 done
+
+# Ensure these values are always true for our requirements
+ENABLE_CHAT=true
+SHOW_CODE=true
+SHOW_METHODS=true
 
 # Export environment variables for Node.js code
 export OLLAMA_URL="$OLLAMA_URL"
@@ -30,6 +44,10 @@ export SIMILARITY_THRESHOLD="$SIMILARITY_THRESHOLD"
 export PORT="$PORT"
 export ENABLE_CHAT="$ENABLE_CHAT"
 export CHAT_MODEL="$CHAT_MODEL"
+export SHOW_CODE="$SHOW_CODE"
+export SHOW_METHODS="$SHOW_METHODS"
+export SHOW_SIMILARITY="$SHOW_SIMILARITY"
+export OPENAI_API_KEY="$OPENAI_API_KEY"
 
 # Find a free port starting from PORT
 find_free_port() {
@@ -94,6 +112,11 @@ fi
 
 # Generate documentation
 echo "📚 Generating documentation..."
+echo "🧩 Showing component code: $SHOW_CODE"
+echo "🔧 Showing component methods: $SHOW_METHODS"
+echo "🔄 Showing method similarities: $SHOW_SIMILARITY"
+echo "💬 AI Chat enabled: $ENABLE_CHAT"
+
 # Manually run the steps since there appears to be an issue with CLI arguments
 # 1. Parse the components
 node -e "
@@ -107,7 +130,8 @@ async function run() {
     useOllama: ${USE_OLLAMA},
     ollamaUrl: '${OLLAMA_URL}',
     ollamaModel: '${OLLAMA_MODEL}',
-    similarityThreshold: ${SIMILARITY_THRESHOLD}
+    similarityThreshold: ${SIMILARITY_THRESHOLD},
+    apiKey: '${OPENAI_API_KEY}'
   });
 
   // Write components to a file so we can use them in the next step
@@ -134,7 +158,10 @@ async function run() {
     title: 'React Component Documentation',
     description: 'Auto-generated documentation for React components',
     theme: 'light',
-    outputDir: path.join(process.cwd(), 'docs')
+    outputDir: path.join(process.cwd(), 'docs'),
+    showCode: true,
+    showMethods: true,
+    showSimilarity: ${SHOW_SIMILARITY}
   });
 
   console.log('✓ Documentation generated at ' + outputPath);
@@ -160,7 +187,8 @@ async function startServer() {
     useOllama: ${USE_OLLAMA},
     ollamaUrl: '${OLLAMA_URL}',
     ollamaModel: '${OLLAMA_MODEL}',
-    chatModel: '${CHAT_MODEL}'
+    chatModel: '${CHAT_MODEL}',
+    apiKey: '${OPENAI_API_KEY}'
   });
 
   const server = http.createServer((req, res) => {
@@ -188,6 +216,71 @@ async function startServer() {
         }
       });
 
+      return;
+    }
+
+    // Handle component code API endpoint
+    if (pathname === '/api/component-code' && req.method === 'GET') {
+      try {
+        const queryParams = parsedUrl.query;
+        const componentName = queryParams.name;
+
+        if (!componentName) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Component name is required' }));
+          return;
+        }
+
+        // Find the component by name
+        const component = components.find(c => c.name === componentName);
+
+        if (!component) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Component not found' }));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          sourceCode: component.sourceCode,
+          methods: component.methods,
+          similarityWarnings: component.similarityWarnings
+        }));
+      } catch (error) {
+        console.error('Error handling component code request:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+      return;
+    }
+
+    // Handle method similarity API endpoint
+    if (pathname === '/api/method-similarity' && req.method === 'GET') {
+      try {
+        // Get all methods with their similarity warnings
+        const allMethods = [];
+        components.forEach(component => {
+          if (component.methods && component.methods.length > 0) {
+            component.methods.forEach(method => {
+              if (method.similarityWarnings && method.similarityWarnings.length > 0) {
+                allMethods.push({
+                  componentName: component.name,
+                  methodName: method.name,
+                  code: method.code || '',
+                  similarityWarnings: method.similarityWarnings
+                });
+              }
+            });
+          }
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(allMethods));
+      } catch (error) {
+        console.error('Error handling method similarity request:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
       return;
     }
 
@@ -235,8 +328,9 @@ async function startServer() {
 
   server.listen(${PORT});
   console.log('🚀 Server started at http://localhost:${PORT}');
-
-  // Print URL for user to open manually instead of using 'open'
+  console.log('💬 AI Chat API available at: http://localhost:${PORT}/api/chat');
+  console.log('📝 Component Code API available at: http://localhost:${PORT}/api/component-code?name=ComponentName');
+  console.log('🔄 Method Similarity API available at: http://localhost:${PORT}/api/method-similarity');
   console.log('✓ Documentation is now available at: http://localhost:${PORT}');
   console.log('Please open your browser to the URL above');
   console.log('Press Ctrl+C to stop the server');

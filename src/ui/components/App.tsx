@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext, createContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { ComponentCard } from './ComponentCard';
 import { ComponentDetails } from './ComponentDetails';
 import { EmptyState } from './EmptyState';
@@ -6,16 +6,30 @@ import { Sidebar } from './Sidebar';
 import { Search } from './Search';
 import { ThemeContext, ThemeProvider } from '../context/ThemeContext';
 import { ToastContext, ToastProvider } from '../context/ToastContext';
-import { processComponentsWithSimilarity } from '../utils/similarity';
+import { ChatToggle } from './ChatToggle';
+
+// Define component types for TypeScript
+interface ComponentDefinition {
+    name: string;
+    description?: string;
+    type?: string;
+    category?: string;
+    filePath?: string;
+    props?: any[];
+    methods?: any[];
+    childComponents?: ComponentDefinition[];
+    similarityScore?: number;
+    similarityWarnings?: any[];
+}
 
 // Main App component
 export const App = () => {
-    const [components, setComponents] = useState([]);
-    const [filteredComponents, setFilteredComponents] = useState([]);
-    const [selectedComponent, setSelectedComponent] = useState(null);
+    const [components, setComponents] = useState<ComponentDefinition[]>([]);
+    const [filteredComponents, setFilteredComponents] = useState<ComponentDefinition[]>([]);
+    const [selectedComponent, setSelectedComponent] = useState<ComponentDefinition | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
-    const [activeCategory, setActiveCategory] = useState(null);
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(true);
     const { theme, toggleTheme } = useContext(ThemeContext);
     const { showToast } = useContext(ToastContext);
@@ -24,26 +38,33 @@ export const App = () => {
     useEffect(() => {
         try {
             if (window.COMPONENT_DATA && Array.isArray(window.COMPONENT_DATA)) {
-                const processedData = processComponentsWithSimilarity(window.COMPONENT_DATA);
+                // Process component data
+                const processedData = window.COMPONENT_DATA as ComponentDefinition[];
                 setComponents(processedData);
                 setFilteredComponents(processedData);
 
                 // Set initial active category if components exist
                 if (processedData.length > 0) {
                     const categories = [...new Set(processedData.map(c => c.category || 'Uncategorized'))];
-                    setActiveCategory(categories[0]);
+                    if (categories.length > 0) {
+                        setActiveCategory(categories[0]);
+                    }
                 }
 
-                console.log('Loaded and processed', processedData.length, 'components');
+                console.log('Loaded', processedData.length, 'components');
             } else {
                 console.error('Component data is not available or not an array');
                 showToast('Failed to load component data', 'error');
             }
         } catch (error) {
             console.error('Error loading component data:', error);
-            showToast('Error loading component data: ' + error.message, 'error');
+            if (error instanceof Error) {
+                showToast('Error loading component data: ' + error.message, 'error');
+            } else {
+                showToast('An unknown error occurred', 'error');
+            }
         }
-    }, []);
+    }, [showToast]);
 
     // Filter components based on search query, active tab and category
     useEffect(() => {
@@ -64,7 +85,7 @@ export const App = () => {
         } else if (activeTab === 'functions') {
             filtered = filtered.filter(comp => comp.type === 'function');
         } else if (activeTab === 'similar') {
-            filtered = filtered.filter(comp => comp.similarityScore > 0.7);
+            filtered = filtered.filter(comp => comp.similarityScore && comp.similarityScore > 0.7);
         }
 
         // Filter by category if one is active
@@ -75,19 +96,19 @@ export const App = () => {
         setFilteredComponents(filtered);
     }, [searchQuery, activeTab, activeCategory, components]);
 
-    const handleSearch = (query) => {
+    const handleSearch = (query: string) => {
         setSearchQuery(query);
     };
 
-    const handleTabChange = (tab) => {
+    const handleTabChange = (tab: string) => {
         setActiveTab(tab);
     };
 
-    const handleCategoryChange = (category) => {
+    const handleCategoryChange = (category: string) => {
         setActiveCategory(category);
     };
 
-    const handleComponentClick = (component) => {
+    const handleComponentClick = (component: ComponentDefinition) => {
         setSelectedComponent(component);
         window.scrollTo(0, 0);
     };
@@ -115,8 +136,9 @@ export const App = () => {
                     </button>
                     <div className="app-title">React Component Documentation</div>
                 </div>
-                <div className="app-actions">
+                <div className="app-actions flex items-center">
                     <Search onSearch={handleSearch} />
+                    <ChatToggle className="ml-2" />
                     <div className="theme-toggle ml-2">
                         <button onClick={toggleTheme} aria-label="Toggle theme">
                             {theme === 'light' ? (
@@ -224,6 +246,6 @@ export const AppWithProviders = () => {
 // Define window interface to include COMPONENT_DATA
 declare global {
     interface Window {
-        COMPONENT_DATA: any[];
+        COMPONENT_DATA: ComponentDefinition[];
     }
 }
