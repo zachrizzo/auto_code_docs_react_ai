@@ -6,13 +6,12 @@ import path from "path";
 
 // Vector database for storing embeddings locally
 interface VectorEntry {
-  id: string;
+  id: string; // Unique ID: componentName_methodName_filePath
   vector: number[];
   methodName: string;
   componentName: string;
   filePath: string;
   code: string;
-  codeHash: string;
 }
 
 export interface VectorSimilarityOptions {
@@ -21,7 +20,7 @@ export interface VectorSimilarityOptions {
   useOpenAI?: boolean;
   ollamaUrl?: string;
   ollamaModel?: string;
-  similarityThreshold?: number; // Default 0.8 (80%)
+  similarityThreshold?: number; // Default 0.85 (85%)
   model?: string;
 }
 
@@ -69,11 +68,16 @@ export class VectorSimilarityService {
       this.model = options.model || "text-embedding-3-small";
     }
 
+    // Use a lower default threshold to catch more potential matches
     this.similarityThreshold =
       options.similarityThreshold ||
       (process.env.SIMILARITY_THRESHOLD
         ? parseFloat(process.env.SIMILARITY_THRESHOLD)
-        : 0.85);
+        : 0.65); // Use a 65% threshold by default for better detection
+
+    console.log(
+      `Vector similarity service initialized with threshold: ${this.similarityThreshold}`
+    );
   }
 
   /**
@@ -139,7 +143,7 @@ Method Name: ${method.name}
 Parameters: ${paramsText}
 Return Type: ${method.returnType || "void"}
 Description: ${method.description || ""}
-Code: ${method.code || ""}
+Implementation: ${method.code || ""}
     `.trim();
 
     if (this.useOllama) {
@@ -175,27 +179,41 @@ Code: ${method.code || ""}
     componentName: string,
     filePath: string
   ): Promise<void> {
-    const vector = await this.generateEmbedding(method);
-    const codeHash = crypto
-      .createHash("md5")
-      .update(method.code || "")
-      .digest("hex");
+    // Don't add empty methods
+    if (!method.code || method.code.trim() === "") return;
 
-    // Normalize the file path to ensure consistent comparison
-    const normalizedPath = path.normalize(filePath);
+    try {
+      // Generate embedding vector for the method
+      const vector = await this.generateEmbedding(method);
 
-    // Create a unique ID that includes code hash to ensure uniqueness
-    const id = `${componentName}_${method.name}_${normalizedPath}_${codeHash}`;
+      // Normalize the file path to ensure consistent comparison
+      const normalizedPath = path.normalize(filePath);
 
-    this.vectorDb.push({
-      id,
-      vector,
-      methodName: method.name,
-      componentName,
-      filePath: normalizedPath,
-      code: method.code || "",
-      codeHash,
-    });
+      // Create a unique ID based on component, method name and path
+      const id = `${componentName}_${method.name}_${normalizedPath}`;
+
+      // *** Debug log for adding ***
+      if (method.name.toLowerCase().includes("zach")) {
+        console.log(`[DEBUG ZACH ADD EMBED-ONLY] Adding method: ${id}`);
+        console.log(
+          `[DEBUG ZACH ADD EMBED-ONLY] Original code:\n---\n${method.code}\n---`
+        );
+      }
+
+      this.vectorDb.push({
+        id,
+        vector,
+        methodName: method.name,
+        componentName,
+        filePath: normalizedPath,
+        code: method.code,
+      });
+    } catch (error) {
+      console.error(
+        `Error adding method ${method.name} from ${componentName} to vector DB:`,
+        error
+      );
+    }
   }
 
   /**
@@ -206,71 +224,67 @@ Code: ${method.code || ""}
     componentName: string,
     filePath: string
   ): Promise<SimilarityWarning[]> {
-    // Generate vector for the current method
-    const vector = await this.generateEmbedding(method);
+    // Ensure method has code
+    if (!method.code || method.code.trim() === "") {
+      return [];
+    }
 
-    // Generate the same hash as in addMethod
-    const codeHash = crypto
-      .createHash("md5")
-      .update(method.code || "")
-      .digest("hex");
+    // *** Debug log for finding ***
+    if (method.name.toLowerCase().includes("zach")) {
+      console.log(
+        `[DEBUG ZACH FIND EMBED-ONLY] Processing method: ${componentName}.${method.name}`
+      );
+      console.log(
+        `[DEBUG ZACH FIND EMBED-ONLY] Original code:\n---\n${method.code}\n---`
+      );
+    }
 
-    // Normalize the file path to ensure consistent comparison
+    // Skip extremely short methods (simple heuristic, could be removed if desired)
+    // if (method.code.trim().length < 20) {
+    //   return [];
+    // }
+
+    // Create a unique ID for the current method for self-comparison
     const normalizedPath = path.normalize(filePath);
+    const currentId = `${componentName}_${method.name}_${normalizedPath}`;
 
-    // Create the same unique ID format as in addMethod
-    const currentId = `${componentName}_${method.name}_${normalizedPath}_${codeHash}`;
-    const methodNameLower = method.name.toLowerCase();
+    // Generate vector for the current method (only needed once)
+    const vector = await this.generateEmbedding(method);
 
     const similarityResults: SimilarityWarning[] = [];
 
     // Compare with all vectors in the database
     for (const entry of this.vectorDb) {
-      // Skip comparing to itself by ID
+      // Skip comparing to itself using the ID
       if (entry.id === currentId) continue;
 
-      // Additional check: also skip if code hash is identical (same method in different places)
-      if (entry.codeHash === codeHash && entry.code === (method.code || ""))
-        continue;
-
-      // Skip methods with the same name from the same component in the same file
-      // This handles cases where a method might be processed multiple times with slight differences
-      if (
-        entry.componentName === componentName &&
-        entry.methodName === method.name &&
-        entry.filePath === normalizedPath
-      )
-        continue;
-
-      // Skip trivial methods (common utility functions with the same name)
-      const entryNameLower = entry.methodName.toLowerCase();
-      if (
-        methodNameLower === entryNameLower &&
-        [
-          "get",
-          "set",
-          "is",
-          "has",
-          "update",
-          "delete",
-          "create",
-          "handle",
-          "on",
-          "toggle",
-          "add",
-          "remove",
-        ].some((prefix) => methodNameLower.startsWith(prefix))
-      ) {
-        // Higher threshold for common utility methods with same name
-        const minThreshold = this.similarityThreshold + 0.1;
-        const similarity = this.cosineSimilarity(vector, entry.vector);
-        if (similarity < minThreshold) continue;
-      }
-
+      // Always calculate vector similarity
       const similarity = this.cosineSimilarity(vector, entry.vector);
+
+      // Debug log comparing similarity score
+      if (
+        method.name.toLowerCase().includes("zach") ||
+        entry.methodName.toLowerCase().includes("zach")
+      ) {
+        console.log(
+          `[DEBUG ZACH COMPARE EMBED-ONLY] Comparing ${currentId} with ${entry.id}`
+        );
+        console.log(
+          `[DEBUG ZACH COMPARE EMBED-ONLY] Vector similarity calculated: ${similarity}. Threshold: ${this.similarityThreshold}`
+        );
+      }
 
       // If similarity exceeds threshold, add a warning
       if (similarity >= this.similarityThreshold) {
+        // Log when pushing warning
+        if (
+          method.name.toLowerCase().includes("zach") ||
+          entry.methodName.toLowerCase().includes("zach")
+        ) {
+          console.log(
+            `[DEBUG ZACH COMPARE EMBED-ONLY] Similarity above threshold! Pushing warning.`
+          );
+        }
         similarityResults.push({
           similarTo: `${entry.componentName}.${entry.methodName}`,
           score: similarity,
@@ -297,28 +311,42 @@ Code: ${method.code || ""}
   ): Promise<MethodDefinition[]> {
     const enhancedMethods: MethodDefinition[] = [];
 
+    console.log(
+      `Processing ${methods.length} methods in ${componentName} for similarity`
+    );
+
+    // Important: First add ALL methods to the vector database
+    // This ensures that methods within this component can be compared to each other
     for (const method of methods) {
-      // Ensure the method code is set
-      if (!method.code) {
+      if (!method.code || method.code.trim() === "") {
         console.warn(
           `Method ${method.name} in ${componentName} has no code defined`
         );
+        continue;
       }
 
-      // First check for similarity with existing methods
+      // Add method to database
+      await this.addMethod(method, componentName, filePath);
+    }
+
+    // Now process each method to find similarities
+    for (const method of methods) {
+      // Skip methods without code
+      if (!method.code || method.code.trim() === "") {
+        enhancedMethods.push(method);
+        continue;
+      }
+
+      // Find similar methods
       const similarMethods = await this.findSimilarMethods(
         method,
         componentName,
         filePath
       );
 
-      // Add similarity warnings if any were found
       if (similarMethods.length > 0) {
         method.similarityWarnings = similarMethods;
       }
-
-      // Then add this method to the database for future comparisons
-      await this.addMethod(method, componentName, filePath);
 
       enhancedMethods.push(method);
     }

@@ -123,34 +123,115 @@ echo "💬 AI Chat enabled: $ENABLE_CHAT"
 UI_DOCS_DIR="src/ui/public/docs-data"
 mkdir -p "$UI_DOCS_DIR"
 
-# 1. Parse the components from examples folder
-node -e "
-const { parseComponents } = require('./dist/index');
+# 1. Parse the components using a Node.js here document
+# Ensures shell variables are accessed via process.env and avoids quoting issues
+node << 'NODE_SCRIPT'
 const path = require('path');
+const fs = require('fs');
+const glob = require('glob');
+const reactDocgen = require('react-docgen-typescript');
+const { VectorSimilarityService } = require('./dist/ai/vector-similarity');
+const { parseSingleComponentFile, processComponentListSimilarities } = require('./dist/core/parser');
 
-async function run() {
-  console.log('Parsing components from examples directory...');
-  const components = await parseComponents({
-    rootDir: process.cwd(),
-    componentPath: 'examples/DocumentAll.tsx',
-    useOllama: ${USE_OLLAMA},
-    ollamaUrl: '${OLLAMA_URL}',
-    ollamaModel: '${OLLAMA_MODEL}',
-    similarityThreshold: ${SIMILARITY_THRESHOLD},
-    apiKey: '${OPENAI_API_KEY}'
-  });
-
-  // Write components to a file so we can use them in the next step
-  require('fs').writeFileSync(
-    path.join(process.cwd(), 'docs-components.json'),
-    JSON.stringify(components)
-  );
-
-  console.log('✓ Components parsed successfully: ' + components.length + ' components found');
+// Helper to get env vars with defaults
+function getEnv(key, defaultValue) {
+  return process.env[key] !== undefined ? process.env[key] : defaultValue;
 }
 
-run().catch(console.error);
-"
+async function run() {
+  console.log('Parsing components from UI components directory...');
+
+  const componentFiles = glob.sync('src/ui/components/**/*.tsx');
+  console.log(`Found ${componentFiles.length} component files to process`);
+
+  if (componentFiles.length === 0) {
+    console.error('No component files found in src/ui/components directory');
+    process.exit(1);
+  }
+
+  // ** Initialize services ONCE using process.env **
+  const useOllama = getEnv('USE_OLLAMA', 'false') === 'true';
+  const ollamaUrl = getEnv('OLLAMA_URL', 'http://localhost:11434');
+  const ollamaModel = getEnv('OLLAMA_MODEL', 'nomic-embed-text:latest');
+  const similarityThreshold = parseFloat(getEnv('SIMILARITY_THRESHOLD', '0.6'));
+  const apiKey = getEnv('OPENAI_API_KEY', ''); // Get API key if needed
+
+  const similarityService = new VectorSimilarityService({
+    useOllama: useOllama,
+    ollamaUrl: ollamaUrl,
+    ollamaModel: ollamaModel,
+    similarityThreshold: similarityThreshold,
+    apiKey: apiKey // Pass API key if OpenAI is used
+  });
+  console.log(`Vector similarity service initialized (Ollama: ${useOllama})`);
+
+  // ** Initialize parser ONCE **
+  const parserOptions = {
+    propFilter: (prop) => !prop.parent || !prop.parent.fileName.includes("node_modules"),
+    shouldExtractLiteralValuesFromEnum: true,
+    shouldRemoveUndefinedFromOptional: true,
+  };
+  let tsconfigPath = path.join(process.cwd(), 'tsconfig.json');
+  if (!fs.existsSync(tsconfigPath)) {
+    const projectRoot = path.resolve(__dirname, '../../');
+    tsconfigPath = path.join(projectRoot, 'tsconfig.json');
+  }
+  const parser = fs.existsSync(tsconfigPath)
+    ? reactDocgen.withCustomConfig(tsconfigPath, parserOptions)
+    : reactDocgen.withDefaultConfig(parserOptions);
+  console.log('React-docgen parser initialized.');
+
+  let allComponents = [];
+
+  // ** Pass 1: Loop and collect components **
+  console.log('--- Starting Pass 1: Component Collection ---');
+  for (const file of componentFiles) {
+    console.log(`Collecting components from file: ${file}`);
+    try {
+      const componentsFromFile = await parseSingleComponentFile({
+        rootDir: process.cwd(),
+        componentPath: file,
+      }, parser);
+      if (componentsFromFile && componentsFromFile.length > 0) {
+        allComponents = allComponents.concat(componentsFromFile);
+        console.log(`Collected ${componentsFromFile.length} component(s) from ${file}`);
+      }
+    } catch (error) {
+      console.error(`Error collecting from ${file}: ${error.message}`);
+      // Optionally add more details: console.error(error.stack);
+    }
+  }
+  console.log(`--- Finished Pass 1: Collected ${allComponents.length} total components ---`);
+
+  // ** Pass 2: Process similarities globally **
+  if (allComponents.length > 0 && similarityService) {
+      console.log('--- Starting Pass 2: Similarity Processing ---');
+      await processComponentListSimilarities(allComponents, similarityService);
+      console.log('--- Finished Pass 2: Similarity Processing ---');
+  } else {
+      console.log('Skipping similarity processing (no components found or service not initialized).');
+  }
+
+  // Write the FINAL processed components to the file
+  fs.writeFileSync(
+    path.join(process.cwd(), 'docs-components.json'),
+    JSON.stringify(allComponents, null, 2) // Add pretty-printing
+  );
+
+  console.log(`✓ Components parsed and processed: ${allComponents.length} components written to docs-components.json`);
+}
+
+run().catch(error => {
+    console.error("Error during Node script execution:", error);
+    process.exit(1);
+});
+NODE_SCRIPT
+
+# Check exit code of the Node script
+if [ $? -ne 0 ]; then
+  echo "❌ Node script failed during component parsing/processing."
+  exit 1
+fi
 
 # 2. Generate the documentation UI
 node -e "

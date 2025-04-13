@@ -1,12 +1,138 @@
 "use client"
 import * as React from "react"
-import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
-import { SimilarityList } from "@/components/similarity-list"
+import { useState, useEffect } from "react"
+import { Card, CardContent } from "../../components/ui/card"
+import { Slider } from "../../components/ui/slider"
+import { SimilarityList } from "../../components/similarity-list"
+
+// Define types to match with SimilarityList component
+interface ComponentData {
+  name: string;
+  slug: string;
+  filePath: string;
+  code?: string;
+  methods?: {
+    name: string;
+    similarityWarnings?: Array<{
+      similarTo: string;
+      score: number;
+      reason: string;
+      filePath: string;
+      code: string;
+    }>;
+  }[];
+  entities?: Array<{
+    methods?: Array<{
+      name: string;
+      similarityWarnings?: Array<{
+        similarTo: string;
+        score: number;
+        reason: string;
+        filePath: string;
+        code: string;
+      }>;
+    }>;
+  }>;
+}
 
 export default function SimilarityPage() {
-  const [threshold, setThreshold] = useState([70])
+  const [threshold, setThreshold] = useState([50])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [componentsData, setComponentsData] = useState<ComponentData[]>([])
+
+  // Add debug code to verify the data files are accessible
+  useEffect(() => {
+    async function loadAllData() {
+      try {
+        // Debug: Check if we can access the component index
+        const indexRes = await fetch('/docs-data/component-index.json')
+        if (!indexRes.ok) {
+          throw new Error(`Failed to fetch component index: ${indexRes.status}`);
+        }
+
+        const indexData = await indexRes.json();
+        console.log('Component index data loaded:', indexData);
+
+        // Load all component data files
+        const allComponentsData = await Promise.all(
+          indexData.map(async (comp: { slug: string }) => {
+            try {
+              const res = await fetch(`/docs-data/${comp.slug}.json`);
+              if (!res.ok) {
+                console.error(`Failed to load ${comp.slug}.json: ${res.status}`);
+                return null;
+              }
+              return await res.json();
+            } catch (err) {
+              console.error(`Error loading ${comp.slug}.json:`, err);
+              return null;
+            }
+          })
+        );
+
+        // Filter out null results
+        const validComponentsData = allComponentsData.filter(Boolean) as ComponentData[];
+        console.log('Valid components loaded:', validComponentsData.length);
+
+        // Process the data to extract and incorporate methods from entities
+        const processedData = validComponentsData.map(data => {
+          if (data.entities && data.entities.length > 0) {
+            // Extract methods from entities
+            if (!data.methods) {
+              data.methods = [];
+            }
+
+            data.entities.forEach((entity) => {
+              if (entity.methods && entity.methods.length > 0) {
+                data.methods!.push(...entity.methods);
+              }
+            });
+          }
+          return data;
+        });
+
+        // Check for methods with similarities
+        let totalMethodsWithSimilarities = 0;
+        processedData.forEach((comp) => {
+          if (comp.methods) {
+            const withSimilarities = comp.methods.filter((m) =>
+              m.similarityWarnings && m.similarityWarnings.length > 0
+            );
+            totalMethodsWithSimilarities += withSimilarities.length;
+          }
+        });
+
+        console.log(`Found ${totalMethodsWithSimilarities} total methods with similarity warnings`);
+
+        // Set components data for the SimilarityList to use
+        setComponentsData(processedData);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setError(error instanceof Error ? error.message : "Unknown error");
+        setIsLoading(false);
+      }
+    }
+
+    loadAllData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="container max-w-5xl py-12">
+        <p className="text-center text-lg">Loading components data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container max-w-5xl py-12">
+        <p className="text-center text-lg text-red-500">Error: {error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-5xl py-12">
@@ -30,7 +156,10 @@ export default function SimilarityPage() {
         </CardContent>
       </Card>
 
-      <SimilarityList threshold={threshold[0]} />
+      <SimilarityList
+        threshold={threshold[0]}
+        preloadedComponents={componentsData}
+      />
     </div>
   )
 }

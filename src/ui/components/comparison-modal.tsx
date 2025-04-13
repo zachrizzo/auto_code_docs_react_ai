@@ -26,26 +26,33 @@ interface ComparisonModalProps {
   similarityScore: number
 }
 
-export function ComparisonModal({ isOpen, onClose, component1, component2, similarityScore }: ComparisonModalProps) {
+export function ComparisonModal({ isOpen, onClose, component1, component2, similarityScore: initialSimilarityScore }: ComparisonModalProps) {
   const [view, setView] = useState<"split" | "unified">("split")
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [showHighlights, setShowHighlights] = useState(true)
+  const [similarityScore, setSimilarityScore] = useState(initialSimilarityScore)
 
   // Calculate diff using jsdiff
   const diff = diffLines(component1.code || '', component2.code || '');
 
-  // Recalculate highlightedCode1 and highlightedCode2 for split view (simple version still)
-  // Note: This simple diff is kept for split view for now.
-  const lines1 = (component1.code || '').split("\n")
-  const lines2 = (component2.code || '').split("\n")
+  // Normalize code for comparison - trim trailing whitespace on each line
+  const normalizedCode1 = (component1.code || '').split('\n').map(line => line.trimRight());
+  const normalizedCode2 = (component2.code || '').split('\n').map(line => line.trimRight());
+
+  // Calculate diff for split view - more accurate line-by-line comparison
+  const lines1 = normalizedCode1;
+  const lines2 = normalizedCode2;
+
+  // For the split view, we want to know which lines are different
   const highlightedCode1 = lines1.map((line, i) => ({
-    line,
-    isDifferent: line !== (lines2[i] || '')
-  }))
+    line: line,
+    isDifferent: i >= lines2.length || line !== lines2[i]
+  }));
+
   const highlightedCode2 = lines2.map((line, i) => ({
-    line,
-    isDifferent: line !== (lines1[i] || '')
-  }))
+    line: line,
+    isDifferent: i >= lines1.length || line !== lines1[i]
+  }));
 
   // Count differences (using jsdiff results for accuracy)
   const diffCount = diff.reduce((count: number, part: Change) => {
@@ -55,6 +62,43 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
     }
     return count;
   }, 0);
+
+  // Double-check for identical code
+  React.useEffect(() => {
+    // If the similarity score is already 100%, no need to check
+    if (initialSimilarityScore >= 100 || initialSimilarityScore === 1) return;
+
+    // If there are no differences, the components are identical
+    if (diffCount === 0) {
+      console.log('No differences detected, setting similarity score to 100%');
+      setSimilarityScore(100);
+      return;
+    }
+
+    // Try a more robust comparison:
+    // 1. Normalize whitespace (replace all whitespace with a single space)
+    // 2. Remove comments
+    // 3. Trim each line
+    const normalize = (code: string) => {
+      return code
+        .replace(/\/\/.*$/gm, '') // Remove single-line comments
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+        .split('\n')
+        .map(line => line.trim()) // Trim each line
+        .filter(line => line.length > 0) // Remove empty lines
+        .join(' ')
+        .replace(/\s+/g, ' ') // Normalize remaining whitespace
+        .trim();
+    };
+
+    const normalizedCode1 = normalize(component1.code || '');
+    const normalizedCode2 = normalize(component2.code || '');
+
+    if (normalizedCode1 === normalizedCode2) {
+      console.log('Components detected as identical after normalization, setting similarity score to 100%');
+      setSimilarityScore(100);
+    }
+  }, [component1.code, component2.code, initialSimilarityScore, diffCount]);
 
   const modalClasses = isFullScreen
     ? "max-w-[99vw] w-[99vw] h-[99vh] flex flex-col p-0 rounded-lg shadow-2xl border-2 border-slate-200 dark:border-slate-700"
@@ -77,12 +121,20 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
                 <EnterFullScreenIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </button>
               <Badge
-                className={`py-1.5 px-3 text-sm font-medium ${similarityScore >= 80
-                  ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                className={`py-1.5 px-3 text-sm font-medium ${similarityScore >= 100 || similarityScore === 1
+                  ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+                  : similarityScore >= 80
+                    ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
                   }`}
               >
-                {similarityScore}% Similar • {diffCount} Differences
+                {similarityScore >= 100 || similarityScore === 1
+                  ? "Identical Components"
+                  : `${Math.round(similarityScore)}% Similar ${diffCount > 0
+                    ? `• ${diffCount} Differences`
+                    : similarityScore < 100 && similarityScore < 1
+                      ? "• Semantic differences detected"
+                      : ""}`}
               </Badge>
             </div>
           </div>
