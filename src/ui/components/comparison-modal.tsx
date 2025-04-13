@@ -1,0 +1,201 @@
+"use client"
+import * as React from "react"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs"
+import { Badge } from "./ui/badge"
+import { ScrollArea } from "./ui/scroll-area"
+import { CodeIcon, EnterFullScreenIcon } from "@radix-ui/react-icons"
+import { Switch } from "./ui/switch"
+import { Label } from "./ui/label"
+import { diffLines, Change } from 'diff';
+
+interface ComparisonModalProps {
+  isOpen: boolean
+  onClose: () => void
+  component1: {
+    name: string
+    code: string
+    filePath: string
+  }
+  component2: {
+    name: string
+    code: string
+    filePath: string
+  }
+  similarityScore: number
+}
+
+export function ComparisonModal({ isOpen, onClose, component1, component2, similarityScore }: ComparisonModalProps) {
+  const [view, setView] = useState<"split" | "unified">("split")
+  const [isFullScreen, setIsFullScreen] = useState(false)
+  const [showHighlights, setShowHighlights] = useState(true)
+
+  // Calculate diff using jsdiff
+  const diff = diffLines(component1.code || '', component2.code || '');
+
+  // Recalculate highlightedCode1 and highlightedCode2 for split view (simple version still)
+  // Note: This simple diff is kept for split view for now.
+  const lines1 = (component1.code || '').split("\n")
+  const lines2 = (component2.code || '').split("\n")
+  const highlightedCode1 = lines1.map((line, i) => ({
+    line,
+    isDifferent: line !== (lines2[i] || '')
+  }))
+  const highlightedCode2 = lines2.map((line, i) => ({
+    line,
+    isDifferent: line !== (lines1[i] || '')
+  }))
+
+  // Count differences (using jsdiff results for accuracy)
+  const diffCount = diff.reduce((count: number, part: Change) => {
+    if (part.added || part.removed) {
+      // Count lines in the changed part
+      return count + (part.value.match(/\n/g) || []).length + (part.value.endsWith('\n') ? 0 : 1);
+    }
+    return count;
+  }, 0);
+
+  const modalClasses = isFullScreen
+    ? "max-w-[99vw] w-[99vw] h-[99vh] flex flex-col p-0 rounded-lg shadow-2xl border-2 border-slate-200 dark:border-slate-700"
+    : "max-w-[98vw] w-[98vw] h-[95vh] flex flex-col p-0 rounded-lg shadow-2xl border-2 border-slate-200 dark:border-slate-700"
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className={`${modalClasses} !max-w-screen-2xl !w-screen`}>
+        <DialogHeader className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-violet-700 dark:from-indigo-400 dark:to-violet-500">
+              Component Comparison
+            </DialogTitle>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                title={isFullScreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                <EnterFullScreenIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              </button>
+              <Badge
+                className={`py-1.5 px-3 text-sm font-medium ${similarityScore >= 80
+                  ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                  }`}
+              >
+                {similarityScore}% Similar • {diffCount} Differences
+              </Badge>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8 mt-6">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+              <div className="flex-shrink-0 p-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
+                <CodeIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">{component1.name}</h3>
+                <p className="text-xs text-muted-foreground font-mono">{component1.filePath}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+              <div className="flex-shrink-0 p-2 rounded-full bg-violet-100 dark:bg-violet-900/30">
+                <CodeIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">{component2.name}</h3>
+                <p className="text-xs text-muted-foreground font-mono">{component2.filePath}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end mt-4 gap-6">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="highlights-mode"
+                checked={showHighlights}
+                onCheckedChange={setShowHighlights}
+              />
+              <Label htmlFor="highlights-mode" className="cursor-pointer">Show Differences</Label>
+            </div>
+            <Tabs value={view} onValueChange={(v) => setView(v as "split" | "unified")} className="w-auto">
+              <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                <TabsTrigger value="split" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
+                  Split View
+                </TabsTrigger>
+                <TabsTrigger value="unified" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
+                  Unified View
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden min-h-0 bg-white dark:bg-slate-900 rounded-b-lg">
+          {view === "split" ? (
+            <div className="flex h-full w-full">
+              <ScrollArea className="w-[50%] border-r border-slate-200 dark:border-slate-700">
+                <div className="py-4 px-2 font-mono text-xs">
+                  {highlightedCode1.map((line, i) => (
+                    <div
+                      key={i}
+                      className={`py-0.5 px-6 flex leading-relaxed ${line.isDifferent && showHighlights
+                        ? "bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600"
+                        : ""
+                        }`}
+                    >
+                      <span className={`select-none text-slate-400 w-16 mr-4 text-right text-xs`}>{i + 1}</span>
+                      <span className="whitespace-pre overflow-x-auto flex-1 text-xs">{line.line}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              <ScrollArea className="w-[50%]">
+                <div className="py-4 px-2 font-mono text-xs">
+                  {highlightedCode2.map((line, i) => (
+                    <div
+                      key={i}
+                      className={`py-0.5 px-6 flex leading-relaxed ${line.isDifferent && showHighlights
+                        ? "bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 dark:border-green-600"
+                        : ""
+                        }`}
+                    >
+                      <span className={`select-none text-slate-400 w-16 mr-4 text-right text-xs`}>{i + 1}</span>
+                      <span className="whitespace-pre overflow-x-auto flex-1 text-xs">{line.line}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          ) : (
+            <ScrollArea className="h-full">
+              <div className="py-4 px-2 font-mono text-xs">
+                {diff.map((part: Change, partIndex: number) => {
+                  // Ensure part.value is treated as a string
+                  const value = part.value || '';
+                  // Split lines, handling potential trailing newline correctly
+                  const lines = value.split('\n').filter((l: string, i: number, arr: string[]) => i < arr.length - 1 || l !== '');
+                  const prefix = part.added ? '+' : part.removed ? '-' : ' ';
+                  const bgColor = part.added ? 'bg-green-50 dark:bg-green-900/20' : part.removed ? 'bg-red-50 dark:bg-red-900/20' : '';
+                  const textColor = part.added ? 'text-green-700 dark:text-green-400' : part.removed ? 'text-red-700 dark:text-red-400' : 'text-slate-400';
+                  const borderColor = part.added ? 'border-l-4 border-green-400 dark:border-green-600' : part.removed ? 'border-l-4 border-red-400 dark:border-red-600' : '';
+
+                  return lines.map((line: string, lineIndex: number) => (
+                    <div
+                      key={`${partIndex}-${lineIndex}`}
+                      className={`py-0.5 px-6 flex leading-relaxed ${showHighlights ? bgColor : ''} ${showHighlights ? borderColor : ''}`}
+                    >
+                      <span className={`select-none ${textColor} w-6 mr-2 text-center font-bold ${!showHighlights && (part.added || part.removed) ? 'opacity-0' : ''}`}>{prefix}</span>
+                      {/* No original line numbers in this basic view */}
+                      <span className="whitespace-pre overflow-x-auto flex-1">{line}</span>
+                    </div>
+                  ));
+                })}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

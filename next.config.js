@@ -6,7 +6,7 @@ const nextConfig = {
     webpack: (config) => {
         config.resolve.alias = {
             ...config.resolve.alias,
-            '@': path.resolve(__dirname, 'src/ui/docs-ui')
+            '@': path.resolve(__dirname, 'src/ui')
         };
         return config;
     }

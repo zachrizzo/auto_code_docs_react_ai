@@ -204,11 +204,11 @@ async function parseComponentRecursively(
       // This is a simple approach - for more accurate extraction we would use AST parsing
       let sourceCode = fileContent;
       // Limit source code length if needed
-      if (sourceCode.length > 5000) {
-        sourceCode =
-          sourceCode.substring(0, 5000) +
-          "...\n// (code truncated for brevity)";
-      }
+      // if (sourceCode.length > 5000) {
+      //   sourceCode =
+      //     sourceCode.substring(0, 5000) +
+      //     "...\n// (code truncated for brevity)";
+      // }
 
       // Create component definition
       const component: ComponentDefinition = {

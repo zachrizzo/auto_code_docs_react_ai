@@ -36,6 +36,7 @@ done
 ENABLE_CHAT=true
 SHOW_CODE=true
 SHOW_METHODS=true
+USE_OLLAMA=true
 
 # Export environment variables for Node.js code
 export OLLAMA_URL="$OLLAMA_URL"
@@ -48,6 +49,7 @@ export SHOW_CODE="$SHOW_CODE"
 export SHOW_METHODS="$SHOW_METHODS"
 export SHOW_SIMILARITY="$SHOW_SIMILARITY"
 export OPENAI_API_KEY="$OPENAI_API_KEY"
+export USE_OLLAMA="$USE_OLLAMA"
 
 # Find a free port starting from PORT
 find_free_port() {
@@ -117,12 +119,17 @@ echo "🔧 Showing component methods: $SHOW_METHODS"
 echo "🔄 Showing method similarities: $SHOW_SIMILARITY"
 echo "💬 AI Chat enabled: $ENABLE_CHAT"
 
-# 1. Parse the components
+# Create public docs directory in the UI folder
+UI_DOCS_DIR="src/ui/public/docs-data"
+mkdir -p "$UI_DOCS_DIR"
+
+# 1. Parse the components from examples folder
 node -e "
 const { parseComponents } = require('./dist/index');
 const path = require('path');
 
 async function run() {
+  console.log('Parsing components from examples directory...');
   const components = await parseComponents({
     rootDir: process.cwd(),
     componentPath: 'examples/DocumentAll.tsx',
@@ -154,8 +161,9 @@ const fs = require('fs');
 async function run() {
   const components = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'docs-components.json')));
 
-  // Make sure the destination directory exists
-  const publicDocsDir = path.join(process.cwd(), 'src/ui/docs-ui/public/docs-data');
+  // Make sure the destination directory exists and is clean
+  const publicDocsDir = path.join(process.cwd(), '${UI_DOCS_DIR}');
+  fs.rmSync(publicDocsDir, { recursive: true, force: true });
   fs.mkdirSync(publicDocsDir, { recursive: true });
 
   // Generate the docs data
@@ -178,7 +186,7 @@ async function run() {
 
   // Log the number of component files created
   const componentFiles = fs.readdirSync(publicDocsDir).filter(f => f.endsWith('.json') && f !== 'component-index.json' && f !== 'config.json');
-  console.log(`✓ Created ${componentFiles.length} component data files`);
+  console.log(\`✓ Created \${componentFiles.length} component data files\`);
 
   console.log('✓ Documentation generated at ' + outputPath);
 }
@@ -195,7 +203,7 @@ echo "$DOCS_URL" > docs-url.txt
 echo "📝 Documentation URL: $DOCS_URL"
 
 # Create a .env.local file for Next.js to use the port and other settings
-cat > src/ui/docs-ui/.env.local << EOF
+cat > src/ui/.env.local << EOF
 PORT=$PORT
 NEXT_PUBLIC_ENABLE_CHAT=${ENABLE_CHAT}
 NEXT_PUBLIC_USE_OLLAMA=${USE_OLLAMA}
@@ -208,9 +216,9 @@ NEXT_PUBLIC_SHOW_SIMILARITY=${SHOW_SIMILARITY}
 EOF
 
 # Navigate to the Next.js directory and start the development server
-cd src/ui/docs-ui
+cd src/ui
 npx next dev -p $PORT
 
 # This code won't execute until the server is terminated
-cd ../../..
+cd ../..
 echo "👋 Documentation server stopped"

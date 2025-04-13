@@ -1,0 +1,51 @@
+[
+  {
+    "name": "DocumentAll",
+    "description": "Default export from DocumentAll.tsx",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 0,
+    "slug": "documentall"
+  },
+  {
+    "name": "calculatePatientCost",
+    "description": "A recursive function to calculate the total cost of a patient's stay\nincluding all procedures, medications, and room charges",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 5,
+    "slug": "calculatepatientcost"
+  },
+  {
+    "name": "DocumentAll",
+    "description": "Default export from DocumentAll.tsx",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 0,
+    "slug": "documentall"
+  },
+  {
+    "name": "findPatient",
+    "description": "Recursive function to find a patient in a hospital hierarchy (floors, wings, rooms)",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 5,
+    "slug": "findpatient"
+  },
+  {
+    "name": "DocumentAll",
+    "description": "Default export from DocumentAll.tsx",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 0,
+    "slug": "documentall"
+  },
+  {
+    "name": "buildHospitalOrgChart",
+    "description": "Recursively build a hospital organizational chart",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 5,
+    "slug": "buildhospitalorgchart"
+  },
+  {
+    "name": "DocumentAll",
+    "description": "This component brings together all the components, functions and examples\nfor documentation generation purposes.",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 6,
+    "slug": "documentall"
+  }
+]

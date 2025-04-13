@@ -20,9 +20,9 @@ export async function generateDocUI(components: any[], options: any = {}) {
   // Ensure the output directory exists
   await fs.ensureDir(outputDir);
 
-  // Generate the docs data directory
-  const docsDataDir = path.join(outputDir, "docs-data");
-  await fs.ensureDir(docsDataDir);
+  // Write component data directly to the specified outputDir
+  // rather than creating a nested docs-data folder
+  const docsDataDir = outputDir;
 
   // Create component index file
   const componentIndex = components.map((comp) => ({
