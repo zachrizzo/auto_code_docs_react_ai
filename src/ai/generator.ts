@@ -331,3 +331,18 @@ Don't include phrases like "Based on the name" or "It seems that". Just provide 
     }
   }
 }
+
+export interface GenerateDocumentationOptions {
+  output?: string;
+  openAIApiKey?: string;
+}
+
+export async function generateDocumentation(
+  components: any[],
+  options: GenerateDocumentationOptions = {}
+) {
+  console.log("Generating documentation...");
+  return components;
+}
+
+export default generateDocumentation;

@@ -117,7 +117,6 @@ echo "🔧 Showing component methods: $SHOW_METHODS"
 echo "🔄 Showing method similarities: $SHOW_SIMILARITY"
 echo "💬 AI Chat enabled: $ENABLE_CHAT"
 
-# Manually run the steps since there appears to be an issue with CLI arguments
 # 1. Parse the components
 node -e "
 const { parseComponents } = require('./dist/index');
@@ -154,15 +153,32 @@ const fs = require('fs');
 
 async function run() {
   const components = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'docs-components.json')));
+
+  // Make sure the destination directory exists
+  const publicDocsDir = path.join(process.cwd(), 'src/ui/docs-ui/public/docs-data');
+  fs.mkdirSync(publicDocsDir, { recursive: true });
+
+  // Generate the docs data
   const outputPath = await generateDocUI(components, {
     title: 'React Component Documentation',
     description: 'Auto-generated documentation for React components',
     theme: 'light',
-    outputDir: path.join(process.cwd(), 'docs'),
+    outputDir: publicDocsDir,
     showCode: true,
     showMethods: true,
     showSimilarity: ${SHOW_SIMILARITY}
   });
+
+  // Verify the files exist
+  if (fs.existsSync(path.join(publicDocsDir, 'component-index.json'))) {
+    console.log('✓ Component index file created successfully');
+  } else {
+    console.error('❌ Failed to create component index file');
+  }
+
+  // Log the number of component files created
+  const componentFiles = fs.readdirSync(publicDocsDir).filter(f => f.endsWith('.json') && f !== 'component-index.json' && f !== 'config.json');
+  console.log(`✓ Created ${componentFiles.length} component data files`);
 
   console.log('✓ Documentation generated at ' + outputPath);
 }
@@ -170,188 +186,31 @@ async function run() {
 run().catch(console.error);
 "
 
-# 3. Start the server with chat functionality
-node -e "
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const url = require('url');
+# 3. Start the Next.js development server
+echo "🚀 Starting Next.js documentation server on port $PORT..."
 
-async function startServer() {
-  const components = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'docs-components.json')));
-  const { CodebaseChatService } = require('./dist/ai/chat-service');
-  const outputPath = path.join(process.cwd(), 'docs');
+# Create a URL file that points to the documentation
+DOCS_URL="http://localhost:$PORT"
+echo "$DOCS_URL" > docs-url.txt
+echo "📝 Documentation URL: $DOCS_URL"
 
-  // Create a chat service
-  const chatService = new CodebaseChatService(components, {
-    useOllama: ${USE_OLLAMA},
-    ollamaUrl: '${OLLAMA_URL}',
-    ollamaModel: '${OLLAMA_MODEL}',
-    chatModel: '${CHAT_MODEL}',
-    apiKey: '${OPENAI_API_KEY}'
-  });
+# Create a .env.local file for Next.js to use the port and other settings
+cat > src/ui/docs-ui/.env.local << EOF
+PORT=$PORT
+NEXT_PUBLIC_ENABLE_CHAT=${ENABLE_CHAT}
+NEXT_PUBLIC_USE_OLLAMA=${USE_OLLAMA}
+NEXT_PUBLIC_OLLAMA_URL=${OLLAMA_URL}
+NEXT_PUBLIC_OLLAMA_MODEL=${OLLAMA_MODEL}
+NEXT_PUBLIC_CHAT_MODEL=${CHAT_MODEL}
+NEXT_PUBLIC_SHOW_CODE=${SHOW_CODE}
+NEXT_PUBLIC_SHOW_METHODS=${SHOW_METHODS}
+NEXT_PUBLIC_SHOW_SIMILARITY=${SHOW_SIMILARITY}
+EOF
 
-  const server = http.createServer((req, res) => {
-    const parsedUrl = url.parse(req.url || '', true);
-    const pathname = parsedUrl.pathname || '';
+# Navigate to the Next.js directory and start the development server
+cd src/ui/docs-ui
+npx next dev -p $PORT
 
-    // Handle API requests
-    if (pathname === '/api/chat' && req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk.toString();
-      });
-
-      req.on('end', async () => {
-        try {
-          const { history, query } = JSON.parse(body);
-          const result = await chatService.chat(history, query);
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        } catch (error) {
-          console.error('Error handling chat request:', error);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Internal server error' }));
-        }
-      });
-
-      return;
-    }
-
-    // Handle component code API endpoint
-    if (pathname === '/api/component-code' && req.method === 'GET') {
-      try {
-        const queryParams = parsedUrl.query;
-        const componentName = queryParams.name;
-
-        if (!componentName) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Component name is required' }));
-          return;
-        }
-
-        // Find the component by name
-        const component = components.find(c => c.name === componentName);
-
-        if (!component) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Component not found' }));
-          return;
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          sourceCode: component.sourceCode,
-          methods: component.methods,
-          similarityWarnings: component.similarityWarnings
-        }));
-      } catch (error) {
-        console.error('Error handling component code request:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal server error' }));
-      }
-      return;
-    }
-
-    // Handle method similarity API endpoint
-    if (pathname === '/api/method-similarity' && req.method === 'GET') {
-      try {
-        // Get all methods with their similarity warnings
-        const allMethods = [];
-        components.forEach(component => {
-          if (component.methods && component.methods.length > 0) {
-            component.methods.forEach(method => {
-              if (method.similarityWarnings && method.similarityWarnings.length > 0) {
-                allMethods.push({
-                  componentName: component.name,
-                  methodName: method.name,
-                  code: method.code || '',
-                  similarityWarnings: method.similarityWarnings
-                });
-              }
-            });
-          }
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(allMethods));
-      } catch (error) {
-        console.error('Error handling method similarity request:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal server error' }));
-      }
-      return;
-    }
-
-    // Handle static file requests
-    const filePath = path.join(outputPath, pathname === '/' ? 'index.html' : pathname);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        // If file doesn't exist, serve index.html (for SPA routing)
-        if (err.code === 'ENOENT' && !pathname.includes('.')) {
-          fs.readFile(path.join(outputPath, 'index.html'), (err, data) => {
-            if (err) {
-              res.writeHead(404);
-              res.end('Not Found');
-              return;
-            }
-
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(data);
-          });
-          return;
-        }
-
-        res.writeHead(404);
-        res.end('Not Found');
-        return;
-      }
-
-      // Set content type based on file extension
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = {
-        '.html': 'text/html',
-        '.js': 'text/javascript',
-        '.css': 'text/css',
-        '.json': 'application/json',
-        '.png': 'image/png',
-        '.jpg': 'image/jpg',
-        '.gif': 'image/gif',
-      }[ext] || 'text/plain';
-
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(data);
-    });
-  });
-
-  server.listen(${PORT});
-  console.log('🚀 Server started at http://localhost:${PORT}');
-  console.log('💬 AI Chat API available at: http://localhost:${PORT}/api/chat');
-  console.log('📝 Component Code API available at: http://localhost:${PORT}/api/component-code?name=ComponentName');
-  console.log('🔄 Method Similarity API available at: http://localhost:${PORT}/api/method-similarity');
-  console.log('✓ Documentation is now available at: http://localhost:${PORT}');
-  console.log('Please open your browser to the URL above');
-  console.log('Press Ctrl+C to stop the server');
-}
-
-startServer().catch(console.error);
-"
-
-# Save the URL to a file so the user can open it
-echo "http://localhost:$PORT" > docs-url.txt
-echo "📊 Documentation is available at: http://localhost:$PORT"
-echo "The URL has been saved to docs-url.txt"
-
-# Open the browser manually if xdg-open or open is available
-if command -v xdg-open &> /dev/null; then
-  xdg-open "http://localhost:$PORT"
-elif command -v open &> /dev/null; then
-  open "http://localhost:$PORT"
-else
-  echo "Could not automatically open browser. Please open the URL manually."
-fi
-
-# Wait for the user to press Ctrl+C
-wait
+# This code won't execute until the server is terminated
+cd ../../..
+echo "👋 Documentation server stopped"

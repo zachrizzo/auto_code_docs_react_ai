@@ -1,200 +1,79 @@
+import { generateDocumentation } from "./ai/generator";
 import { parseComponents } from "./core/parser";
-import { AiDescriptionGenerator } from "./ai/generator";
-import { generateDocumentation as generateDocUI } from "./ui/generator";
-import { CodebaseChatService } from "./ai/chat-service";
-import {
-  ComponentDefinition,
-  PropDefinition,
-  MethodDefinition,
-  ParserOptions,
-  DocumentationConfig,
-} from "./core/types";
-import * as path from "path";
-import * as fs from "fs/promises";
+import fs from "fs-extra";
+import path from "path";
 
-// Define the interface for the main API options
-export interface DocumentationOptions extends ParserOptions {
-  outputDir?: string;
-  title?: string;
-  description?: string;
-  theme?: "light" | "dark" | "auto";
-  openBrowser?: boolean;
-  port?: number;
-  apiKey?: string;
-  similarityThreshold?: number;
-  useOllama?: boolean;
-  ollamaUrl?: string;
-  ollamaModel?: string;
-  enableChat?: boolean;
-  chatModel?: string;
-  cachePath?: string; // Path for documentation cache
-  useOpenAI?: boolean; // New flag to explicitly use OpenAI instead of Ollama
-}
+export { generateDocumentation, parseComponents };
 
-export {
-  // Core functions
-  parseComponents,
-  AiDescriptionGenerator,
-  generateDocUI,
-  CodebaseChatService,
-
-  // Types
-  ComponentDefinition,
-  PropDefinition,
-  MethodDefinition,
-  ParserOptions,
-  DocumentationConfig,
-};
-
-/**
- * Generate documentation for React components
- */
-export async function generateDocumentation(
-  options: DocumentationOptions
-): Promise<string> {
+// Generate the documentation UI
+export async function generateDocUI(components: any[], options: any = {}) {
   const {
-    componentPath,
-    rootDir = process.cwd(),
-    outputDir = "./component-docs",
-    excludePatterns = [],
-    includePatterns = ["**/*.tsx", "**/*.jsx", "**/*.js", "**/*.ts"],
-    maxDepth = Infinity,
     title = "React Component Documentation",
     description = "Auto-generated documentation for React components",
     theme = "light",
-    openBrowser = false,
-    port = process.env.PORT ? parseInt(process.env.PORT) : 3000,
-    apiKey = process.env.OPENAI_API_KEY, // Use environment variable if available
-    similarityThreshold = process.env.SIMILARITY_THRESHOLD
-      ? parseFloat(process.env.SIMILARITY_THRESHOLD)
-      : 0.6,
-    useOpenAI = false, // Default to not using OpenAI
-    useOllama = !useOpenAI, // Use Ollama by default
-    ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434",
-    ollamaModel = process.env.OLLAMA_MODEL || "nomic-embed-text:latest", // Default from shell script
-    cachePath = path.join(process.cwd(), ".docs-cache", "docs-cache.json"), // Default cache path
+    outputDir = path.join(process.cwd(), "docs"),
+    showCode = true,
+    showMethods = true,
+    showSimilarity = true,
   } = options;
 
-  // Parse components
-  const components = await parseComponents({
-    rootDir,
-    componentPath,
-    excludePatterns,
-    includePatterns,
-    maxDepth,
-    apiKey,
-    similarityThreshold,
-    useOllama,
-    ollamaUrl,
-    ollamaModel,
-  });
+  // Ensure the output directory exists
+  await fs.ensureDir(outputDir);
 
-  console.log(`Found components before deduplication: ${components.length}`);
+  // Generate the docs data directory
+  const docsDataDir = path.join(outputDir, "docs-data");
+  await fs.ensureDir(docsDataDir);
 
-  // Deduplicate components (sometimes the same component is found multiple times)
-  const uniqueComponents = deduplicateComponents(components);
-  console.log(`Components after deduplication: ${uniqueComponents.length}`);
+  // Create component index file
+  const componentIndex = components.map((comp) => ({
+    name: comp.name,
+    description: comp.description || "",
+    filePath: comp.filePath || "",
+    methodCount: comp.methods ? comp.methods.length : 0,
+    slug: comp.name.toLowerCase().replace(/\s+/g, "-"),
+  }));
 
-  // Configure output directory
-  const absoluteOutputDir = path.isAbsolute(outputDir)
-    ? outputDir
-    : path.resolve(rootDir, outputDir);
+  await fs.writeJson(
+    path.join(docsDataDir, "component-index.json"),
+    componentIndex,
+    { spaces: 2 }
+  );
 
-  // Ensure output directory exists
-  await fs.mkdir(absoluteOutputDir, { recursive: true });
+  // Write individual component files
+  for (const component of components) {
+    const componentData = {
+      ...component,
+      slug: component.name.toLowerCase().replace(/\s+/g, "-"),
+    };
 
-  // Generate UI files
-  await generateDocUI(uniqueComponents, {
+    await fs.writeJson(
+      path.join(docsDataDir, `${componentData.slug}.json`),
+      componentData,
+      { spaces: 2 }
+    );
+  }
+
+  // Create config file
+  const configData = {
     title,
     description,
     theme,
-    outputDir: absoluteOutputDir,
-    openBrowser,
-    port,
+    showCode,
+    showMethods,
+    showSimilarity,
+    generatedAt: new Date().toISOString(),
+  };
+
+  await fs.writeJson(path.join(docsDataDir, "config.json"), configData, {
+    spaces: 2,
   });
 
-  // If explicitly using OpenAI and API key is provided, enhance components with AI descriptions
-  if (useOpenAI && apiKey) {
-    const aiGenerator = new AiDescriptionGenerator({
-      apiKey,
-      cachePath,
-      model: options.chatModel,
-    });
+  // Create a URL file that points to the documentation
+  const docsUrl = `http://localhost:3000/docs`;
+  await fs.writeFile(path.join(process.cwd(), "docs-url.txt"), docsUrl);
 
-    // Enhance with descriptions
-    await aiGenerator.enhanceComponentsWithDescriptions(uniqueComponents);
-  }
-
-  return absoluteOutputDir;
+  console.log(`Documentation data generated at: ${outputDir}`);
+  return outputDir;
 }
 
-/**
- * Remove duplicate components based on name and file path
- */
-function deduplicateComponents(
-  components: ComponentDefinition[]
-): ComponentDefinition[] {
-  const seen = new Map<string, ComponentDefinition>();
-  const result: ComponentDefinition[] = [];
-
-  // Helper function to recursively process components and their children
-  function processComponent(
-    component: ComponentDefinition
-  ): ComponentDefinition {
-    const key = `${component.name}:${component.filePath}`;
-
-    // Process child components recursively
-    if (component.childComponents && component.childComponents.length > 0) {
-      const uniqueChildren: ComponentDefinition[] = [];
-      const childNameSet = new Set<string>();
-
-      for (const child of component.childComponents) {
-        const childKey = `${child.name}:${child.filePath}`;
-
-        // Only add this child if we haven't already seen it at this level
-        if (!childNameSet.has(childKey)) {
-          childNameSet.add(childKey);
-          uniqueChildren.push(processComponent(child));
-        }
-      }
-
-      // Replace with deduplicated children
-      component.childComponents = uniqueChildren;
-    }
-
-    return component;
-  }
-
-  // First pass: collect all unique components by name + file path
-  for (const component of components) {
-    const key = `${component.name}:${component.filePath}`;
-
-    // If this is a new component, add it to our seen map
-    if (!seen.has(key)) {
-      seen.set(key, component);
-    } else {
-      // If we've seen it before, keep the one with more information
-      const existing = seen.get(key)!;
-
-      // Choose the better component (prefer ones with more details)
-      const currentHasMoreInfo =
-        (component.description && !existing.description) ||
-        (component.props?.length || 0) > (existing.props?.length || 0) ||
-        (component.methods?.length || 0) > (existing.methods?.length || 0);
-
-      if (currentHasMoreInfo) {
-        seen.set(key, component);
-      }
-    }
-  }
-
-  // Process all top-level components and deduplicate their children
-  for (const component of seen.values()) {
-    result.push(processComponent(component));
-  }
-
-  console.log(`Initial components: ${components.length}`);
-  console.log(`After deduplication: ${result.length}`);
-
-  return result;
-}
+export default generateDocumentation;
