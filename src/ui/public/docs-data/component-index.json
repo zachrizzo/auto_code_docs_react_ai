@@ -1,51 +1,1773 @@
 [
   {
-    "name": "DocumentAll",
-    "description": "Default export from DocumentAll.tsx",
-    "filePath": "examples/DocumentAll.tsx",
+    "name": "ThemeProvider",
+    "description": "",
+    "filePath": "src/ui/components/theme-provider.tsx",
     "methodCount": 0,
-    "slug": "documentall"
+    "slug": "themeprovider"
   },
   {
-    "name": "calculatePatientCost",
-    "description": "A recursive function to calculate the total cost of a patient's stay\nincluding all procedures, medications, and room charges",
-    "filePath": "examples/DocumentAll.tsx",
-    "methodCount": 5,
-    "slug": "calculatepatientcost"
+    "name": "SimilarityList",
+    "description": "",
+    "filePath": "src/ui/components/similarity-list.tsx",
+    "methodCount": 3,
+    "slug": "similaritylist"
   },
   {
-    "name": "DocumentAll",
-    "description": "Default export from DocumentAll.tsx",
-    "filePath": "examples/DocumentAll.tsx",
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
     "methodCount": 0,
-    "slug": "documentall"
+    "slug": "badge"
   },
   {
-    "name": "findPatient",
-    "description": "Recursive function to find a patient in a hospital hierarchy (floors, wings, rooms)",
-    "filePath": "examples/DocumentAll.tsx",
-    "methodCount": 5,
-    "slug": "findpatient"
-  },
-  {
-    "name": "DocumentAll",
-    "description": "Default export from DocumentAll.tsx",
-    "filePath": "examples/DocumentAll.tsx",
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
     "methodCount": 0,
-    "slug": "documentall"
+    "slug": "cn"
   },
   {
-    "name": "buildHospitalOrgChart",
-    "description": "Recursively build a hospital organizational chart",
-    "filePath": "examples/DocumentAll.tsx",
-    "methodCount": 5,
-    "slug": "buildhospitalorgchart"
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
   },
   {
-    "name": "DocumentAll",
-    "description": "This component brings together all the components, functions and examples\nfor documentation generation purposes.",
-    "filePath": "examples/DocumentAll.tsx",
-    "methodCount": 6,
-    "slug": "documentall"
+    "name": "ComparisonModal",
+    "description": "",
+    "filePath": "src/ui/components/comparison-modal.tsx",
+    "methodCount": 1,
+    "slug": "comparisonmodal"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "ScrollArea",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollarea"
+  },
+  {
+    "name": "ScrollBar",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollbar"
+  },
+  {
+    "name": "Switch",
+    "description": "",
+    "filePath": "src/ui/components/ui/switch.tsx",
+    "methodCount": 0,
+    "slug": "switch"
+  },
+  {
+    "name": "Label",
+    "description": "",
+    "filePath": "src/ui/components/ui/label.tsx",
+    "methodCount": 0,
+    "slug": "label"
+  },
+  {
+    "name": "SimilarComponentsSection",
+    "description": "",
+    "filePath": "src/ui/components/similar-components-section.tsx",
+    "methodCount": 2,
+    "slug": "similarcomponentssection"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
+  },
+  {
+    "name": "ComparisonModal",
+    "description": "",
+    "filePath": "src/ui/components/comparison-modal.tsx",
+    "methodCount": 1,
+    "slug": "comparisonmodal"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "ScrollArea",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollarea"
+  },
+  {
+    "name": "ScrollBar",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollbar"
+  },
+  {
+    "name": "Switch",
+    "description": "",
+    "filePath": "src/ui/components/ui/switch.tsx",
+    "methodCount": 0,
+    "slug": "switch"
+  },
+  {
+    "name": "Label",
+    "description": "",
+    "filePath": "src/ui/components/ui/label.tsx",
+    "methodCount": 0,
+    "slug": "label"
+  },
+  {
+    "name": "ComponentStats",
+    "description": "",
+    "filePath": "src/ui/components/component-stats.tsx",
+    "methodCount": 1,
+    "slug": "componentstats"
+  },
+  {
+    "name": "Card",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 1,
+    "slug": "card"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "CardHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardheader"
+  },
+  {
+    "name": "CardFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardfooter"
+  },
+  {
+    "name": "CardTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardtitle"
+  },
+  {
+    "name": "CardAction",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardaction"
+  },
+  {
+    "name": "CardDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "carddescription"
+  },
+  {
+    "name": "CardContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardcontent"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "ComparisonModal",
+    "description": "",
+    "filePath": "src/ui/components/comparison-modal.tsx",
+    "methodCount": 1,
+    "slug": "comparisonmodal"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "ScrollArea",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollarea"
+  },
+  {
+    "name": "ScrollBar",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollbar"
+  },
+  {
+    "name": "Switch",
+    "description": "",
+    "filePath": "src/ui/components/ui/switch.tsx",
+    "methodCount": 0,
+    "slug": "switch"
+  },
+  {
+    "name": "Label",
+    "description": "",
+    "filePath": "src/ui/components/ui/label.tsx",
+    "methodCount": 0,
+    "slug": "label"
+  },
+  {
+    "name": "CodeRelationships",
+    "description": "",
+    "filePath": "src/ui/components/code-relationships.tsx",
+    "methodCount": 7,
+    "slug": "coderelationships"
+  },
+  {
+    "name": "Card",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 1,
+    "slug": "card"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "CardHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardheader"
+  },
+  {
+    "name": "CardFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardfooter"
+  },
+  {
+    "name": "CardTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardtitle"
+  },
+  {
+    "name": "CardAction",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardaction"
+  },
+  {
+    "name": "CardDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "carddescription"
+  },
+  {
+    "name": "CardContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardcontent"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "CodeGraph",
+    "description": "",
+    "filePath": "src/ui/components/code-graph.tsx",
+    "methodCount": 9,
+    "slug": "codegraph"
+  },
+  {
+    "name": "Card",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 1,
+    "slug": "card"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "CardHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardheader"
+  },
+  {
+    "name": "CardFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardfooter"
+  },
+  {
+    "name": "CardTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardtitle"
+  },
+  {
+    "name": "CardAction",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardaction"
+  },
+  {
+    "name": "CardDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "carddescription"
+  },
+  {
+    "name": "CardContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardcontent"
+  },
+  {
+    "name": "Select",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "select"
+  },
+  {
+    "name": "SelectContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectcontent"
+  },
+  {
+    "name": "SelectGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectgroup"
+  },
+  {
+    "name": "SelectItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectitem"
+  },
+  {
+    "name": "SelectLabel",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectlabel"
+  },
+  {
+    "name": "SelectScrollDownButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrolldownbutton"
+  },
+  {
+    "name": "SelectScrollUpButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrollupbutton"
+  },
+  {
+    "name": "SelectSeparator",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectseparator"
+  },
+  {
+    "name": "SelectTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selecttrigger"
+  },
+  {
+    "name": "SelectValue",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectvalue"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
+  },
+  {
+    "name": "CodeEntityDetails",
+    "description": "",
+    "filePath": "src/ui/components/code-entity-details.tsx",
+    "methodCount": 2,
+    "slug": "codeentitydetails"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "CodeBlock",
+    "description": "",
+    "filePath": "src/ui/components/code-block.tsx",
+    "methodCount": 1,
+    "slug": "codeblock"
+  },
+  {
+    "name": "CodeEntityDetails",
+    "description": "",
+    "filePath": "src/ui/components/code-entity-details.tsx",
+    "methodCount": 2,
+    "slug": "codeentitydetails"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "CodeBlock",
+    "description": "",
+    "filePath": "src/ui/components/code-block.tsx",
+    "methodCount": 1,
+    "slug": "codeblock"
+  },
+  {
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
+  },
+  {
+    "name": "CodeGraph",
+    "description": "",
+    "filePath": "src/ui/components/code-graph.tsx",
+    "methodCount": 9,
+    "slug": "codegraph"
+  },
+  {
+    "name": "Card",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 1,
+    "slug": "card"
+  },
+  {
+    "name": "CardHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardheader"
+  },
+  {
+    "name": "CardFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardfooter"
+  },
+  {
+    "name": "CardTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardtitle"
+  },
+  {
+    "name": "CardAction",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardaction"
+  },
+  {
+    "name": "CardDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "carddescription"
+  },
+  {
+    "name": "CardContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardcontent"
+  },
+  {
+    "name": "Select",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "select"
+  },
+  {
+    "name": "SelectContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectcontent"
+  },
+  {
+    "name": "SelectGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectgroup"
+  },
+  {
+    "name": "SelectItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectitem"
+  },
+  {
+    "name": "SelectLabel",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectlabel"
+  },
+  {
+    "name": "SelectScrollDownButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrolldownbutton"
+  },
+  {
+    "name": "SelectScrollUpButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrollupbutton"
+  },
+  {
+    "name": "SelectSeparator",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectseparator"
+  },
+  {
+    "name": "SelectTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selecttrigger"
+  },
+  {
+    "name": "SelectValue",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectvalue"
+  },
+  {
+    "name": "CodeBlock",
+    "description": "",
+    "filePath": "src/ui/components/code-block.tsx",
+    "methodCount": 1,
+    "slug": "codeblock"
+  },
+  {
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Textarea",
+    "description": "",
+    "filePath": "src/ui/components/ui/textarea.tsx",
+    "methodCount": 0,
+    "slug": "textarea"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Tabs",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabs"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "TabsList",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabslist"
+  },
+  {
+    "name": "TabsTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabstrigger"
+  },
+  {
+    "name": "TabsContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/tabs.tsx",
+    "methodCount": 0,
+    "slug": "tabscontent"
+  },
+  {
+    "name": "Switch",
+    "description": "",
+    "filePath": "src/ui/components/ui/switch.tsx",
+    "methodCount": 0,
+    "slug": "switch"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Slider",
+    "description": "",
+    "filePath": "src/ui/components/ui/slider.tsx",
+    "methodCount": 0,
+    "slug": "slider"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Select",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "select"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "SelectContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectcontent"
+  },
+  {
+    "name": "SelectGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectgroup"
+  },
+  {
+    "name": "SelectItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectitem"
+  },
+  {
+    "name": "SelectLabel",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectlabel"
+  },
+  {
+    "name": "SelectScrollDownButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrolldownbutton"
+  },
+  {
+    "name": "SelectScrollUpButton",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectscrollupbutton"
+  },
+  {
+    "name": "SelectSeparator",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectseparator"
+  },
+  {
+    "name": "SelectTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selecttrigger"
+  },
+  {
+    "name": "SelectValue",
+    "description": "",
+    "filePath": "src/ui/components/ui/select.tsx",
+    "methodCount": 0,
+    "slug": "selectvalue"
+  },
+  {
+    "name": "ScrollArea",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollarea"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "ScrollBar",
+    "description": "",
+    "filePath": "src/ui/components/ui/scroll-area.tsx",
+    "methodCount": 0,
+    "slug": "scrollbar"
+  },
+  {
+    "name": "Label",
+    "description": "",
+    "filePath": "src/ui/components/ui/label.tsx",
+    "methodCount": 0,
+    "slug": "label"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "DropdownMenu",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenu"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "DropdownMenuPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenuportal"
+  },
+  {
+    "name": "DropdownMenuTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenutrigger"
+  },
+  {
+    "name": "DropdownMenuContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenucontent"
+  },
+  {
+    "name": "DropdownMenuGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenugroup"
+  },
+  {
+    "name": "DropdownMenuLabel",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenulabel"
+  },
+  {
+    "name": "DropdownMenuItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenuitem"
+  },
+  {
+    "name": "DropdownMenuCheckboxItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenucheckboxitem"
+  },
+  {
+    "name": "DropdownMenuRadioGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenuradiogroup"
+  },
+  {
+    "name": "DropdownMenuRadioItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenuradioitem"
+  },
+  {
+    "name": "DropdownMenuSeparator",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenuseparator"
+  },
+  {
+    "name": "DropdownMenuShortcut",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenushortcut"
+  },
+  {
+    "name": "DropdownMenuSub",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenusub"
+  },
+  {
+    "name": "DropdownMenuSubTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenusubtrigger"
+  },
+  {
+    "name": "DropdownMenuSubContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dropdown-menu.tsx",
+    "methodCount": 0,
+    "slug": "dropdownmenusubcontent"
+  },
+  {
+    "name": "Dialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialog"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "DialogClose",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogclose"
+  },
+  {
+    "name": "DialogContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogcontent"
+  },
+  {
+    "name": "DialogDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogdescription"
+  },
+  {
+    "name": "DialogFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogfooter"
+  },
+  {
+    "name": "DialogHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogheader"
+  },
+  {
+    "name": "DialogOverlay",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogoverlay"
+  },
+  {
+    "name": "DialogPortal",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogportal"
+  },
+  {
+    "name": "DialogTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtitle"
+  },
+  {
+    "name": "DialogTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/dialog.tsx",
+    "methodCount": 0,
+    "slug": "dialogtrigger"
+  },
+  {
+    "name": "Command",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "command"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "CommandDialog",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commanddialog"
+  },
+  {
+    "name": "CommandInput",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandinput"
+  },
+  {
+    "name": "CommandList",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandlist"
+  },
+  {
+    "name": "CommandEmpty",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandempty"
+  },
+  {
+    "name": "CommandGroup",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandgroup"
+  },
+  {
+    "name": "CommandItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commanditem"
+  },
+  {
+    "name": "CommandShortcut",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandshortcut"
+  },
+  {
+    "name": "CommandSeparator",
+    "description": "",
+    "filePath": "src/ui/components/ui/command.tsx",
+    "methodCount": 0,
+    "slug": "commandseparator"
+  },
+  {
+    "name": "Card",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 1,
+    "slug": "card"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "CardHeader",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardheader"
+  },
+  {
+    "name": "CardFooter",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardfooter"
+  },
+  {
+    "name": "CardTitle",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardtitle"
+  },
+  {
+    "name": "CardAction",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardaction"
+  },
+  {
+    "name": "CardDescription",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "carddescription"
+  },
+  {
+    "name": "CardContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/card.tsx",
+    "methodCount": 0,
+    "slug": "cardcontent"
+  },
+  {
+    "name": "Button",
+    "description": "",
+    "filePath": "src/ui/components/ui/button.tsx",
+    "methodCount": 0,
+    "slug": "button"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Badge",
+    "description": "",
+    "filePath": "src/ui/components/ui/badge.tsx",
+    "methodCount": 0,
+    "slug": "badge"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "Avatar",
+    "description": "",
+    "filePath": "src/ui/components/ui/avatar.tsx",
+    "methodCount": 0,
+    "slug": "avatar"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "AvatarImage",
+    "description": "",
+    "filePath": "src/ui/components/ui/avatar.tsx",
+    "methodCount": 0,
+    "slug": "avatarimage"
+  },
+  {
+    "name": "AvatarFallback",
+    "description": "",
+    "filePath": "src/ui/components/ui/avatar.tsx",
+    "methodCount": 0,
+    "slug": "avatarfallback"
+  },
+  {
+    "name": "Accordion",
+    "description": "",
+    "filePath": "src/ui/components/ui/accordion.tsx",
+    "methodCount": 0,
+    "slug": "accordion"
+  },
+  {
+    "name": "AccordionItem",
+    "description": "",
+    "filePath": "src/ui/components/ui/accordion.tsx",
+    "methodCount": 0,
+    "slug": "accordionitem"
+  },
+  {
+    "name": "AccordionTrigger",
+    "description": "",
+    "filePath": "src/ui/components/ui/accordion.tsx",
+    "methodCount": 0,
+    "slug": "accordiontrigger"
+  },
+  {
+    "name": "AccordionContent",
+    "description": "",
+    "filePath": "src/ui/components/ui/accordion.tsx",
+    "methodCount": 0,
+    "slug": "accordioncontent"
   }
 ]

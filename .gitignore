@@ -30,3 +30,6 @@ example-docs/
 .DS_Store
 src/ui/public/docs-data/
 docs-components.json
+src/ui/public/docs-data/component-index.json
+src/ui/public/docs-data/config.json
+docs-components.json

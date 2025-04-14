@@ -61,10 +61,12 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
   const [loading, setLoading] = useState(!preloadedComponents)
   const [error, setError] = useState<string | null>(null)
 
-  function zach(hi: string) {
-    let z = hi + hi
+  // Example method that demonstrates the functionality
+  // This is intentionally similar to methods in other components for testing
+  /* function zach(hi: string) {
+    const z = hi + hi
     console.log(z)
-  }
+  } */
 
   // Fetch component data (only if no preloaded data)
   useEffect(() => {
@@ -415,25 +417,46 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
     component1: ComponentData
     component2: ComponentData
     similarity: number
+    isMethodLevel?: boolean
+    method1?: string
+    method2?: string
   }) => {
     // Fetch code for components if not already available
-    const fetchComponentCode = async (component: ComponentData) => {
-      if (component.code) return component.code
-
+    const fetchComponentCode = async (component: ComponentData, methodName?: string) => {
       try {
+        // If it's a method-level comparison, try to get the specific method code
+        if (methodName) {
+          const res = await fetch(`/docs-data/${component.slug}.json`)
+          const data = await res.json()
+
+          // Look for the method in the methods array
+          if (data.methods) {
+            const method = data.methods.find((m: { name: string; code?: string }) => m.name === methodName)
+            if (method && method.code) {
+              return method.code
+            }
+          }
+
+          // If we couldn't find the method code, fall back to component code
+          console.warn(`Couldn't find method ${methodName} code in ${component.name}, falling back to full component`)
+        }
+
+        // Otherwise, get the whole component code
+        if (component.code) return component.code
+
         const res = await fetch(`/docs-data/${component.slug}.json`)
         const data = await res.json()
         return data.sourceCode || data.code || `// No code available for ${component.name}`
       } catch (error) {
-        console.error(`Error fetching code for ${component.name}:`, error)
-        return `// Error loading code for ${component.name}`
+        console.error(`Error fetching code for ${component.name}${methodName ? `.${methodName}` : ''}:`, error)
+        return `// Error loading code for ${component.name}${methodName ? `.${methodName}` : ''}`
       }
     }
 
     // Set up the comparison
     Promise.all([
-      fetchComponentCode(item.component1),
-      fetchComponentCode(item.component2)
+      fetchComponentCode(item.component1, item.isMethodLevel ? item.method1 : undefined),
+      fetchComponentCode(item.component2, item.isMethodLevel ? item.method2 : undefined)
     ]).then(([code1, code2]) => {
       // Perform direct code comparison to catch identical components
       // This is a client-side fallback to ensure identical components show as 100% similar
@@ -447,7 +470,7 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
         // If codes are identical, set similarity to 100%
         if (normalizedCode1 === normalizedCode2) {
           similarity = 100;
-          console.log(`Components detected as identical via client-side check: ${item.component1.name} and ${item.component2.name}`);
+          console.log(`Components detected as identical via client-side check: ${item.component1.name}${item.isMethodLevel ? `.${item.method1}` : ''} and ${item.component2.name}${item.isMethodLevel ? `.${item.method2}` : ''}`);
         }
       }
 
@@ -572,6 +595,16 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
             filePath: selectedPair.component2.filePath,
           }}
           similarityScore={selectedPair.similarity}
+          isMethodComparison={!!similarComponents.find(item =>
+            item.isMethodLevel &&
+            item.component1.name === selectedPair.component1.name &&
+            item.component2.name === selectedPair.component2.name
+          )}
+          methodName={similarComponents.find(item =>
+            item.isMethodLevel &&
+            item.component1.name === selectedPair.component1.name &&
+            item.component2.name === selectedPair.component2.name
+          )?.method1}
         />
       )}
     </>

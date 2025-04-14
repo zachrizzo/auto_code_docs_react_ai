@@ -24,35 +24,144 @@ interface ComparisonModalProps {
     filePath: string
   }
   similarityScore: number
+  methodName?: string
+  isMethodComparison?: boolean
 }
 
-export function ComparisonModal({ isOpen, onClose, component1, component2, similarityScore: initialSimilarityScore }: ComparisonModalProps) {
+export function ComparisonModal({
+  isOpen,
+  onClose,
+  component1,
+  component2,
+  similarityScore: initialSimilarityScore,
+  methodName,
+  isMethodComparison = false
+}: ComparisonModalProps) {
   const [view, setView] = useState<"split" | "unified">("split")
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [showHighlights, setShowHighlights] = useState(true)
   const [similarityScore, setSimilarityScore] = useState(initialSimilarityScore)
 
+  // Extract method code if we're comparing methods
+  const extractMethodCode = (code: string, methodName?: string) => {
+    if (!isMethodComparison || !methodName) return code;
+
+    // If the code already appears to be just a method (starts with common function patterns) return as is
+    if (code.trim().startsWith('function') ||
+      code.trim().startsWith('const') ||
+      code.trim().startsWith('let') ||
+      code.trim().startsWith('export')) {
+      return code;
+    }
+
+    try {
+      // More comprehensive regex to find method definitions with various patterns
+      const methodPatterns = [
+        // Standard function declarations
+        `function\\s+${methodName}\\s*\\([^)]*\\)\\s*{[\\s\\S]*?}`,
+        // Function expression assignments (const/let/var)
+        `(const|let|var)\\s+${methodName}\\s*=\\s*function\\s*\\([^)]*\\)\\s*{[\\s\\S]*?}`,
+        // Arrow function assignments
+        `(const|let|var)\\s+${methodName}\\s*=\\s*\\([^)]*\\)\\s*=>\\s*{[\\s\\S]*?}`,
+        // Arrow function without braces (single expression)
+        `(const|let|var)\\s+${methodName}\\s*=\\s*\\([^)]*\\)\\s*=>\\s*[^;{]*;?`,
+        // Class methods
+        `${methodName}\\s*\\([^)]*\\)\\s*{[\\s\\S]*?}`,
+        // Async functions
+        `async\\s+function\\s+${methodName}\\s*\\([^)]*\\)\\s*{[\\s\\S]*?}`,
+        // Async arrow functions
+        `(const|let|var)\\s+${methodName}\\s*=\\s*async\\s*\\([^)]*\\)\\s*=>\\s*{[\\s\\S]*?}`
+      ];
+
+      // Join all patterns with OR
+      const combinedPattern = methodPatterns.join('|');
+      const methodRegex = new RegExp(combinedPattern, 'g');
+
+      let match;
+      // Find the first match
+      if ((match = methodRegex.exec(code)) !== null) {
+        return match[0];
+      }
+
+      // Alternative approach if the regex fails: try to find the method by looking for its name
+      // and then extracting a reasonable block after it
+      const methodStartIndex = code.indexOf(`function ${methodName}`) > -1
+        ? code.indexOf(`function ${methodName}`)
+        : code.indexOf(`${methodName} =`) > -1
+          ? code.indexOf(`${methodName} =`)
+          : code.indexOf(`${methodName}(`) > -1
+            ? code.indexOf(`${methodName}(`)
+            : -1;
+
+      if (methodStartIndex > -1) {
+        // Find a reasonable endpoint - either the next method or the end of the file
+        let depth = 0;
+        let endIndex = methodStartIndex;
+
+        // Go through the code character by character looking for matching braces
+        for (let i = methodStartIndex; i < code.length; i++) {
+          if (code[i] === '{') depth++;
+          else if (code[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              endIndex = i + 1;
+              break;
+            }
+          }
+        }
+
+        if (endIndex > methodStartIndex) {
+          return code.substring(methodStartIndex, endIndex);
+        }
+      }
+    } catch (e) {
+      console.error("Error extracting method code:", e);
+    }
+
+    return code;
+  };
+
+  // Process the component code
+  const processedCode1 = extractMethodCode(component1.code || '', methodName);
+  const processedCode2 = extractMethodCode(component2.code || '', methodName);
+
   // Calculate diff using jsdiff
-  const diff = diffLines(component1.code || '', component2.code || '');
+  const diff = diffLines(processedCode1, processedCode2);
 
   // Normalize code for comparison - trim trailing whitespace on each line
-  const normalizedCode1 = (component1.code || '').split('\n').map(line => line.trimRight());
-  const normalizedCode2 = (component2.code || '').split('\n').map(line => line.trimRight());
+  const normalizedCode1 = processedCode1.split('\n').map(line => line.trimRight());
+  const normalizedCode2 = processedCode2.split('\n').map(line => line.trimRight());
 
   // Calculate diff for split view - more accurate line-by-line comparison
   const lines1 = normalizedCode1;
   const lines2 = normalizedCode2;
 
   // For the split view, we want to know which lines are different
-  const highlightedCode1 = lines1.map((line, i) => ({
-    line: line,
-    isDifferent: i >= lines2.length || line !== lines2[i]
-  }));
+  const normalizeForComparison = (line: string) => line.trim().replace(/\s+/g, ' ');
 
-  const highlightedCode2 = lines2.map((line, i) => ({
-    line: line,
-    isDifferent: i >= lines1.length || line !== lines1[i]
-  }));
+  const highlightedCode1 = lines1.map((line, i) => {
+    // Consider a line different only if it's beyond the other file's length
+    // or if the normalized content differs
+    const isDifferent = i >= lines2.length ||
+      normalizeForComparison(line) !== normalizeForComparison(lines2[i]);
+
+    return {
+      line: line,
+      isDifferent: isDifferent
+    };
+  });
+
+  const highlightedCode2 = lines2.map((line, i) => {
+    // Consider a line different only if it's beyond the other file's length
+    // or if the normalized content differs
+    const isDifferent = i >= lines1.length ||
+      normalizeForComparison(line) !== normalizeForComparison(lines1[i]);
+
+    return {
+      line: line,
+      isDifferent: isDifferent
+    };
+  });
 
   // Count differences (using jsdiff results for accuracy)
   const diffCount = diff.reduce((count: number, part: Change) => {
@@ -91,14 +200,14 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
         .trim();
     };
 
-    const normalizedCode1 = normalize(component1.code || '');
-    const normalizedCode2 = normalize(component2.code || '');
+    const normalizedCode1 = normalize(processedCode1);
+    const normalizedCode2 = normalize(processedCode2);
 
     if (normalizedCode1 === normalizedCode2) {
       console.log('Components detected as identical after normalization, setting similarity score to 100%');
       setSimilarityScore(100);
     }
-  }, [component1.code, component2.code, initialSimilarityScore, diffCount]);
+  }, [processedCode1, processedCode2, initialSimilarityScore, diffCount]);
 
   const modalClasses = isFullScreen
     ? "max-w-[99vw] w-[99vw] h-[99vh] flex flex-col p-0 rounded-lg shadow-2xl border-2 border-slate-200 dark:border-slate-700"
@@ -110,7 +219,7 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
         <DialogHeader className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-violet-700 dark:from-indigo-400 dark:to-violet-500">
-              Component Comparison
+              {isMethodComparison ? "Method Comparison" : "Component Comparison"}
             </DialogTitle>
             <div className="flex items-center gap-3">
               <button
@@ -145,7 +254,11 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
                 <CodeIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">{component1.name}</h3>
+                <h3 className="font-bold text-lg">
+                  {isMethodComparison && methodName
+                    ? `${component1.name}.${methodName}`
+                    : component1.name}
+                </h3>
                 <p className="text-xs text-muted-foreground font-mono">{component1.filePath}</p>
               </div>
             </div>
@@ -155,7 +268,11 @@ export function ComparisonModal({ isOpen, onClose, component1, component2, simil
                 <CodeIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <h3 className="font-bold text-lg">{component2.name}</h3>
+                <h3 className="font-bold text-lg">
+                  {isMethodComparison && methodName
+                    ? `${component2.name}.${methodName}`
+                    : component2.name}
+                </h3>
                 <p className="text-xs text-muted-foreground font-mono">{component2.filePath}</p>
               </div>
             </div>
