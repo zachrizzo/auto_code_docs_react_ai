@@ -10,7 +10,7 @@
     "name": "SimilarityList",
     "description": "",
     "filePath": "src/ui/components/similarity-list.tsx",
-    "methodCount": 3,
+    "methodCount": 2,
     "slug": "similaritylist"
   },
   {
@@ -38,7 +38,7 @@
     "name": "ComparisonModal",
     "description": "",
     "filePath": "src/ui/components/comparison-modal.tsx",
-    "methodCount": 1,
+    "methodCount": 3,
     "slug": "comparisonmodal"
   },
   {
@@ -199,7 +199,7 @@
     "name": "ComparisonModal",
     "description": "",
     "filePath": "src/ui/components/comparison-modal.tsx",
-    "methodCount": 1,
+    "methodCount": 3,
     "slug": "comparisonmodal"
   },
   {
@@ -402,7 +402,7 @@
     "name": "ComparisonModal",
     "description": "",
     "filePath": "src/ui/components/comparison-modal.tsx",
-    "methodCount": 1,
+    "methodCount": 3,
     "slug": "comparisonmodal"
   },
   {
