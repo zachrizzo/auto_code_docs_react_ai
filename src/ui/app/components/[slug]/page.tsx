@@ -1,61 +1,127 @@
 "use client"
 import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sparkles, FileCode } from "lucide-react"
-import { Button } from "../../../components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs"
-import { CodeBlock } from "../../../components/code-block"
-import { Badge } from "../../../components/ui/badge"
-import { SimilarComponentsSection } from "../../../components/similar-components-section"
-import { CodeRelationships } from "../../../components/code-relationships"
-import { CodeGraph } from "../../../components/code-graph"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CodeBlock } from "@/components/code-block"
+import { Badge } from "@/components/ui/badge"
+import { SimilarComponentsSection } from "@/components/similar-components-section"
+import { CodeRelationships } from "@/components/code-relationships"
+import { CodeGraph } from "@/components/code-graph"
+
+interface ComponentData {
+  name: string;
+  type: string;
+  filePath: string;
+  route: string;
+  code: string;
+  description?: string;
+  lastUpdated: string;
+  similarComponents: {
+    name: string;
+    similarity: number;
+    reason: string;
+  }[];
+}
 
 export default function ComponentPage({ params }: { params: { slug: string } }) {
+  const [componentData, setComponentData] = useState<ComponentData | null>(null)
   const [description, setDescription] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - in a real app this would come from your backend
-  const componentData = {
-    name: params.slug,
-    type: "React Component",
-    filePath: `src/components/${params.slug}.tsx`,
-    route: `/components/${params.slug.toLowerCase()}`,
-    lastUpdated: "2 days ago",
-    similarComponents: [
-      {
-        name: params.slug === "Modal" ? "Dialog" : "Modal",
-        similarity: 85,
-        reason: "Both handle popup content with similar open/close behavior",
-      },
-      {
-        name: "Dropdown",
-        similarity: 65,
-        reason: "Similar toggling behavior and content display",
-      },
-    ],
-  }
+  // Fetch component data
+  useEffect(() => {
+    async function fetchComponent() {
+      try {
+        // Try to fetch from docs-data
+        const res = await fetch(`/docs-data/${params.slug}.json`)
 
-  const generateDescription = () => {
+        if (res.ok) {
+          const data = await res.json()
+          setComponentData(data)
+          if (data.description) {
+            setDescription(data.description)
+          }
+        } else {
+          // Fallback to mock data
+          setComponentData({
+            name: params.slug,
+            type: "React Component",
+            filePath: `src/components/${params.slug}.tsx`,
+            route: `/components/${params.slug.toLowerCase()}`,
+            code: `import React from 'react';\n\nexport function ${params.slug}({ title, children }) {\n  return (\n    <div className="component">\n      <h2>{title}</h2>\n      <div>{children}</div>\n    </div>\n  );\n}`,
+            lastUpdated: "2 days ago",
+            similarComponents: [
+              {
+                name: params.slug === "Modal" ? "Dialog" : "Modal",
+                similarity: 85,
+                reason: "Both handle popup content with similar open/close behavior",
+              },
+              {
+                name: "Dropdown",
+                similarity: 65,
+                reason: "Similar toggling behavior and content display",
+              },
+            ],
+          })
+        }
+        setLoading(false)
+      } catch (error) {
+        console.error('Error loading component data:', error)
+        setLoading(false)
+      }
+    }
+
+    fetchComponent()
+  }, [params.slug])
+
+  const generateDescription = async () => {
+    if (!componentData) return;
     setIsGenerating(true)
-    // Simulate API call
-    setTimeout(() => {
-      setDescription(
-        "This component renders a user interface element that displays information in a structured format. It accepts props for customization and handles various user interactions.",
-      )
-      setIsGenerating(false)
-    }, 1500)
+
+    try {
+      const response = await fetch('/api/describe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          componentName: componentData.name,
+          code: componentData.code || `function ${componentData.name}() { /* Code not available */ }`,
+          filePath: componentData.filePath,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate description');
+      }
+
+      const data = await response.json();
+      setDescription(data.description);
+    } catch (error) {
+      console.error('Error generating description:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
-  const componentCode = `import React from 'react';
+  if (loading) {
+    return (
+      <div className="container max-w-5xl py-12">
+        <p className="text-center text-muted-foreground">Loading component data...</p>
+      </div>
+    )
+  }
 
-export function ${params.slug}({ title, children }) {
-  return (
-    <div className="component">
-      <h2>{title}</h2>
-      <div>{children}</div>
-    </div>
-  );
-}`
+  if (!componentData) {
+    return (
+      <div className="container max-w-5xl py-12">
+        <p className="text-center text-muted-foreground">Component not found</p>
+      </div>
+    )
+  }
 
   return (
     <div className="container max-w-5xl py-12">
@@ -108,17 +174,17 @@ export function ${params.slug}({ title, children }) {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="code">
-          <CodeBlock code={componentCode} language="tsx" />
+          <CodeBlock code={componentData.code || `// Code not available for ${componentData.name}`} language="tsx" />
         </TabsContent>
         <TabsContent value="usage">
           <CodeBlock
-            code={`import { ${params.slug} } from 'components/${params.slug.toLowerCase()}';
+            code={`import { ${componentData.name} } from '${componentData.filePath.replace(/\.tsx?$/, '')}';
 
 export default function Example() {
   return (
-    <${params.slug} title="Example">
+    <${componentData.name} title="Example">
       This is an example usage
-    </${params.slug}>
+    </${componentData.name}>
   );
 }`}
             language="tsx"
@@ -164,7 +230,7 @@ export default function Example() {
         components={componentData.similarComponents}
         currentComponent={{
           name: componentData.name,
-          code: componentCode,
+          code: componentData.code || `// Code not available`,
           filePath: componentData.filePath,
         }}
       />

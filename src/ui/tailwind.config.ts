@@ -5,7 +5,8 @@ const config = {
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
+    // Include CSS files for @apply
+    "./app/**/*.{ts,tsx,css}",
     "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],

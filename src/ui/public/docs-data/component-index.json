@@ -1769,5 +1769,327 @@
     "filePath": "src/ui/components/ui/accordion.tsx",
     "methodCount": 0,
     "slug": "accordioncontent"
+  },
+  {
+    "name": "layout",
+    "description": "",
+    "filePath": "src/ui/app/layout.tsx",
+    "methodCount": 1,
+    "slug": "layout"
+  },
+  {
+    "name": "ThemeProvider",
+    "description": "",
+    "filePath": "src/ui/components/theme-provider.tsx",
+    "methodCount": 0,
+    "slug": "themeprovider"
+  },
+  {
+    "name": "cn",
+    "description": "",
+    "filePath": "src/ui/lib/utils.ts",
+    "methodCount": 0,
+    "slug": "cn"
+  },
+  {
+    "name": "page",
+    "description": "",
+    "filePath": "src/ui/app/docs/[slug]/page.tsx",
+    "methodCount": 4,
+    "slug": "page"
+  },
+  {
+    "name": "page",
+    "description": "",
+    "filePath": "src/ui/app/components/[slug]/page.tsx",
+    "methodCount": 3,
+    "slug": "page"
+  },
+  {
+    "name": "UseRecursiveExamples",
+    "description": "This file demonstrates how to use the recursive examples in a test environment",
+    "filePath": "examples/UseRecursiveExamples.tsx",
+    "methodCount": 3,
+    "slug": "userecursiveexamples"
+  },
+  {
+    "name": "TodoItem",
+    "description": "Component that displays a single todo item with controls to toggle completion or delete",
+    "filePath": "examples/TodoItem.tsx",
+    "methodCount": 3,
+    "slug": "todoitem"
+  },
+  {
+    "name": "Todo",
+    "description": "A component for managing a list of todo items with categories, priorities, and filters",
+    "filePath": "examples/Todo.tsx",
+    "methodCount": 8,
+    "slug": "todo"
+  },
+  {
+    "name": "Todo",
+    "description": "A component for managing a list of todo items with categories, priorities, and filters",
+    "filePath": "examples/Todo.tsx",
+    "methodCount": 8,
+    "slug": "todo"
+  },
+  {
+    "name": "TodoItem",
+    "description": "Component that displays a single todo item with controls to toggle completion or delete",
+    "filePath": "examples/TodoItem.tsx",
+    "methodCount": 3,
+    "slug": "todoitem"
+  },
+  {
+    "name": "factorial",
+    "description": "Recursive functions in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "factorial"
+  },
+  {
+    "name": "sumNestedArray",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "sumnestedarray"
+  },
+  {
+    "name": "deepClone",
+    "description": "JavaScript examples with recursion (using JS syntax, no types)",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "deepclone"
+  },
+  {
+    "name": "RecursiveTreeProcessor",
+    "description": "Recursive class implementation in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 4,
+    "slug": "recursivetreeprocessor"
+  },
+  {
+    "name": "CommentThread",
+    "description": "React component that demonstrates recursive rendering",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "commentthread"
+  },
+  {
+    "name": "RecursiveExamples",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "recursiveexamples"
+  },
+  {
+    "name": "HealthcareDashboard",
+    "description": "Healthcare Dashboard component that displays and manages patient information",
+    "filePath": "examples/HealthcareDashboard.tsx",
+    "methodCount": 4,
+    "slug": "healthcaredashboard"
+  },
+  {
+    "name": "fibonacci",
+    "description": "Fibonacci number calculator using recursion with memoization",
+    "filePath": "examples/Fibonacci.tsx",
+    "methodCount": 0,
+    "slug": "fibonacci"
+  },
+  {
+    "name": "Fibonacci",
+    "description": "Component that demonstrates the fibonacci sequence calculation",
+    "filePath": "examples/Fibonacci.tsx",
+    "methodCount": 2,
+    "slug": "fibonacci"
+  },
+  {
+    "name": "calculatePatientCost",
+    "description": "A recursive function to calculate the total cost of a patient's stay\nincluding all procedures, medications, and room charges",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 2,
+    "slug": "calculatepatientcost"
+  },
+  {
+    "name": "App",
+    "description": "Main application component that demonstrates various React features",
+    "filePath": "examples/App.tsx",
+    "methodCount": 1,
+    "slug": "app"
+  },
+  {
+    "name": "Todo",
+    "description": "A component for managing a list of todo items with categories, priorities, and filters",
+    "filePath": "examples/Todo.tsx",
+    "methodCount": 8,
+    "slug": "todo"
+  },
+  {
+    "name": "TodoItem",
+    "description": "Component that displays a single todo item with controls to toggle completion or delete",
+    "filePath": "examples/TodoItem.tsx",
+    "methodCount": 3,
+    "slug": "todoitem"
+  },
+  {
+    "name": "factorial",
+    "description": "Recursive functions in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "factorial"
+  },
+  {
+    "name": "sumNestedArray",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "sumnestedarray"
+  },
+  {
+    "name": "deepClone",
+    "description": "JavaScript examples with recursion (using JS syntax, no types)",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "deepclone"
+  },
+  {
+    "name": "RecursiveTreeProcessor",
+    "description": "Recursive class implementation in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 4,
+    "slug": "recursivetreeprocessor"
+  },
+  {
+    "name": "CommentThread",
+    "description": "React component that demonstrates recursive rendering",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "commentthread"
+  },
+  {
+    "name": "RecursiveExamples",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "recursiveexamples"
+  },
+  {
+    "name": "HealthcareDashboard",
+    "description": "Healthcare Dashboard component that displays and manages patient information",
+    "filePath": "examples/HealthcareDashboard.tsx",
+    "methodCount": 4,
+    "slug": "healthcaredashboard"
+  },
+  {
+    "name": "UseRecursiveExamples",
+    "description": "This file demonstrates how to use the recursive examples in a test environment",
+    "filePath": "examples/UseRecursiveExamples.tsx",
+    "methodCount": 3,
+    "slug": "userecursiveexamples"
+  },
+  {
+    "name": "fibonacci",
+    "description": "Fibonacci number calculator using recursion with memoization",
+    "filePath": "examples/Fibonacci.tsx",
+    "methodCount": 0,
+    "slug": "fibonacci"
+  },
+  {
+    "name": "Fibonacci",
+    "description": "Component that demonstrates the fibonacci sequence calculation",
+    "filePath": "examples/Fibonacci.tsx",
+    "methodCount": 2,
+    "slug": "fibonacci"
+  },
+  {
+    "name": "findPatient",
+    "description": "Recursive function to find a patient in a hospital hierarchy (floors, wings, rooms)",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 0,
+    "slug": "findpatient"
+  },
+  {
+    "name": "buildHospitalOrgChart",
+    "description": "Recursively build a hospital organizational chart",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 1,
+    "slug": "buildhospitalorgchart"
+  },
+  {
+    "name": "DocumentAll",
+    "description": "This component brings together all the components, functions and examples\nfor documentation generation purposes.",
+    "filePath": "examples/DocumentAll.tsx",
+    "methodCount": 0,
+    "slug": "documentall"
+  },
+  {
+    "name": "App",
+    "description": "Main application component that demonstrates various React features",
+    "filePath": "examples/App.tsx",
+    "methodCount": 1,
+    "slug": "app"
+  },
+  {
+    "name": "Todo",
+    "description": "A component for managing a list of todo items with categories, priorities, and filters",
+    "filePath": "examples/Todo.tsx",
+    "methodCount": 8,
+    "slug": "todo"
+  },
+  {
+    "name": "TodoItem",
+    "description": "Component that displays a single todo item with controls to toggle completion or delete",
+    "filePath": "examples/TodoItem.tsx",
+    "methodCount": 3,
+    "slug": "todoitem"
+  },
+  {
+    "name": "factorial",
+    "description": "Recursive functions in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "factorial"
+  },
+  {
+    "name": "sumNestedArray",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "sumnestedarray"
+  },
+  {
+    "name": "deepClone",
+    "description": "JavaScript examples with recursion (using JS syntax, no types)",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 0,
+    "slug": "deepclone"
+  },
+  {
+    "name": "RecursiveTreeProcessor",
+    "description": "Recursive class implementation in TypeScript",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 4,
+    "slug": "recursivetreeprocessor"
+  },
+  {
+    "name": "CommentThread",
+    "description": "React component that demonstrates recursive rendering",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "commentthread"
+  },
+  {
+    "name": "RecursiveExamples",
+    "description": "",
+    "filePath": "examples/RecursiveExamples.tsx",
+    "methodCount": 1,
+    "slug": "recursiveexamples"
+  },
+  {
+    "name": "HealthcareDashboard",
+    "description": "Healthcare Dashboard component that displays and manages patient information",
+    "filePath": "examples/HealthcareDashboard.tsx",
+    "methodCount": 4,
+    "slug": "healthcaredashboard"
   }
 ]

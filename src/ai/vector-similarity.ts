@@ -58,12 +58,12 @@ export class VectorSimilarityService {
       );
     } else {
       // Use OpenAI for embeddings
-      if (!options.apiKey) {
+      if (!options.apiKey && !process.env.OPENAI_API_KEY) {
         throw new Error("API key is required when using OpenAI");
       }
 
       this.openai = new OpenAI({
-        apiKey: options.apiKey,
+        apiKey: options.apiKey || process.env.OPENAI_API_KEY,
       });
       this.model = options.model || "text-embedding-3-small";
     }

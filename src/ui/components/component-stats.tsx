@@ -17,6 +17,7 @@ interface ComponentData {
   filePath: string
   methodCount: number
   type?: string
+  code?: string
 }
 
 export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
@@ -87,7 +88,7 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
   return (
     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
       {components.map((component) => (
-        <Link key={component.slug} href={`/docs/${component.slug}`} passHref>
+        <Link key={component.slug} href={`/docs/${component.slug}`} className="h-full block">
           <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border-none shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -110,7 +111,7 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
               </p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                <span>{component.filePath || 'File path not available'}</span>
+                <span className="truncate max-w-[250px]">{component.filePath || 'Unknown path'}</span>
               </div>
             </CardContent>
           </Card>

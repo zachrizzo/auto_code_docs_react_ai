@@ -6,12 +6,15 @@
   "types": "dist/index.d.ts",
   "bin": {
     "docs-by-zach": "./dist/cli/index.js",
+    "rdocs": "./dist/cli/index.js",
     "docs-ui": "./generate-and-run-docs.sh"
   },
   "files": [
     "dist",
     "generate-and-run-docs.sh",
-    "generate_docs_helper.sh"
+    "generate_docs_helper.sh",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "node scripts/build.js",
@@ -21,8 +24,9 @@
     "prepare": "npm run build",
     "example": "ts-node examples/example-usage.ts",
     "docs-ui": "bash ./generate-and-run-docs.sh",
-    "docs-ollama": " npm run build && bash ./generate-and-run-docs.sh --use-ollama",
-    "docs": "bash ./generate-and-run-docs.sh"
+    "docs-ollama": "npm run build && bash ./generate-and-run-docs.sh --use-ollama",
+    "docs": "bash ./generate-and-run-docs.sh",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "react",
@@ -60,6 +64,7 @@
     "@radix-ui/react-switch": "^1.1.4",
     "@radix-ui/react-tabs": "^1.1.4",
     "@radix-ui/react-tooltip": "^1.2.0",
+    "@tailwindcss/postcss": "^4.1.4",
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.4",
     "chalk": "^4.1.2",
@@ -88,6 +93,7 @@
     "react-hook-form": "^7.55.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
+    "serve": "^14.2.1",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.1.3",
