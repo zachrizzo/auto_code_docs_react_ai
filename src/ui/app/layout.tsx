@@ -2,11 +2,11 @@ import * as React from "react"
 import type { Metadata } from "next"
 import { Inter as FontSans } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { ChatBubble } from "@/components/chat-bubble"
+import { ThemeProvider } from "../components/theme-provider"
+import { ChatBubble } from "../components/chat-bubble"
 import { cn } from "../lib/utils"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/sidebar"
+import { Header } from "../components/header"
+import { Sidebar } from "../components/sidebar"
 
 const fontSans = FontSans({
   subsets: ["latin"],

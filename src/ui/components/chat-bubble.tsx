@@ -2,7 +2,7 @@
 import * as React from "react"
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { MessageSquare, Maximize2, Minimize2 } from "lucide-react"
+import { MessageSquare, Maximize2, Minimize2, Trash2 } from "lucide-react"
 import { Button } from "./ui/button"
 import { Textarea } from "./ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
@@ -96,6 +96,12 @@ export function ChatBubble() {
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded)
+  }
+
+  const clearMessages = () => {
+    setMessages([
+      { text: "Hi there! I can help you understand your code. What would you like to know?", isUser: false, role: "assistant" },
+    ])
   }
 
   // Custom renderer for code blocks with syntax highlighting
@@ -224,9 +230,18 @@ export function ChatBubble() {
                   <AvatarImage src="/placeholder.svg?height=32&width=32" />
                   <AvatarFallback>AI</AvatarFallback>
                 </Avatar>
-                <h3 className="font-medium">Code Assistant</h3>
+                <h3 className="font-medium">Code Assistant hh</h3>
               </div>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  onClick={clearMessages}
+                  className="text-white hover:bg-white/20 flex items-center gap-1"
+                  title="Clear chat"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Clear</span>
+                </Button>
                 <Button variant="ghost" size="icon" onClick={toggleExpand} className="text-white hover:bg-white/20">
                   {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
