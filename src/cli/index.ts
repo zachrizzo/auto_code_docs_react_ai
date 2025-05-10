@@ -7,15 +7,27 @@ import { generateDocUI } from "../index";
 import { execSync, spawn } from "child_process";
 import { ComponentDefinition } from "../core/types";
 import { AiDescriptionGenerator } from "../ai/generator";
-import * as net from "net";
+import { isPortInUse, findFreePort } from "./utils/cli-helpers";
+
+/**
+ * Main CLI program instance for code-y.
+ * Handles parsing of all CLI commands and options.
+ */
+/**
+ * Interface for all CLI options accepted by code-y.
+ */
+import { CodeYOptions } from "./cli.types";
 
 const program = new Command();
 
 // Get the package version
 const packageJson = require("../../package.json");
 
+/**
+ * Configure CLI name, description, and version.
+ */
 program
-  .name("docs-by-zach")
+  .name("code-y")
   .description("Generate AI-powered documentation for React components")
   .version(packageJson.version);
 
@@ -83,7 +95,12 @@ program
   );
 
 // Add a default action to the main program
-program.action(async (options) => {
+/**
+ * Default CLI action for code-y.
+ * Generates documentation for React components based on provided options.
+ * @param options {CodeYOptions} - Parsed CLI options
+ */
+program.action(async (options: CodeYOptions) => {
   console.log("📚 Generating documentation...");
 
   // Process options
@@ -494,6 +511,10 @@ Or: npx serve ${outputDir} -p ${options.port}`);
 });
 
 // Keep the existing generate command for backward compatibility
+/**
+ * Generate command for explicit documentation generation.
+ * Accepts the same options as the default action.
+ */
 program
   .command("generate")
   .description("Generate component documentation")
@@ -557,7 +578,11 @@ program
     "Generate AI descriptions for components and props",
     false
   )
-  .action(async (options) => {
+  /**
+   * Action handler for the generate command.
+   * @param options {CodeYOptions} - Parsed CLI options
+   */
+  .action(async (options: CodeYOptions) => {
     console.log("📚 Generating documentation...");
 
     // Process options
@@ -974,40 +999,22 @@ Or: npx serve ${outputDir} -p ${options.port}`);
     }
   });
 
-// Run the CLI
-export async function run() {
+/**
+ * Run the CLI program asynchronously.
+ * Parses process.argv and executes the appropriate command/action.
+ */
+export async function run(): Promise<void> {
   await program.parseAsync(process.argv);
 }
 
 // Run the CLI if this file is executed directly
+/**
+ * If this file is run directly, execute the CLI.
+ */
 if (require.main === module) {
-  run().catch((error) => {
+  run().catch((error: unknown) => {
     console.error("Error:", error);
     process.exit(1);
   });
 }
 
-// Add this function to check if a port is in use
-function isPortInUse(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => {
-      resolve(true); // Port is in use
-    });
-    server.once("listening", () => {
-      server.close();
-      resolve(false); // Port is free
-    });
-    server.listen(port);
-  });
-}
-
-// Add this function to find a free port
-async function findFreePort(startPort: number): Promise<number> {
-  let port = startPort;
-  while (await isPortInUse(port)) {
-    console.log(`Port ${port} is already in use, trying next port...`);
-    port++;
-  }
-  return port;
-}

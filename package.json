@@ -1,14 +1,11 @@
 {
-  "name": "recursive-react-docs-ai",
+  "name": "code-y",
   "version": "0.1.0",
   "description": "Recursively generate documentation for React components with AI-powered descriptions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "docs-by-zach": "./dist/cli/index.js",
-    "rdocs": "./dist/cli/index.js",
-    "docs-ui": "./dist/cli/start-nextjs-ui.js",
-    "docs-server": "./dist/cli/start-docs-ui.js"
+    "code-y": "./dist/cli/index.js"
   },
   "files": [
     "dist",
