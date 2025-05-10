@@ -50,6 +50,21 @@ export interface DocumentationConfig {
 }
 
 /**
+ * AI-generated content for summaries and descriptions
+ */
+export interface AIGeneratedContent {
+  /**
+   * AI-generated summary of the component or method
+   */
+  summary?: string;
+  
+  /**
+   * AI-generated detailed description
+   */
+  description?: string;
+}
+
+/**
  * Component property definition
  */
 export interface PropDefinition {
@@ -124,6 +139,11 @@ export interface SimilarityWarning {
   reason: string;
 
   /**
+   * File path of the similar method
+   */
+  filePath: string;
+
+  /**
    * Code of the similar method
    */
   code?: string;
@@ -191,7 +211,7 @@ export interface ComponentDefinition {
   /**
    * Path to the file containing the component
    */
-  filePath?: string;
+  filePath: string;
 
   /**
    * Name of the file containing the component
@@ -232,4 +252,64 @@ export interface ComponentDefinition {
    * Similarity warnings for the component
    */
   similarityWarnings?: SimilarityWarning[];
+
+  /**
+   * AI-generated content for this component
+   */
+  ai?: AIGeneratedContent;
+}
+
+/**
+ * Parser options for processing React components
+ */
+export interface ParserOptions {
+  /**
+   * Root directory of the project
+   */
+  rootDir: string;
+
+  /**
+   * Path to the component or directory to parse
+   */
+  componentPath: string;
+
+  /**
+   * Patterns to exclude from parsing (defaults to empty array)
+   */
+  excludePatterns?: string[];
+
+  /**
+   * Patterns to include in parsing (defaults to tsx, jsx, js, ts files)
+   */
+  includePatterns?: string[];
+
+  /**
+   * Maximum depth for recursive component parsing (defaults to Infinity)
+   */
+  maxDepth?: number;
+
+  /**
+   * OpenAI API key for similarity analysis
+   */
+  apiKey?: string | undefined;
+
+  /**
+   * Threshold for similarity warnings (0-1, defaults to 0.85)
+   */
+  similarityThreshold?: number;
+
+  /**
+   * Whether to use Ollama instead of OpenAI (defaults to false)
+   */
+  useOllama?: boolean;
+
+  /**
+   * URL for Ollama API (defaults to http://localhost:11434)
+   */
+  ollamaUrl?: string;
+
+  /**
+   * Model to use with Ollama (defaults to nomic-embed-text:latest)
+   */
+  ollamaModel?: string;
 }

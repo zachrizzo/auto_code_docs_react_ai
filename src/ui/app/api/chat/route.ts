@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CodebaseChatService, ChatMessage } from "../../../../ai/chat-service";
+import { CodebaseChatService } from "../../../../ai/chat/chat-service";
+import type { ChatMessage } from "../../../../ai/shared/ai.types";
 import path from "path";
 import fs from "fs-extra";
 
