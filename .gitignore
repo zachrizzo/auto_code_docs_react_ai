@@ -33,3 +33,6 @@ docs-components.json
 src/ui/public/docs-data/component-index.json
 src/ui/public/docs-data/config.json
 docs-components.json
+test-docs-project/documentation/
+test-docs-project/node_modules/
+.ui-build/

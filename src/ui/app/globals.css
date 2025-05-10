@@ -51,8 +51,7 @@
 
 @layer base {
   * {
-    @apply border;
-    border-color: hsl(var(--border));
+    @apply border-0; /* Remove borders from all elements */
   }
   body {
     @apply bg-background text-foreground;

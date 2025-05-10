@@ -582,6 +582,7 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
 
       {selectedPair && (
         <ComparisonModal
+          key={`comparison-${selectedPair.component1.name}-${selectedPair.component2.name}`}
           isOpen={comparisonOpen}
           onClose={() => setComparisonOpen(false)}
           component1={{

@@ -92,6 +92,7 @@ export function ${componentName}({ title, children }) {
 
       {selectedComponent && (
         <ComparisonModal
+          key={`comparison-${currentComponent.name}-${selectedComponent.name}-${Date.now()}`}
           isOpen={comparisonOpen}
           onClose={() => setComparisonOpen(false)}
           component1={currentComponent}

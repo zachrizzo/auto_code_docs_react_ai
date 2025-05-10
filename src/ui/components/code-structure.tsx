@@ -12,6 +12,7 @@ interface FileStructure {
   type: 'file' | 'folder'
   children?: FileStructure[]
   componentSlug?: string
+  uniqueKey?: string
 }
 
 export function CodeStructure() {
@@ -82,11 +83,12 @@ export function CodeStructure() {
               name: fileName,
               path: path,
               type: 'file',
-              children: components.map(comp => ({
+              children: components.map((comp, compIndex) => ({
                 name: comp.name,
-                path: `${path}#${comp.name}`,
+                path: `${path}#${comp.name}-${compIndex}`, // Add index to make path unique
                 type: 'file',
-                componentSlug: comp.slug
+                componentSlug: comp.slug,
+                uniqueKey: `${comp.slug}-${path}-${compIndex}` // Add explicit unique key property
               }))
             })
           }
@@ -124,7 +126,7 @@ export function CodeStructure() {
     return (
       <ul className={`pl-${depth * 4} space-y-1`} style={{ paddingLeft: depth * 16 }}>
         {items.map((item, index) => (
-          <li key={`${item.path}-${index}`} className="py-1">
+          <li key={item.uniqueKey || `${item.path}-${index}`} className="py-1">
             <div className="flex items-center">
               {item.type === 'folder' ? (
                 <FolderIcon className="h-4 w-4 text-blue-500 mr-2" />
