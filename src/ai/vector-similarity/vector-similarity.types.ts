@@ -1,0 +1,27 @@
+// Types and interfaces for vector similarity feature
+import { MethodDefinition, SimilarityWarning } from "../../core/types";
+
+/**
+ * Represents a single vector entry for a method in the vector database.
+ */
+export interface VectorEntry {
+  id: string; // Unique ID: componentName_methodName_filePath
+  vector: number[];
+  methodName: string;
+  componentName: string;
+  filePath: string;
+  code: string;
+}
+
+/**
+ * Options for configuring the VectorSimilarityService.
+ */
+export interface VectorSimilarityOptions {
+  apiKey?: string;
+  useOllama?: boolean;
+  useOpenAI?: boolean;
+  ollamaUrl?: string;
+  ollamaModel?: string;
+  similarityThreshold?: number; // Default 0.85 (85%)
+  model?: string;
+}

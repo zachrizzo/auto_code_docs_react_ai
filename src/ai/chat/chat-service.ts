@@ -1,31 +1,16 @@
 import { OpenAI } from "openai";
-import { VectorSimilarityService } from "./vector-similarity";
-import { ComponentDefinition } from "../core/types";
+import { VectorSimilarityService } from "../../ai/vector-similarity/vector-similarity";
+import { ComponentDefinition } from "../../core/types";
 import axios from "axios";
+import type { ChatServiceOptions, ChatMessage, CodebaseSearchResult } from "../shared/ai.types";
 
-export interface ChatServiceOptions {
-  apiKey?: string;
-  useOllama?: boolean;
-  useOpenAI?: boolean;
-  ollamaUrl?: string;
-  ollamaModel?: string;
-  chatModel?: string;
-}
-
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-export interface CodebaseSearchResult {
-  componentName: string;
-  methodName?: string;
-  code: string;
-  filePath: string;
-  description?: string;
-  similarity: number;
-}
-
+/**
+ * Main service for codebase-aware chat using OpenAI or Ollama.
+ *
+ * @example
+ * const chatService = new CodebaseChatService(components, { apiKey: 'sk-...', useOllama: false });
+ * const { response, searchResults } = await chatService.chat([{ role: 'user', content: 'How does Button work?' }], 'How does Button work?');
+ */
 export class CodebaseChatService {
   private openai: OpenAI | null = null;
   private vectorService: VectorSimilarityService;
@@ -37,6 +22,13 @@ export class CodebaseChatService {
     process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
   private chatModel: string;
 
+  /**
+   * Create a new CodebaseChatService.
+   * @param components List of parsed codebase components.
+   * @param options Chat service options (see {@link ChatServiceOptions}).
+   * @example
+   * const chatService = new CodebaseChatService(components, { apiKey: 'sk-...', useOllama: false });
+   */
   constructor(components: ComponentDefinition[], options: ChatServiceOptions) {
     this.components = components;
 
@@ -88,6 +80,11 @@ export class CodebaseChatService {
   /**
    * Initialize the vector database with all component methods
    */
+  /**
+   * Initialize the vector database with all component methods.
+   * This should be called once after instantiation.
+   * @private
+   */
   private async initializeVectorDatabase(): Promise<void> {
     console.log("Initializing vector database with component methods...");
 
@@ -106,6 +103,12 @@ export class CodebaseChatService {
 
   /**
    * Generate embeddings for a user query
+   */
+  /**
+   * Generate an embedding vector for a user query.
+   * @param query The user's natural language query.
+   * @returns The embedding vector.
+   * @private
    */
   private async generateQueryEmbedding(query: string): Promise<number[]> {
     if (this.useOllama) {
@@ -150,6 +153,13 @@ export class CodebaseChatService {
   /**
    * Search the codebase for relevant components and methods
    */
+  /**
+   * Search the codebase for relevant components and methods based on a query.
+   * @param query The user's natural language query.
+   * @returns Array of relevant codebase search results, sorted by similarity (highest first).
+   * @example
+   * const results = await chatService.searchCodebase('How does Button handle clicks?');
+   */
   async searchCodebase(query: string): Promise<CodebaseSearchResult[]> {
     const queryEmbedding = await this.generateQueryEmbedding(query);
     const results: CodebaseSearchResult[] = [];
@@ -184,6 +194,13 @@ export class CodebaseChatService {
   /**
    * Calculate cosine similarity between two vectors
    */
+  /**
+   * Calculate cosine similarity between two vectors.
+   * @param vecA First vector.
+   * @param vecB Second vector.
+   * @returns Cosine similarity score (0-1).
+   * @private
+   */
   private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
     if (vecA.length !== vecB.length) {
       throw new Error("Vectors must have the same length");
@@ -209,6 +226,12 @@ export class CodebaseChatService {
   /**
    * Get a chat response using OpenAI
    */
+  /**
+   * Get a chat response using OpenAI.
+   * @param messages Array of chat messages (history + user message).
+   * @returns Assistant response string.
+   * @private
+   */
   private async getOpenAIResponse(messages: ChatMessage[]): Promise<string> {
     if (!this.openai) {
       throw new Error("OpenAI client not initialized");
@@ -232,6 +255,12 @@ export class CodebaseChatService {
   /**
    * Get a chat response using Ollama
    */
+  /**
+   * Get a chat response using Ollama.
+   * @param messages Array of chat messages (history + user message).
+   * @returns Assistant response string.
+   * @private
+   */
   private async getOllamaResponse(messages: ChatMessage[]): Promise<string> {
     try {
       const response = await axios.post(`${this.ollamaUrl}/api/chat`, {
@@ -254,6 +283,15 @@ export class CodebaseChatService {
 
   /**
    * Chat with the codebase assistant
+   */
+  /**
+   * Chat with the codebase assistant. Searches for relevant code, injects context, and gets an LLM response.
+   *
+   * @param history Chat history (array of messages).
+   * @param query User's new question or message.
+   * @returns An object with the assistant's response and relevant code search results.
+   * @example
+   * const { response, searchResults } = await chatService.chat([{ role: 'user', content: 'How does Button work?' }], 'How does Button work?');
    */
   async chat(
     history: ChatMessage[],

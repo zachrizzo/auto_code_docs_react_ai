@@ -9,7 +9,8 @@ import {
   PropDefinition,
   MethodDefinition,
 } from "./types";
-import { VectorSimilarityService } from "../ai/vector-similarity";
+import { VectorSimilarityService } from "../ai/vector-similarity/vector-similarity";
+import { CodebaseChatService } from "../ai/chat";
 import * as ts from "typescript";
 
 // Enable debug logging

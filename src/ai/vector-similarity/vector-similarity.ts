@@ -1,29 +1,14 @@
 import { OpenAI } from "openai";
-import { MethodDefinition, SimilarityWarning } from "../core/types";
+import { MethodDefinition, SimilarityWarning } from "../../core/types";
 import axios from "axios";
 import crypto from "crypto";
 import path from "path";
+import { VectorEntry, VectorSimilarityOptions } from "./vector-similarity.types";
+import { cosineSimilarity } from "./utils/vector-similarity-utils";
 
-// Vector database for storing embeddings locally
-interface VectorEntry {
-  id: string; // Unique ID: componentName_methodName_filePath
-  vector: number[];
-  methodName: string;
-  componentName: string;
-  filePath: string;
-  code: string;
-}
-
-export interface VectorSimilarityOptions {
-  apiKey?: string;
-  useOllama?: boolean;
-  useOpenAI?: boolean;
-  ollamaUrl?: string;
-  ollamaModel?: string;
-  similarityThreshold?: number; // Default 0.85 (85%)
-  model?: string;
-}
-
+/**
+ * Service for vector similarity search and embeddings.
+ */
 export class VectorSimilarityService {
   private openai: OpenAI | null = null;
   private vectorDb: VectorEntry[] = [];
@@ -81,31 +66,6 @@ export class VectorSimilarityService {
   }
 
   /**
-   * Calculate cosine similarity between two vectors
-   */
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (vecA.length !== vecB.length) {
-      throw new Error("Vectors must have the same length");
-    }
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
-
-    if (normA === 0 || normB === 0) {
-      return 0;
-    }
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  /**
    * Generate embedding vector using Ollama
    */
   private async generateOllamaEmbedding(text: string): Promise<number[]> {
@@ -135,16 +95,10 @@ export class VectorSimilarityService {
   private async generateEmbedding(method: MethodDefinition): Promise<number[]> {
     // Create a text representation of the method
     const paramsText = method.params
-      .map((param) => `${param.name}: ${param.type}`)
-      .join(", ");
+      ? method.params.map((param) => `${param.name}: ${param.type}`).join(", ")
+      : "";
 
-    const methodText = `
-Method Name: ${method.name}
-Parameters: ${paramsText}
-Return Type: ${method.returnType || "void"}
-Description: ${method.description || ""}
-Implementation: ${method.code || ""}
-    `.trim();
+    const methodText = `\nMethod Name: ${method.name}\nParameters: ${paramsText}\nReturn Type: ${method.returnType || "void"}\nDescription: ${method.description || ""}\nImplementation: ${method.code || ""}\n    `.trim();
 
     if (this.useOllama) {
       return this.generateOllamaEmbedding(methodText);
@@ -200,6 +154,7 @@ Implementation: ${method.code || ""}
         );
       }
 
+      // Add to vector database
       this.vectorDb.push({
         id,
         vector,
@@ -210,7 +165,7 @@ Implementation: ${method.code || ""}
       });
     } catch (error) {
       console.error(
-        `Error adding method ${method.name} from ${componentName} to vector DB:`,
+        `Error adding method ${method.name} to vector database:`,
         error
       );
     }
@@ -224,81 +179,31 @@ Implementation: ${method.code || ""}
     componentName: string,
     filePath: string
   ): Promise<SimilarityWarning[]> {
-    // Ensure method has code
-    if (!method.code || method.code.trim() === "") {
-      return [];
-    }
+    // Generate embedding for the input method
+    const inputVector = await this.generateEmbedding(method);
+    const warnings: SimilarityWarning[] = [];
 
-    // *** Debug log for finding ***
-    if (method.name.toLowerCase().includes("zach")) {
-      console.log(
-        `[DEBUG ZACH FIND EMBED-ONLY] Processing method: ${componentName}.${method.name}`
-      );
-      console.log(
-        `[DEBUG ZACH FIND EMBED-ONLY] Original code:\n---\n${method.code}\n---`
-      );
-    }
-
-    // Skip extremely short methods (simple heuristic, could be removed if desired)
-    // if (method.code.trim().length < 20) {
-    //   return [];
-    // }
-
-    // Create a unique ID for the current method for self-comparison
-    const normalizedPath = path.normalize(filePath);
-    const currentId = `${componentName}_${method.name}_${normalizedPath}`;
-
-    // Generate vector for the current method (only needed once)
-    const vector = await this.generateEmbedding(method);
-
-    const similarityResults: SimilarityWarning[] = [];
-
-    // Compare with all vectors in the database
     for (const entry of this.vectorDb) {
-      // Skip comparing to itself using the ID
-      if (entry.id === currentId) continue;
-
-      // Always calculate vector similarity
-      const similarity = this.cosineSimilarity(vector, entry.vector);
-
-      // Debug log comparing similarity score
+      // Skip self-comparison
       if (
-        method.name.toLowerCase().includes("zach") ||
-        entry.methodName.toLowerCase().includes("zach")
+        entry.componentName === componentName &&
+        entry.methodName === method.name &&
+        entry.filePath === filePath
       ) {
-        console.log(
-          `[DEBUG ZACH COMPARE EMBED-ONLY] Comparing ${currentId} with ${entry.id}`
-        );
-        console.log(
-          `[DEBUG ZACH COMPARE EMBED-ONLY] Vector similarity calculated: ${similarity}. Threshold: ${this.similarityThreshold}`
-        );
+        continue;
       }
-
-      // If similarity exceeds threshold, add a warning
+      const similarity = cosineSimilarity(inputVector, entry.vector);
       if (similarity >= this.similarityThreshold) {
-        // Log when pushing warning
-        if (
-          method.name.toLowerCase().includes("zach") ||
-          entry.methodName.toLowerCase().includes("zach")
-        ) {
-          console.log(
-            `[DEBUG ZACH COMPARE EMBED-ONLY] Similarity above threshold! Pushing warning.`
-          );
-        }
-        similarityResults.push({
-          similarTo: `${entry.componentName}.${entry.methodName}`,
+        warnings.push({
+          similarTo: entry.methodName,
           score: similarity,
-          reason: `Function appears to have similar functionality (${Math.round(
-            similarity * 100
-          )}% similar)`,
+          reason: `Similar to ${entry.methodName} in ${entry.componentName}`,
           filePath: entry.filePath,
           code: entry.code,
         });
       }
     }
-
-    // Sort by similarity score (highest first)
-    return similarityResults.sort((a, b) => b.score - a.score);
+    return warnings;
   }
 
   /**
@@ -309,49 +214,12 @@ Implementation: ${method.code || ""}
     methods: MethodDefinition[],
     filePath: string
   ): Promise<MethodDefinition[]> {
-    const enhancedMethods: MethodDefinition[] = [];
-
-    console.log(
-      `Processing ${methods.length} methods in ${componentName} for similarity`
-    );
-
-    // Important: First add ALL methods to the vector database
-    // This ensures that methods within this component can be compared to each other
     for (const method of methods) {
-      if (!method.code || method.code.trim() === "") {
-        console.warn(
-          `Method ${method.name} in ${componentName} has no code defined`
-        );
-        continue;
-      }
-
-      // Add method to database
       await this.addMethod(method, componentName, filePath);
+      const warnings = await this.findSimilarMethods(method, componentName, filePath);
+      method.similarityWarnings = warnings;
     }
-
-    // Now process each method to find similarities
-    for (const method of methods) {
-      // Skip methods without code
-      if (!method.code || method.code.trim() === "") {
-        enhancedMethods.push(method);
-        continue;
-      }
-
-      // Find similar methods
-      const similarMethods = await this.findSimilarMethods(
-        method,
-        componentName,
-        filePath
-      );
-
-      if (similarMethods.length > 0) {
-        method.similarityWarnings = similarMethods;
-      }
-
-      enhancedMethods.push(method);
-    }
-
-    return enhancedMethods;
+    return methods;
   }
 
   /**
@@ -366,7 +234,12 @@ Implementation: ${method.code || ""}
    */
   importVectorDatabase(json: string): void {
     try {
-      this.vectorDb = JSON.parse(json);
+      const data = JSON.parse(json);
+      if (Array.isArray(data)) {
+        this.vectorDb = data;
+      } else {
+        throw new Error("Invalid vector database format");
+      }
     } catch (error) {
       console.error("Error importing vector database:", error);
     }
