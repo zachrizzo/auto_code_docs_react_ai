@@ -3,6 +3,31 @@
  */
 
 /**
+ * General code item for documentation (function or class)
+ */
+export interface CodeItem {
+  /**
+   * Name of the code item
+   */
+  name: string;
+
+  /**
+   * Kind of the code item
+   */
+  kind: 'function' | 'class';
+
+  /**
+   * Code of the code item
+   */
+  code: string;
+
+  /**
+   * File path of the code item
+   */
+  filePath: string;
+}
+
+/**
  * Documentation configuration options
  */
 export interface DocumentationConfig {

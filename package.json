@@ -16,7 +16,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "tsc -p tsconfig-build.json",
     "start": "node dist/cli/index.js",
     "dev": "ts-node src/cli/index.ts",
     "test": "jest",

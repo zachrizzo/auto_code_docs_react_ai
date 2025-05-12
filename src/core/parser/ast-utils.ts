@@ -117,6 +117,215 @@ export function extractComponentSourceCode(
  * @param componentName - The name of the component to extract methods from
  * @returns Array of method definitions
  */
+
+/**
+ * Extract all top-level functions and classes from a JS/TS file using AST.
+ * @param fileContent - The content of the file
+ * @returns Array of component information including name, kind, code, and props
+ */
+export function extractAllTopLevelCodeItems(fileContent: string): Array<{ 
+  name: string; 
+  kind: 'function' | 'class'; 
+  code: string;
+  props?: Array<{
+    name: string;
+    type: string;
+    required?: boolean;
+    defaultValue?: string;
+    description?: string;
+  }>;
+}> {
+  const results: Array<{
+    name: string;
+    kind: 'function' | 'class';
+    code: string;
+    props?: Array<{
+      name: string;
+      type: string;
+      required?: boolean;
+      defaultValue?: string;
+      description?: string;
+    }>;
+  }> = [];
+  
+  // Store interfaces and their properties for later use
+  const interfaces: Record<string, Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    description?: string;
+  }>> = {};
+  
+  try {
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      fileContent,
+      ts.ScriptTarget.Latest,
+      true
+    );
+
+    // First pass: collect all interfaces
+    function collectInterfaces(node: ts.Node) {
+      if (ts.isInterfaceDeclaration(node) && node.name) {
+        const interfaceName = node.name.text;
+        const props: Array<{
+          name: string;
+          type: string;
+          required: boolean;
+          description?: string;
+        }> = [];
+        
+        // Get JSDoc comment for the property if available
+        function getJSDocComment(node: ts.Node): string | undefined {
+          const jsDocComments = (node as any).jsDoc;
+          if (jsDocComments && jsDocComments.length > 0) {
+            return jsDocComments[0].comment;
+          }
+          return undefined;
+        }
+        
+        // Process each property in the interface
+        node.members.forEach(member => {
+          if (ts.isPropertySignature(member) && member.name) {
+            const propName = member.name.getText(sourceFile);
+            const propType = member.type ? member.type.getText(sourceFile) : 'any';
+            const required = !member.questionToken;
+            const description = getJSDocComment(member);
+            
+            props.push({
+              name: propName,
+              type: propType,
+              required,
+              description
+            });
+          }
+        });
+        
+        interfaces[interfaceName] = props;
+      }
+      ts.forEachChild(node, collectInterfaces);
+    }
+    
+    // Collect all interfaces first
+    ts.forEachChild(sourceFile, collectInterfaces);
+    
+    // Second pass: process components and link to their props
+    function visit(node: ts.Node) {
+      // Top-level function declarations
+      if (ts.isFunctionDeclaration(node) && node.name) {
+        const name = node.name.text;
+        const code = fileContent.substring(node.pos, node.end);
+        const componentResult: {
+          name: string;
+          kind: 'function';
+          code: string;
+          props?: Array<{
+            name: string;
+            type: string;
+            required: boolean;
+            description?: string;
+          }>;
+        } = { name, kind: 'function', code };
+        
+        // Try to find props for this component
+        const propsTypeName = findPropsTypeForComponent(node, sourceFile);
+        if (propsTypeName && interfaces[propsTypeName]) {
+          componentResult.props = interfaces[propsTypeName];
+        }
+        
+        results.push(componentResult);
+      }
+      // Top-level class declarations
+      else if (ts.isClassDeclaration(node) && node.name) {
+        const name = node.name.text;
+        const code = fileContent.substring(node.pos, node.end);
+        const componentResult: {
+          name: string;
+          kind: 'class';
+          code: string;
+          props?: Array<{
+            name: string;
+            type: string;
+            required: boolean;
+            description?: string;
+          }>;
+        } = { name, kind: 'class', code };
+        
+        // Try to find props for this component
+        const propsTypeName = findPropsTypeForComponent(node, sourceFile);
+        if (propsTypeName && interfaces[propsTypeName]) {
+          componentResult.props = interfaces[propsTypeName];
+        }
+        
+        results.push(componentResult);
+      }
+      // Top-level variable statements with function expressions or arrow functions
+      else if (ts.isVariableStatement(node)) {
+        for (const declaration of node.declarationList.declarations) {
+          if (
+            declaration.name &&
+            ts.isIdentifier(declaration.name) &&
+            declaration.initializer &&
+            (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+          ) {
+            const name = declaration.name.text;
+            const code = fileContent.substring(node.pos, node.end);
+            const componentResult: {
+              name: string;
+              kind: 'function';
+              code: string;
+              props?: Array<{
+                name: string;
+                type: string;
+                required: boolean;
+                description?: string;
+              }>;
+            } = { name, kind: 'function', code };
+            
+            // Try to find props for this component
+            const propsTypeName = findPropsTypeForComponent(declaration.initializer, sourceFile);
+            if (propsTypeName && interfaces[propsTypeName]) {
+              componentResult.props = interfaces[propsTypeName];
+            }
+            
+            results.push(componentResult);
+          }
+        }
+      }
+    }
+    
+    // Helper function to find props type for a component
+    function findPropsTypeForComponent(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
+      // For arrow functions or function expressions with destructured parameters
+      if ((ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && node.parameters.length > 0) {
+        const firstParam = node.parameters[0];
+        if (firstParam.type) {
+          return firstParam.type.getText(sourceFile);
+        }
+      }
+      
+      // For function declarations with type annotations
+      if (ts.isFunctionDeclaration(node) && node.type) {
+        const typeText = node.type.getText(sourceFile);
+        // Extract component props type from React.FC<PropsType>
+        const match = typeText.match(/React\.FC<([^>]+)>/i) || typeText.match(/FC<([^>]+)>/i);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+      
+      return undefined;
+    }
+
+    // Only visit top-level nodes
+    sourceFile.statements.forEach(visit);
+    return results;
+  } catch (error) {
+    debug('Error in extractAllTopLevelCodeItems:', error);
+    return results;
+  }
+}
+
 export function extractComponentMethods(
   fileContent: string,
   componentName: string

@@ -88,7 +88,7 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
   return (
     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
       {components.map((component) => (
-        <Link key={component.slug} href={`/docs/${component.slug}`} className="h-full block">
+        <Link key={`${component.slug}-${component.filePath}`} href={`/components/${component.slug}`} className="h-full block">
           <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border-none shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">

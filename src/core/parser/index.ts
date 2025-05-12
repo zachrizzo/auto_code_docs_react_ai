@@ -4,12 +4,15 @@
  */
 
 import path from "path";
+import fs from "fs-extra";
+import { glob } from "glob";
 import * as reactDocgen from "react-docgen-typescript";
-import { ComponentDefinition, ParserOptions } from "../types";
+import { ComponentDefinition, ParserOptions, CodeItem } from "../types";
 import { findTsConfig, debug } from "./file-utils";
 import { parseSingleComponentFile } from "./component-parser";
 import { processComponentListSimilarities } from "./similarity";
 import { VectorSimilarityService } from "../../ai/vector-similarity/vector-similarity";
+import { extractAllTopLevelCodeItems } from "./ast-utils";
 
 /**
  * Recursively parse React components starting from the root component.
@@ -131,6 +134,35 @@ export async function parseComponents(
   }
 
   return allParsedComponents;
+}
+
+
+
+/**
+ * Parse all top-level functions and classes in all JS/TS files in a directory tree (excluding node_modules)
+ */
+export async function parseAllCodeItems(rootDir: string): Promise<CodeItem[]> {
+  const patterns = ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx"];
+  const ignore = ["**/node_modules/**"];
+  const files = await glob(patterns, {
+    cwd: rootDir,
+    ignore,
+    absolute: true,
+  });
+  const allItems: CodeItem[] = [];
+  for (const filePath of files) {
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      const items = extractAllTopLevelCodeItems(content).map(item => ({
+        ...item,
+        filePath,
+      }));
+      allItems.push(...items);
+    } catch (err) {
+      debug(`Failed to parse file: ${filePath}`, err);
+    }
+  }
+  return allItems;
 }
 
 // Re-export utility functions that may be useful to consumers

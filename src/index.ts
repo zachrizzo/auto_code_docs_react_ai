@@ -1,9 +1,9 @@
 import { generateDocumentation, AiDescriptionGenerator } from "./ai/generator";
-import { parseComponents } from "./core/parser";
+import { parseComponents, parseAllCodeItems } from "./core/parser/";
 import fs from "fs-extra";
 import path from "path";
 
-export { generateDocumentation, parseComponents, AiDescriptionGenerator };
+export { generateDocumentation, parseComponents, parseAllCodeItems, AiDescriptionGenerator };
 
 // Generate the documentation UI
 export async function generateDocUI(components: any[], options: any = {}) {
