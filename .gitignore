@@ -36,3 +36,6 @@ docs-components.json
 test-docs-project/
 .ui-build/
 test-docs-project/
+
+# Large files
+code-y-0.1.0.tgz
