@@ -21,10 +21,14 @@ export interface ChatServiceOptions {
   useOpenAI?: boolean;
   /** Ollama server URL */
   ollamaUrl?: string;
-  /** Ollama model name */
+  /** Ollama model name (for chat) */
   ollamaModel?: string;
+  /** Ollama embedding model name (for vector search) */
+  ollamaEmbeddingModel?: string;
   /** Chat model name (OpenAI or Ollama) */
   chatModel?: string;
+  /** Similarity threshold for vector search */
+  similarityThreshold?: number;
 }
 
 /**

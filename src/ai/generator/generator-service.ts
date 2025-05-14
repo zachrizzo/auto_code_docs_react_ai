@@ -18,7 +18,7 @@ export class CodebaseGeneratorService {
     this.apiKey = options.apiKey;
     this.useOllama = options.useOllama || false;
     this.ollamaUrl = options.ollamaUrl || "http://localhost:11434";
-    this.model = options.model || (this.useOllama ? "gemma:3b" : "gpt-4");
+    this.model = options.model || (this.useOllama ? "gemma3:4b" : "gpt-4");
   }
 
   /**

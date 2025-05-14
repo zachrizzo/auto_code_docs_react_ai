@@ -10,48 +10,15 @@ import { cosineSimilarity } from "./utils/vector-similarity-utils";
  * Service for vector similarity search and embeddings.
  */
 export class VectorSimilarityService {
-  private openai: OpenAI | null = null;
   private vectorDb: VectorEntry[] = [];
   private similarityThreshold: number;
-  private model: string;
-  private useOllama: boolean;
-  private ollamaUrl: string =
-    process.env.OLLAMA_URL || "http://localhost:11434";
-  private ollamaModel: string =
-    process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
+  private ollamaUrl: string = process.env.OLLAMA_URL || "http://localhost:11434";
+  private ollamaEmbeddingModel: string = process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest";
 
   constructor(options: VectorSimilarityOptions) {
-    // Use useOpenAI if explicitly set, otherwise use !useOllama
-    const useOpenAI =
-      options.useOpenAI !== undefined
-        ? options.useOpenAI
-        : !(options.useOllama || false);
-
-    this.useOllama = !useOpenAI;
-
-    if (this.useOllama) {
-      // Use Ollama for local embeddings
-      this.ollamaUrl =
-        options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
-      this.ollamaModel =
-        options.ollamaModel ||
-        process.env.OLLAMA_MODEL ||
-        "nomic-embed-text:latest";
-      this.model = "ollama";
-      console.log(
-        `Using local embeddings with Ollama (${this.ollamaModel}) at ${this.ollamaUrl}`
-      );
-    } else {
-      // Use OpenAI for embeddings
-      if (!options.apiKey && !process.env.OPENAI_API_KEY) {
-        throw new Error("API key is required when using OpenAI");
-      }
-
-      this.openai = new OpenAI({
-        apiKey: options.apiKey || process.env.OPENAI_API_KEY,
-      });
-      this.model = options.model || "text-embedding-3-small";
-    }
+    // Always use Ollama for embeddings by default
+    this.ollamaUrl = options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
+    this.ollamaEmbeddingModel = options.ollamaEmbeddingModel || process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest";
 
     // Use a lower default threshold to catch more potential matches
     this.similarityThreshold =
@@ -61,7 +28,7 @@ export class VectorSimilarityService {
         : 0.65); // Use a 65% threshold by default for better detection
 
     console.log(
-      `Vector similarity service initialized with threshold: ${this.similarityThreshold}`
+      `Vector similarity service initialized with Ollama embeddings (model: ${this.ollamaEmbeddingModel}) at ${this.ollamaUrl} and threshold: ${this.similarityThreshold}`
     );
   }
 
@@ -71,7 +38,7 @@ export class VectorSimilarityService {
   private async generateOllamaEmbedding(text: string): Promise<number[]> {
     try {
       const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
-        model: this.ollamaModel,
+        model: this.ollamaEmbeddingModel,
         prompt: text,
       });
 
@@ -100,29 +67,8 @@ export class VectorSimilarityService {
 
     const methodText = `\nMethod Name: ${method.name}\nParameters: ${paramsText}\nReturn Type: ${method.returnType || "void"}\nDescription: ${method.description || ""}\nImplementation: ${method.code || ""}\n    `.trim();
 
-    if (this.useOllama) {
-      return this.generateOllamaEmbedding(methodText);
-    } else {
-      try {
-        if (!this.openai) {
-          throw new Error("OpenAI client not initialized");
-        }
-
-        const response = await this.openai.embeddings.create({
-          input: methodText,
-          model: this.model,
-        });
-
-        return response.data[0].embedding;
-      } catch (error) {
-        console.error(
-          `Error generating embedding for method ${method.name}:`,
-          error
-        );
-        // Return a zero vector as fallback
-        return new Array(1536).fill(0);
-      }
-    }
+    // Always use Ollama for embeddings
+    return this.generateOllamaEmbedding(methodText);
   }
 
   /**

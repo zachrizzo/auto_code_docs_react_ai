@@ -545,6 +545,37 @@ export function extractComponentMethods(
       // For function components, we extract any functions defined inside them
       else {
         extractAllFunctions(sourceFile, methods, sourceFile, fileContent);
+        // --- PATCH: Always add main function component as a method if none found ---
+        if (methods.length === 0) {
+          // Find the main function node and add it as a method
+          let fnNode: ts.FunctionDeclaration | ts.VariableDeclaration | undefined = undefined;
+          if (ts.isFunctionDeclaration(componentNode)) {
+            fnNode = componentNode;
+          } else if (ts.isVariableStatement(componentNode)) {
+            for (const declaration of componentNode.declarationList.declarations) {
+              if (
+                declaration.name &&
+                ts.isIdentifier(declaration.name) &&
+                declaration.name.text === componentName &&
+                declaration.initializer &&
+                (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+              ) {
+                fnNode = declaration;
+                break;
+              }
+            }
+          }
+          if (fnNode) {
+            extractMethod(
+              fnNode,
+              componentName,
+              methods,
+              sourceFile,
+              fileContent
+            );
+          }
+        }
+        // --- END PATCH ---
       }
     } else {
       debug(

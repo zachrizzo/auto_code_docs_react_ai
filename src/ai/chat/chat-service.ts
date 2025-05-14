@@ -16,10 +16,9 @@ export class CodebaseChatService {
   private vectorService: VectorSimilarityService;
   private components: ComponentDefinition[] = [];
   private useOllama: boolean;
-  private ollamaUrl: string =
-    process.env.OLLAMA_URL || "http://localhost:11434";
-  private ollamaModel: string =
-    process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
+  private ollamaUrl: string = process.env.OLLAMA_URL || "http://localhost:11434";
+  private ollamaModel: string = process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
+  private ollamaEmbeddingModel: string = process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest";
   private chatModel: string;
 
   /**
@@ -43,30 +42,23 @@ export class CodebaseChatService {
     // Initialize vector service for embeddings and similarity search
     this.vectorService = new VectorSimilarityService({
       apiKey: options.apiKey,
-      useOllama: this.useOllama,
       ollamaUrl: options.ollamaUrl,
-      ollamaModel: options.ollamaModel,
+      ollamaEmbeddingModel: options.ollamaEmbeddingModel,
+      similarityThreshold: options.similarityThreshold,
     });
 
-    if (this.useOllama) {
-      // Use Ollama for chat completions
-      this.ollamaUrl =
-        options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
-      this.ollamaModel =
-        options.ollamaModel ||
-        process.env.OLLAMA_MODEL ||
-        "nomic-embed-text:latest";
-      this.chatModel =
-        options.chatModel || process.env.CHAT_MODEL || "gemma:3b";
-      console.log(
-        `Using Ollama for chat (${this.chatModel}) at ${this.ollamaUrl}`
-      );
-    } else {
-      // Use OpenAI for chat completions
+    // Ollama chat config
+    this.ollamaUrl = options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
+    this.ollamaModel = options.ollamaModel || process.env.OLLAMA_MODEL || "nomic-embed-text:latest";
+    this.ollamaEmbeddingModel = options.ollamaEmbeddingModel || process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest";
+    this.chatModel = options.chatModel || process.env.CHAT_MODEL || "gemma3:4b";
+    console.log(`Using Ollama for chat (${this.chatModel}) at ${this.ollamaUrl}`);
+
+    // If OpenAI is selected for chat, configure it (not for embeddings)
+    if (!this.useOllama) {
       if (!options.apiKey) {
         throw new Error("API key is required when using OpenAI");
       }
-
       this.openai = new OpenAI({
         apiKey: options.apiKey,
       });
@@ -111,42 +103,25 @@ export class CodebaseChatService {
    * @private
    */
   private async generateQueryEmbedding(query: string): Promise<number[]> {
-    if (this.useOllama) {
-      try {
-        const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
-          model: this.ollamaModel,
-          prompt: query,
-        });
+    // Always use Ollama for embeddings
+    try {
+      const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
+        model: this.ollamaEmbeddingModel,
+        prompt: query,
+      });
 
-        if (response.data && response.data.embedding) {
-          return response.data.embedding;
-        } else {
-          console.error(
-            "Unexpected response format from Ollama:",
-            response.data
-          );
-          return new Array(1536).fill(0);
-        }
-      } catch (error) {
-        console.error("Error generating query embedding with Ollama:", error);
+      if (response.data && response.data.embedding) {
+        return response.data.embedding;
+      } else {
+        console.error(
+          "Unexpected response format from Ollama:",
+          response.data
+        );
         return new Array(1536).fill(0);
       }
-    } else {
-      try {
-        if (!this.openai) {
-          throw new Error("OpenAI client not initialized");
-        }
-
-        const response = await this.openai.embeddings.create({
-          input: query,
-          model: "text-embedding-3-small",
-        });
-
-        return response.data[0].embedding;
-      } catch (error) {
-        console.error(`Error generating embedding for query:`, error);
-        return new Array(1536).fill(0);
-      }
+    } catch (error) {
+      console.error("Error generating query embedding with Ollama:", error);
+      return new Array(1536).fill(0);
     }
   }
 

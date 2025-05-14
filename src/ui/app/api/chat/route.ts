@@ -48,7 +48,7 @@ async function getChatService() {
       useOllama: true,
       ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
       ollamaModel: process.env.OLLAMA_MODEL || "nomic-embed-text:latest",
-      chatModel: process.env.CHAT_MODEL || "gemma:3b",
+      chatModel: process.env.CHAT_MODEL || "gemma3:4b",
     });
   }
 

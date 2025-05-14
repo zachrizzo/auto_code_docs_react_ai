@@ -1,3 +1,4 @@
+import React from "react";
 import { use } from "react";
 import ComponentClient from "@/components/component-client";
 

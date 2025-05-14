@@ -11,7 +11,6 @@ import { createVectorSimilarityService } from "./patch-embedding-model";
 import { saveVectorDatabase } from "./save-vector-db";
 import { glob } from "glob";
 import * as ts from "typescript";
-import ignore from "ignore"; // NEW: for .gitignore parsing
 
 // Simple utility to extract methods from code for similarity analysis
 function extractMethodsFromCode(code: string, componentName: string): Array<any> {
@@ -188,7 +187,7 @@ program
   .option("-r, --root <path>", "Root directory of the project", process.cwd())
   .option("-p, --port <number>", "Port for documentation server", "3000")
   .option("--ollama-url <url>", "URL for Ollama API", "http://localhost:11434")
-  .option("--ollama-model <model>", "Model to use with Ollama for chat", "gemma3:4b")
+  .option("--ollama-model <model>", "Model to use with Ollama for chat", "gemma:3b")
   .option("--ollama-embedding-model <model>", "Model to use with Ollama for embeddings", "nomic-embed-text:latest")
   .action(async (options: { root: string, port: string, ollamaUrl?: string, ollamaModel?: string, ollamaEmbeddingModel?: string }) => {
     try {
@@ -576,9 +575,6 @@ NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
         );
 
         // Create a docs-config.js file
-        fs.writeFileSync(
-          path.join(outputDocsUiDir, "docs-config.js"),
-          `module.exports = {
   port: ${options.port},
   enableChat: true,
   useOllama: ${useOllama},
@@ -765,7 +761,7 @@ program
   .option(
     "--ollama-model <model>",
     "Model to use with Ollama for chat",
-    "gemma3:4b"
+    "gemma:3b"
   )
   .option(
     "--ollama-embedding-model <model>",
@@ -796,37 +792,7 @@ program
     const rootDir = path.resolve(options.root);
     console.log(`Using root directory: ${rootDir}`);
 
-    let excludePatterns = options.exclude.split(",");
-    // --- Add outputDir to excludePatterns and .gitignore ---
-    const outputDir = path.resolve(rootDir, options.output || "documentation");
-    const outputDirRelative = path.relative(rootDir, outputDir) || outputDir;
-    // Add outputDir glob pattern to excludePatterns if not present
-    const outputGlob = outputDirRelative.endsWith("/") ? `${outputDirRelative}**` : `${outputDirRelative}/**`;
-    if (!excludePatterns.includes(outputGlob)) excludePatterns.push(outputGlob);
-    // Add outputDir to .gitignore if not present
-    const gitignorePath = path.join(rootDir, ".gitignore");
-    if (fs.existsSync(gitignorePath)) {
-      let gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
-      if (!gitignoreContent.split("\n").some(line => line.trim() === outputDirRelative || line.trim() === `${outputDirRelative}/`)) {
-        gitignoreContent += `\n${outputDirRelative}/\n`;
-        fs.writeFileSync(gitignorePath, gitignoreContent, "utf-8");
-        console.log(`Added ${outputDirRelative}/ to .gitignore`);
-      }
-      // --- NEW: Parse .gitignore and add patterns to excludePatterns ---
-      const ig = ignore();
-      ig.add(gitignoreContent.split("\n"));
-      // Convert .gitignore patterns to glob exclude patterns
-      const gitignorePatterns = gitignoreContent
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith("#"))
-        .map(pattern => {
-          // If pattern ends with /, treat as directory
-          if (pattern.endsWith("/")) return pattern + "**";
-          return pattern;
-        });
-      excludePatterns = [...excludePatterns, ...gitignorePatterns.filter(p => !excludePatterns.includes(p))];
-    }
+    const excludePatterns = options.exclude.split(",");
     const includePatterns = options.include.split(",");
     const maxDepth =
       options.depth === "Infinity" ? Infinity : parseInt(options.depth);

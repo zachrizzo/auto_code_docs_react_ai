@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     // Get Ollama configuration
     const ollamaUrl =
       process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434";
-    const chatModel = process.env.NEXT_PUBLIC_CHAT_MODEL || "gemma:3b";
+    const chatModel = process.env.NEXT_PUBLIC_CHAT_MODEL || "gemma3:4b";
 
     // Create the prompt for description generation
     const prompt = `

@@ -21,7 +21,8 @@ export interface VectorSimilarityOptions {
   useOllama?: boolean;
   useOpenAI?: boolean;
   ollamaUrl?: string;
-  ollamaModel?: string;
+  ollamaModel?: string; // For backwards compatibility (chat model)
+  ollamaEmbeddingModel?: string; // Explicit embedding model for vector search
   similarityThreshold?: number; // Default 0.85 (85%)
   model?: string;
 }

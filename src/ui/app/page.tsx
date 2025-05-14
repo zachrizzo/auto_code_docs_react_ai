@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeStructure } from "@/components/code-structure"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { BookOpen } from "lucide-react"
+import { Component } from "lucide-react"
 
 interface ComponentCounts {
   components: number
@@ -96,10 +96,10 @@ export default function Home() {
           <p className="text-xl text-gray-600 mb-6">
             Explore and understand components, methods, and code relationships in your React codebase.
           </p>
-          <Link href="/docs" passHref>
+          <Link href="/?tab=components" passHref>
             <Button size="lg" className="gap-2">
-              <BookOpen className="h-5 w-5" />
-              View Documentation
+              <Component className="h-5 w-5" />
+              View Components
             </Button>
           </Link>
         </div>

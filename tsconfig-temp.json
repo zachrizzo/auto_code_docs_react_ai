@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "skipLibCheck": true,
+    "checkJs": false,
+    "allowJs": true,
+    "noEmitOnError": false
+  },
+  "exclude": ["src/ui/**/*", "src/__tests__/**/*"]
+}

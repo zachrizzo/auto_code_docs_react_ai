@@ -18,6 +18,28 @@ interface FileStructure {
 export function CodeStructure() {
   const [fileStructure, setFileStructure] = useState<FileStructure[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [selectedPath, setSelectedPath] = useState<string>('')
+  const [breadcrumb, setBreadcrumb] = useState<string[]>([])
+
+  // Helper to toggle folder expansion
+  function toggleFolder(path: string) {
+    setExpandedFolders((prev: Set<string>) => {
+      const newSet = new Set(prev)
+      if (newSet.has(path)) {
+        newSet.delete(path)
+      } else {
+        newSet.add(path)
+      }
+      return newSet
+    })
+  }
+
+  // Helper to update breadcrumb
+  function updateBreadcrumb(path: string) {
+    if (!path) return setBreadcrumb([])
+    setBreadcrumb(path.split('/').filter(Boolean))
+  }
 
   // Fetch component data and organize it by file path
   useEffect(() => {
@@ -113,6 +135,8 @@ export function CodeStructure() {
 
         setFileStructure(sortStructure(rootStructure))
         setLoading(false)
+        // Optionally, expand root by default
+        setExpandedFolders(new Set(['']))
       } catch (error) {
         console.error('Error loading file structure:', error)
         setLoading(false)
@@ -122,38 +146,73 @@ export function CodeStructure() {
     fetchComponents()
   }, [])
 
-  function renderTree(items: FileStructure[], depth = 0) {
+  function renderTree(items: FileStructure[], depth = 0, parentPath = '') {
     return (
       <ul className={`pl-${depth * 4} space-y-1`} style={{ paddingLeft: depth * 16 }}>
-        {items.map((item, index) => (
-          <li key={item.uniqueKey || `${item.path}-${index}`} className="py-1">
-            <div className="flex items-center">
-              {item.type === 'folder' ? (
-                <FolderIcon className="h-4 w-4 text-blue-500 mr-2" />
-              ) : item.componentSlug ? (
-                <div className="w-4 h-4 mr-2" />
-              ) : (
-                <FileIcon className="h-4 w-4 text-gray-500 mr-2" />
-              )}
+        {items.map((item, index) => {
+          const isFolder = item.type === 'folder'
+          const isExpanded = isFolder && expandedFolders.has(item.path)
+          const isSelected = selectedPath === item.path
+          return (
+            <li
+              key={item.uniqueKey || `${item.path}-${index}`}
+              className={`py-1 rounded transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+              onClick={e => {
+                e.stopPropagation()
+                setSelectedPath(item.path)
+                updateBreadcrumb(item.path)
+                if (isFolder) toggleFolder(item.path)
+              }}
+              onMouseOver={e => {
+                e.currentTarget.classList.add('bg-slate-100', 'dark:bg-slate-800/50')
+              }}
+              onMouseOut={e => {
+                if (!isSelected) e.currentTarget.classList.remove('bg-slate-100', 'dark:bg-slate-800/50')
+              }}
+              style={{ cursor: isFolder ? 'pointer' : 'default' }}
+            >
+              <div className="flex items-center">
+                {isFolder ? (
+                  <span className="mr-2 flex items-center">
+                    <FolderIcon className={`h-4 w-4 ${isExpanded ? 'text-yellow-600' : 'text-blue-500'} transition-colors`} />
+                    <span className="ml-1 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                  </span>
+                ) : item.componentSlug ? (
+                  <div className="w-4 h-4 mr-2" />
+                ) : (
+                  <FileIcon className="h-4 w-4 text-gray-500 mr-2" />
+                )}
 
-              {item.componentSlug ? (
-                <Link href={`/docs/${item.componentSlug}`} className="text-sm hover:underline text-violet-500">
-                  {item.name}
-                </Link>
-              ) : (
-                <span className="text-sm font-medium">{item.name}</span>
-              )}
+                {item.componentSlug ? (
+                  <Link
+                    href={`/docs/${item.componentSlug}`}
+                    className="text-sm hover:underline text-violet-500"
+                    onClick={e => {
+                      e.stopPropagation()
+                      setSelectedPath(item.path)
+                      updateBreadcrumb(item.path)
+                    }}
+                  >
+                    {item.name}
+                  </Link>
+                ) : (
+                  <span className="text-sm font-medium">{item.name}</span>
+                )}
 
-              {item.componentSlug && (
-                <Badge className="ml-2 text-xs bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800">
-                  Component
-                </Badge>
-              )}
-            </div>
+                {item.componentSlug && (
+                  <Badge className="ml-2 text-xs bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800">
+                    Component
+                  </Badge>
+                )}
+              </div>
 
-            {item.children && item.children.length > 0 && renderTree(item.children, depth + 1)}
-          </li>
-        ))}
+              {/* Children */}
+              {isFolder && isExpanded && item.children && item.children.length > 0 && (
+                <div>{renderTree(item.children, depth + 1, item.path)}</div>
+              )}
+            </li>
+          )
+        })}
       </ul>
     )
   }
@@ -185,6 +244,37 @@ export function CodeStructure() {
   return (
     <Card className="bg-white dark:bg-slate-900 shadow-sm">
       <CardContent className="p-6">
+        {/* Breadcrumb navigation */}
+        {breadcrumb.length > 0 && (
+          <nav className="mb-4 text-xs text-slate-600 dark:text-slate-300 flex flex-wrap gap-1">
+            <span
+              className="hover:underline cursor-pointer"
+              onClick={() => {
+                setSelectedPath('')
+                setBreadcrumb([])
+                setExpandedFolders(new Set(['']))
+              }}
+            >Root</span>
+            {breadcrumb.map((part: string, idx: number) => (
+              <React.Fragment key={idx}>
+                <span className="mx-1">/</span>
+                <span
+                  className="hover:underline cursor-pointer"
+                  onClick={() => {
+                    const path = breadcrumb.slice(0, idx + 1).join('/')
+                    setSelectedPath(path)
+                    setBreadcrumb(breadcrumb.slice(0, idx + 1))
+                    setExpandedFolders((prev: Set<string>) => {
+                      const newSet = new Set(prev)
+                      newSet.add(path)
+                      return newSet
+                    })
+                  }}
+                >{part}</span>
+              </React.Fragment>
+            ))}
+          </nav>
+        )}
         {renderTree(fileStructure)}
       </CardContent>
     </Card>

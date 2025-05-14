@@ -1,16 +1,33 @@
 {
-  "name": "test-docs-project",
-  "version": "1.0.0",
-  "description": "Test project for documentation generation",
-  "main": "index.js",
+  "name": "code-docs",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "docs": "docs-ui"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "prop-types": "^15.8.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "code-y": "file:.."
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10",
+    "eslint": "^8",
+    "eslint-config-next": "13.5.4",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.284.0",
+    "next": "^15.3.2",
+    "next-themes": "^0.2.1",
+    "null-loader": "^4.0.1",
+    "postcss": "^8",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-force-graph-2d": "^1.27.1",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-raw": "^7.0.0",
+    "tailwindcss": "^3",
+    "tailwindcss-animate": "^1.0.7"
   }
 }

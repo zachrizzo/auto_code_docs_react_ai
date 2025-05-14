@@ -10,11 +10,10 @@ import { LayoutDashboard, GitCompare, Component, Code, FileCode, Layers, Network
 export function SidebarWrapper() {
     const pathname = usePathname() || ""
 
-    const isComponentsActive = pathname ? pathname.startsWith("/components") : false
-    const isClassesActive = pathname ? pathname.startsWith("/classes") : false
-    const isMethodsActive = pathname ? pathname.startsWith("/methods") : false
-    const isStructureActive = pathname ? pathname.startsWith("/structure") : false
-    const isDocsActive = pathname ? pathname.startsWith("/docs") : false
+    const isComponentsActive = pathname ? pathname.startsWith("/components") || pathname.includes("?tab=components") : false
+    const isClassesActive = pathname ? pathname.startsWith("/classes") || pathname.includes("?tab=classes") : false
+    const isMethodsActive = pathname ? pathname.startsWith("/methods") || pathname.includes("?tab=methods") : false
+    const isStructureActive = pathname ? pathname.startsWith("/structure") || pathname.includes("#structure") : false
 
     return (
         <div className="w-64 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 h-screen flex flex-col">
@@ -68,23 +67,11 @@ export function SidebarWrapper() {
                                 Code Relationships
                             </Link>
                         </Button>
-                        <Button
-                            variant="ghost"
-                            asChild
-                            className={cn(
-                                "w-full justify-start gap-2",
-                                isDocsActive && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
-                            )}
-                        >
-                            <Link href="/docs">
-                                <BookOpen className="h-4 w-4" />
-                                Documentation
-                            </Link>
-                        </Button>
+
                     </div>
 
                     <div className="mt-6 space-y-1">
-                        <h4 className="px-4 text-sm font-semibold text-muted-foreground mb-2">Documentation</h4>
+                        <h4 className="px-4 text-sm font-semibold text-muted-foreground mb-2">Code Documentation</h4>
                         <Button
                             variant="ghost"
                             asChild
@@ -93,7 +80,7 @@ export function SidebarWrapper() {
                                 isComponentsActive && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
                             )}
                         >
-                            <Link href="/?tab=components">
+                            <Link href="/?tab=components" prefetch={false}>
                                 <Component className="h-4 w-4" />
                                 Components
                             </Link>
@@ -106,7 +93,7 @@ export function SidebarWrapper() {
                                 isClassesActive && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
                             )}
                         >
-                            <Link href="/?tab=classes">
+                            <Link href="/?tab=classes" prefetch={false}>
                                 <Code className="h-4 w-4" />
                                 Classes
                             </Link>
@@ -119,7 +106,7 @@ export function SidebarWrapper() {
                                 isMethodsActive && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
                             )}
                         >
-                            <Link href="/?tab=methods">
+                            <Link href="/?tab=methods" prefetch={false}>
                                 <FileCode className="h-4 w-4" />
                                 Methods
                             </Link>

@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Button } from "./ui/button"
 import { cn } from "../lib/utils"
 import { CheckIcon, CopyIcon } from "@radix-ui/react-icons"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface CodeBlockProps {
   code: string
@@ -21,16 +23,23 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
 
   return (
     <div className="relative group">
-      <pre
-        className={cn(
-          "rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 overflow-x-auto shadow-sm",
-          language === "tsx" && "language-tsx",
-          language === "jsx" && "language-jsx",
-          language === "css" && "language-css",
-        )}
+      <SyntaxHighlighter
+        language={language}
+        style={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? oneDark : oneLight}
+        customStyle={{
+          borderRadius: '0.75rem',
+          border: '1px solid',
+          borderColor: 'var(--border-color, #e5e7eb)',
+          background: 'var(--background, #fff)',
+          padding: '1.5rem',
+          fontSize: '0.875rem',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          overflowX: 'auto',
+        }}
+        codeTagProps={{ style: { fontFamily: 'monospace' } }}
       >
-        <code className="text-sm font-mono">{code}</code>
-      </pre>
+        {code}
+      </SyntaxHighlighter>
       <Button
         size="icon"
         variant="ghost"

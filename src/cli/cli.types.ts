@@ -17,8 +17,8 @@ export interface CodeYOptions {
   useOllama: boolean;
   ollamaUrl: string;
   ollamaModel: string;
+  ollamaEmbeddingModel: string;
   chatModel: string;
-  enableChat: boolean;
   showCode: boolean;
   showMethods: boolean;
   showSimilarity: boolean;

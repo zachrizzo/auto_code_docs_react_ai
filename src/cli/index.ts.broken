@@ -7,87 +7,8 @@ import { execSync, spawn } from "child_process";
 import { ComponentDefinition } from "../core/types";
 import { AiDescriptionGenerator } from "../ai/generator";
 import { isPortInUse, findFreePort } from "./utils/cli-helpers";
-import { createVectorSimilarityService } from "./patch-embedding-model";
-import { saveVectorDatabase } from "./save-vector-db";
 import { glob } from "glob";
 import * as ts from "typescript";
-import ignore from "ignore"; // NEW: for .gitignore parsing
-
-// Simple utility to extract methods from code for similarity analysis
-function extractMethodsFromCode(code: string, componentName: string): Array<any> {
-  const methods: Array<any> = [];
-  
-  try {
-    // Create a source file from the code
-    const sourceFile = ts.createSourceFile(
-      "temp.tsx",
-      code,
-      ts.ScriptTarget.Latest,
-      true
-    );
-    
-    // Function to visit nodes and extract methods
-    function visit(node: ts.Node) {
-      // Function declarations
-      if (ts.isFunctionDeclaration(node) && node.name) {
-        const name = node.name.text;
-        const methodCode = code.substring(node.pos, node.end);
-        methods.push({
-          name,
-          code: methodCode,
-          returnType: node.type ? node.type.getText(sourceFile) : 'void',
-          params: node.parameters.map(p => ({
-            name: p.name.getText(sourceFile),
-            type: p.type ? p.type.getText(sourceFile) : 'any'
-          }))
-        });
-      }
-      // Method declarations in classes
-      else if (ts.isMethodDeclaration(node) && node.name) {
-        const name = node.name.getText(sourceFile);
-        const methodCode = code.substring(node.pos, node.end);
-        methods.push({
-          name,
-          code: methodCode,
-          returnType: node.type ? node.type.getText(sourceFile) : 'void',
-          params: node.parameters.map(p => ({
-            name: p.name.getText(sourceFile),
-            type: p.type ? p.type.getText(sourceFile) : 'any'
-          }))
-        });
-      }
-      // Arrow functions in variable declarations
-      else if (ts.isVariableDeclaration(node) && 
-               node.name && 
-               ts.isIdentifier(node.name) &&
-               node.initializer && 
-               ts.isArrowFunction(node.initializer)) {
-        const name = node.name.text;
-        const methodCode = code.substring(node.initializer.pos, node.initializer.end);
-        methods.push({
-          name,
-          code: methodCode,
-          returnType: node.initializer.type ? node.initializer.type.getText(sourceFile) : 'void',
-          params: node.initializer.parameters.map(p => ({
-            name: p.name.getText(sourceFile),
-            type: p.type ? p.type.getText(sourceFile) : 'any'
-          }))
-        });
-      }
-      
-      // Continue visiting child nodes
-      ts.forEachChild(node, visit);
-    }
-    
-    // Start visiting from the root
-    ts.forEachChild(sourceFile, visit);
-    
-    return methods;
-  } catch (error) {
-    console.error(`Error extracting methods from ${componentName}:`, error);
-    return [];
-  }
-}
 
 // Simple utility to extract all top-level functions and classes from a JS/TS file
 function extractAllTopLevelCodeItems(fileContent: string): Array<{ name: string; kind: 'function' | 'class'; code: string }> {
@@ -187,58 +108,19 @@ program
   .description("Generate documentation for the project and serve the documentation UI (Next.js)")
   .option("-r, --root <path>", "Root directory of the project", process.cwd())
   .option("-p, --port <number>", "Port for documentation server", "3000")
-  .option("--ollama-url <url>", "URL for Ollama API", "http://localhost:11434")
-  .option("--ollama-model <model>", "Model to use with Ollama for chat", "gemma3:4b")
-  .option("--ollama-embedding-model <model>", "Model to use with Ollama for embeddings", "nomic-embed-text:latest")
-  .action(async (options: { root: string, port: string, ollamaUrl?: string, ollamaModel?: string, ollamaEmbeddingModel?: string }) => {
+  .action(async (options: { root: string, port: string }) => {
     try {
       const rootDir = path.resolve(options.root || process.cwd());
-      
-      // Initialize vector similarity service with Ollama as default
-      const similarityService = createVectorSimilarityService();
-      
-      console.log(`Using Ollama for embeddings: ${process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest"} at ${process.env.OLLAMA_URL || "http://localhost:11434"}`);
-      
       const codeItems = await parseAllCodeItems(rootDir);
-      
-      // Process each code item to extract methods and generate vectors
-      console.log("Processing methods for similarity analysis...");
-      for (const item of codeItems) {
-        // Extract methods from the code
-        const methods = extractMethodsFromCode(item.code, item.name);
-        if (methods && methods.length > 0) {
-          console.log(`Found ${methods.length} methods in ${item.name}`);
-          // Add methods to the item
-          item.methods = methods;
-          // Process methods for similarity
-          await similarityService.processComponentMethods(item.name, methods, item.filePath);
-        }
-      }
-      console.log("Finished processing methods for similarity analysis.");
       const outputDir = path.join(process.cwd(), "documentation");
-      
-      // Save the vector database to a file in the documentation directory
-      saveVectorDatabase(similarityService, outputDir);
       // Save code items as code-index.json
       await fs.ensureDir(outputDir);
-      const docsDataDir = path.join(outputDir, "docs-data");
-      await fs.ensureDir(docsDataDir);
-      await fs.writeJson(path.join(docsDataDir, "code-index.json"), codeItems, { spaces: 2 });
-      
-      // Also generate a [slug].json file for each code item in the docs-data directory
+      await fs.writeJson(path.join(outputDir, "code-index.json"), codeItems, { spaces: 2 });
+      // Also generate a [slug].json file for each code item
       for (const item of codeItems) {
         const slug = item.slug || item.name.toLowerCase().replace(/\s+/g, "-");
-        item.slug = slug; // Ensure slug is set
-        await fs.writeJson(path.join(docsDataDir, `${slug}.json`), item, { spaces: 2 });
+        await fs.writeJson(path.join(outputDir, `${slug}.json`), item, { spaces: 2 });
       }
-      
-      // Generate a component-index.json file for the UI to use
-      const componentIndex = codeItems.map(item => ({
-        name: item.name,
-        slug: item.slug || item.name.toLowerCase().replace(/\s+/g, "-"),
-        type: item.kind || 'component'
-      }));
-      await fs.writeJson(path.join(docsDataDir, "component-index.json"), componentIndex, { spaces: 2 });
       await generateDocUI(codeItems, { outputDir });
       console.log(`Documentation generated for code in: ${rootDir}`);
       
@@ -325,8 +207,9 @@ program.action(async (options: CodeYOptions) => {
   const useOllama =
     options.useOllama === true ||
     String(options.useOllama).toLowerCase() === "true";
-  // Chat is always enabled
-  const enableChat = true;
+  const enableChat =
+    options.enableChat === true ||
+    String(options.enableChat).toLowerCase() === "true";
   const showCode =
     options.showCode === true ||
     String(options.showCode).toLowerCase() === "true";
@@ -407,12 +290,19 @@ program.action(async (options: CodeYOptions) => {
 
       console.log("Parser initialized");
 
-      // Initialize similarity service using our helper to ensure Ollama is used for embeddings by default
-      const similarityService = createVectorSimilarityService();
+      // Initialize similarity service if needed
+      const similarityService = new VectorSimilarityService({
+        useOllama: useOllama,
+        ollamaUrl: options.ollamaUrl,
+        ollamaModel: options.ollamaModel,
+        similarityThreshold: parseFloat(options.similarityThreshold),
+        apiKey: apiKey, // Pass potentially overridden API key
+      });
 
       console.log("Similarity service options:", {
+        useOllama: useOllama,
         ollamaUrl: options.ollamaUrl,
-        ollamaEmbeddingModel: options.ollamaEmbeddingModel,
+        ollamaModel: options.ollamaModel,
         similarityThreshold: parseFloat(options.similarityThreshold),
         hasApiKey: !!apiKey, // Check the final apiKey value
       });
@@ -454,10 +344,6 @@ program.action(async (options: CodeYOptions) => {
           allComponents,
           similarityService
         );
-        
-        // Save the vector database to a file in the documentation directory
-        const outputDir = path.resolve(rootDir, options.output);
-        saveVectorDatabase(similarityService, outputDir);
       }
     }
 
@@ -562,8 +448,9 @@ program.action(async (options: CodeYOptions) => {
         const envFilePath = path.join(outputDocsUiDir, ".env.local");
         fs.writeFileSync(
           envFilePath,
-          `PORT=${options.port}
-NEXT_PUBLIC_ENABLE_CHAT=true
+          `
+PORT=${options.port}
+NEXT_PUBLIC_ENABLE_CHAT=${enableChat}
 NEXT_PUBLIC_USE_OLLAMA=${useOllama}
 NEXT_PUBLIC_OLLAMA_URL=${options.ollamaUrl}
 NEXT_PUBLIC_OLLAMA_MODEL=${options.ollamaModel}
@@ -571,16 +458,16 @@ NEXT_PUBLIC_CHAT_MODEL=${options.chatModel}
 NEXT_PUBLIC_SHOW_CODE=${showCode}
 NEXT_PUBLIC_SHOW_METHODS=${showMethods}
 NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
-            `,
-          "utf8"
+            `
         );
 
         // Create a docs-config.js file
+        const configFilePath = path.join(outputDir, "docs-config.js");
         fs.writeFileSync(
-          path.join(outputDocsUiDir, "docs-config.js"),
+          configFilePath,
           `module.exports = {
   port: ${options.port},
-  enableChat: true,
+  enableChat: ${enableChat},
   useOllama: ${useOllama},
   ollamaUrl: "${options.ollamaUrl}",
   ollamaModel: "${options.ollamaModel}",
@@ -590,25 +477,11 @@ NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
   showSimilarity: ${showSimilarity}
 };
             `
-    );
-
-    console.log(`Configuration saved to ${outputDir}`);
-
-    // Open the browser with dynamic import
-    (async () => {
-      try {
-        const open = await import("open");
-        await open.default(docsUrl);
-        console.log(`✓ Browser opened to ${docsUrl}`);
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : String(err);
-        console.error("Error opening browser:", errorMessage);
-        console.log(
-          `To view documentation, open your browser to: ${docsUrl}`
         );
-      }
-    })();
+
+        console.log(`Configuration saved to ${outputDir}`);
+
+        // Open the browser with dynamic import
         (async () => {
           try {
             const open = await import("open");
@@ -764,18 +637,18 @@ program
   .option("--ollama-url <url>", "URL for Ollama API", "http://localhost:11434")
   .option(
     "--ollama-model <model>",
-    "Model to use with Ollama for chat",
-    "gemma3:4b"
-  )
-  .option(
-    "--ollama-embedding-model <model>",
-    "Model to use with Ollama for embeddings and similarity search",
+    "Model to use with Ollama",
     "nomic-embed-text:latest"
   )
   .option(
     "--chat-model <model>",
-    "Model to use for chat",
-    "gemma3:4b"
+    "Model to use for chat (if chat enabled)",
+    "gemma3:27b"
+  )
+  .option(
+    "--enable-chat <boolean>",
+    "Enable AI chat in documentation UI",
+    "true"
   )
   .option("--show-code <boolean>", "Show component source code", "true")
   .option("--show-methods <boolean>", "Show component methods", "true")
@@ -796,37 +669,7 @@ program
     const rootDir = path.resolve(options.root);
     console.log(`Using root directory: ${rootDir}`);
 
-    let excludePatterns = options.exclude.split(",");
-    // --- Add outputDir to excludePatterns and .gitignore ---
-    const outputDir = path.resolve(rootDir, options.output || "documentation");
-    const outputDirRelative = path.relative(rootDir, outputDir) || outputDir;
-    // Add outputDir glob pattern to excludePatterns if not present
-    const outputGlob = outputDirRelative.endsWith("/") ? `${outputDirRelative}**` : `${outputDirRelative}/**`;
-    if (!excludePatterns.includes(outputGlob)) excludePatterns.push(outputGlob);
-    // Add outputDir to .gitignore if not present
-    const gitignorePath = path.join(rootDir, ".gitignore");
-    if (fs.existsSync(gitignorePath)) {
-      let gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
-      if (!gitignoreContent.split("\n").some(line => line.trim() === outputDirRelative || line.trim() === `${outputDirRelative}/`)) {
-        gitignoreContent += `\n${outputDirRelative}/\n`;
-        fs.writeFileSync(gitignorePath, gitignoreContent, "utf-8");
-        console.log(`Added ${outputDirRelative}/ to .gitignore`);
-      }
-      // --- NEW: Parse .gitignore and add patterns to excludePatterns ---
-      const ig = ignore();
-      ig.add(gitignoreContent.split("\n"));
-      // Convert .gitignore patterns to glob exclude patterns
-      const gitignorePatterns = gitignoreContent
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith("#"))
-        .map(pattern => {
-          // If pattern ends with /, treat as directory
-          if (pattern.endsWith("/")) return pattern + "**";
-          return pattern;
-        });
-      excludePatterns = [...excludePatterns, ...gitignorePatterns.filter(p => !excludePatterns.includes(p))];
-    }
+    const excludePatterns = options.exclude.split(",");
     const includePatterns = options.include.split(",");
     const maxDepth =
       options.depth === "Infinity" ? Infinity : parseInt(options.depth);
@@ -835,8 +678,9 @@ program
     const useOllama =
       options.useOllama === true ||
       String(options.useOllama).toLowerCase() === "true";
-    // Chat is always enabled
-    const enableChat = true;
+    const enableChat =
+      options.enableChat === true ||
+      String(options.enableChat).toLowerCase() === "true";
     const showCode =
       options.showCode === true ||
       String(options.showCode).toLowerCase() === "true";
@@ -919,12 +763,19 @@ program
 
         console.log("Parser initialized");
 
-        // Initialize similarity service using our helper to ensure Ollama is used for embeddings by default
-        const similarityService = createVectorSimilarityService();
+        // Initialize similarity service if needed
+        const similarityService = new VectorSimilarityService({
+          useOllama: useOllama,
+          ollamaUrl: options.ollamaUrl,
+          ollamaModel: options.ollamaModel,
+          similarityThreshold: parseFloat(options.similarityThreshold),
+          apiKey: apiKey, // Pass potentially overridden API key
+        });
 
         console.log("Similarity service options:", {
+          useOllama: useOllama,
           ollamaUrl: options.ollamaUrl,
-          ollamaEmbeddingModel: options.ollamaEmbeddingModel,
+          ollamaModel: options.ollamaModel,
           similarityThreshold: parseFloat(options.similarityThreshold),
           hasApiKey: !!apiKey, // Check the final apiKey value
         });
@@ -966,10 +817,6 @@ program
             allComponents,
             similarityService
           );
-          
-          // Save the vector database to a file in the documentation directory
-          const outputDir = path.resolve(rootDir, options.output);
-          saveVectorDatabase(similarityService, outputDir);
         }
       }
 
@@ -1079,7 +926,7 @@ program
             envFilePath,
             `
 PORT=${options.port}
-NEXT_PUBLIC_ENABLE_CHAT=true
+NEXT_PUBLIC_ENABLE_CHAT=${enableChat}
 NEXT_PUBLIC_USE_OLLAMA=${useOllama}
 NEXT_PUBLIC_OLLAMA_URL=${options.ollamaUrl}
 NEXT_PUBLIC_OLLAMA_MODEL=${options.ollamaModel}
@@ -1096,7 +943,7 @@ NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
             configFilePath,
             `module.exports = {
   port: ${options.port},
-  enableChat: true,
+  enableChat: ${enableChat},
   useOllama: ${useOllama},
   ollamaUrl: "${options.ollamaUrl}",
   ollamaModel: "${options.ollamaModel}",

@@ -46,7 +46,7 @@ export default function SimilarityPage() {
     async function loadAllData() {
       try {
         // Debug: Check if we can access the component index
-        const indexRes = await fetch('/test-docs-project/documentation/docs-data/component-index.json')
+        const indexRes = await fetch('/docs-data/component-index.json')
         if (!indexRes.ok) {
           throw new Error(`Failed to fetch component index: ${indexRes.status}`);
         }
@@ -58,7 +58,7 @@ export default function SimilarityPage() {
         const allComponentsData = await Promise.all(
           indexData.map(async (comp: { slug: string }) => {
             try {
-              const res = await fetch(`/test-docs-project/documentation/docs-data/${comp.slug}.json`);
+              const res = await fetch(`/docs-data/${comp.slug}.json`);
               if (!res.ok) {
                 console.error(`Failed to load ${comp.slug}.json: ${res.status}`);
                 return null;
