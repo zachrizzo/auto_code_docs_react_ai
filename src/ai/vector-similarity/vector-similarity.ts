@@ -37,12 +37,15 @@ export class VectorSimilarityService {
    */
   private async generateOllamaEmbedding(text: string): Promise<number[]> {
     try {
+      console.log(`Generating embedding for text (length: ${text.length}) with model: ${this.ollamaEmbeddingModel}`);
+      
       const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
         model: this.ollamaEmbeddingModel,
         prompt: text,
       });
 
       if (response.data && response.data.embedding) {
+        console.log(`Successfully generated embedding vector with length: ${response.data.embedding.length}`);
         return response.data.embedding;
       } else {
         console.error("Unexpected response format from Ollama:", response.data);
@@ -51,6 +54,7 @@ export class VectorSimilarityService {
       }
     } catch (error) {
       console.error("Error generating embedding with Ollama:", error);
+      console.error("Make sure Ollama is running and the embedding model is available");
       // Return a zero vector as fallback
       return new Array(1536).fill(0);
     }

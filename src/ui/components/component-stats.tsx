@@ -18,6 +18,8 @@ interface ComponentData {
   methodCount: number
   type?: string
   code?: string
+  parentName?: string
+  parentType?: string
 }
 
 export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
@@ -31,6 +33,47 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
         const res = await fetch('/docs-data/component-index.json')
         const data = await res.json()
 
+        // For methods, we need to extract methods from all components
+        if (type === 'method') {
+          const allMethods: ComponentData[] = []
+          
+          // Load all component details and extract their methods
+          await Promise.all(
+            data.map(async (comp: { name: string; slug: string }) => {
+              try {
+                const detailRes = await fetch(`/docs-data/${comp.slug}.json`)
+                const detail = await detailRes.json()
+                
+                // If this component has methods, add them to our collection
+                if (detail.methods && Array.isArray(detail.methods)) {
+                  detail.methods.forEach((method: any) => {
+                    // Skip if the method name is the same as the component (main function)
+                    if (method.name !== comp.name) {
+                      allMethods.push({
+                        name: method.name,
+                        slug: `${comp.slug}#${method.name}`, // Use fragment for method linking
+                        description: method.description || `A method in ${comp.name}`,
+                        filePath: detail.filePath || 'Unknown path',
+                        methodCount: 0,
+                        type: 'method',
+                        parentName: comp.name,
+                        parentType: detail.type || 'component'
+                      })
+                    }
+                  })
+                }
+              } catch (error) {
+                console.error(`Error fetching details for ${comp.name}:`, error)
+              }
+            })
+          )
+          
+          setComponents(allMethods)
+          setLoading(false)
+          return
+        }
+        
+        // For non-method types, use the original logic
         // Load all component details to check for types
         const fullComponents = await Promise.all(
           data.map(async (comp: { name: string; slug: string }) => {
@@ -87,8 +130,27 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
 
   return (
     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-      {components.map((component) => (
-        <Link key={`${component.slug}-${component.filePath}`} href={`/components/${component.slug}`} className="h-full block">
+      {components.map((component) => {
+        // Determine the correct base path based on type
+        let basePath = '/components/';
+        if (type === 'class') basePath = '/classes/';
+        if (type === 'function') basePath = '/functions/';
+        
+        // For methods, use the parent type to determine the base path
+        if (type === 'method' && component.parentType) {
+          if (component.parentType === 'class') basePath = '/classes/';
+          if (component.parentType === 'function') basePath = '/functions/';
+        }
+        
+        // Extract the path and fragment for proper routing
+        const [path, fragment] = component.slug.split('#');
+        const href = `${basePath}${path}${fragment ? `#${fragment}` : ''}`;
+        
+        // Create a truly unique key by including the type and parent info if available
+        const uniqueKey = `${type}-${component.slug}-${component.parentName || ''}-${Math.random().toString(36).substring(7)}`;
+        
+        return (
+        <Link key={uniqueKey} href={href} className="h-full block">
           <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border-none shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -116,7 +178,7 @@ export function ComponentStats({ type = 'component' }: ComponentStatsProps) {
             </CardContent>
           </Card>
         </Link>
-      ))}
+      )})}
     </div>
   )
 }

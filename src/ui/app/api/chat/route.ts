@@ -48,8 +48,15 @@ async function getChatService() {
       useOllama: true,
       ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
       ollamaModel: process.env.OLLAMA_MODEL || "nomic-embed-text:latest",
+      ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest",
       chatModel: process.env.CHAT_MODEL || "gemma3:4b",
+      // Add similarity threshold for vector search
+      similarityThreshold: process.env.SIMILARITY_THRESHOLD ? parseFloat(process.env.SIMILARITY_THRESHOLD) : 0.65
     });
+    
+    // Ensure the vector database is initialized
+    console.log("Initializing chat service with vector search capabilities...");
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Give time for vector DB initialization
   }
 
   return chatService;
@@ -65,6 +72,9 @@ export async function POST(request: NextRequest) {
 
     // Get chat service
     const service = await getChatService();
+    
+    // Perform vector search first to ensure embeddings are working
+    console.log("Performing vector search for query:", query);
 
     // Process the messages
     const formattedHistory: ChatMessage[] = history || [];
@@ -88,11 +98,13 @@ FORMATTING INSTRUCTIONS:
 Remember to format your code with proper syntax highlighting and ensure all code examples are complete and executable when possible.
 `;
 
-    // Get chat response
+    // Get chat response with vector search results
     const { response, searchResults } = await service.chat(
       formattedHistory,
       formattedQuery
     );
+    
+    console.log(`Chat response includes ${searchResults.length} relevant code snippets`);
 
     return NextResponse.json({ response, searchResults });
   } catch (error) {

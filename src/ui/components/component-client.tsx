@@ -26,6 +26,16 @@ interface ComponentData {
   description?: string;
   lastUpdated: string;
   props?: PropDefinition[];
+  methods?: {
+    name: string;
+    code?: string;
+    description?: string;
+    params?: {
+      name: string;
+      type: string;
+    }[];
+    returnType?: string;
+  }[];
   similarComponents: {
     name: string;
     similarity: number;
@@ -38,6 +48,20 @@ export default function ComponentClient({ slug }: { slug: string }) {
   const [description, setDescription] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('code')
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
+
+  // Check for method fragment in URL
+  useEffect(() => {
+    // Check if URL has a fragment that might be a method name
+    if (typeof window !== 'undefined') {
+      const fragment = window.location.hash.replace('#', '');
+      if (fragment) {
+        setSelectedMethod(fragment);
+        setActiveTab('methods');
+      }
+    }
+  }, []);
 
   // Fetch component data
   useEffect(() => {
@@ -157,7 +181,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
           <p className="text-lg">{description}</p>
         </div>
       )}
-      <Tabs defaultValue="code" className="mb-10">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-10">
         <TabsList className="mb-6 bg-white dark:bg-slate-900 p-1 rounded-lg">
           <TabsTrigger value="code" className="rounded-md">
             Code
@@ -167,6 +191,9 @@ export default function ComponentClient({ slug }: { slug: string }) {
           </TabsTrigger>
           <TabsTrigger value="props" className="rounded-md">
             Props
+          </TabsTrigger>
+          <TabsTrigger value="methods" className="rounded-md">
+            Methods
           </TabsTrigger>
           <TabsTrigger value="relationships" className="rounded-md">
             Relationships
@@ -241,6 +268,79 @@ export default function ComponentClient({ slug }: { slug: string }) {
             </table>
           </div>
         </TabsContent>
+        <TabsContent value="methods">
+          <div className="space-y-6">
+            {!componentData.methods || componentData.methods.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No methods found for this component.</p>
+              </div>
+            ) : (
+              componentData.methods.map((method, index) => {
+                const isSelected = selectedMethod === method.name;
+                return (
+                  <div 
+                    key={`method-${method.name}-${index}`} 
+                    id={method.name}
+                    className={`p-6 rounded-xl border ${isSelected ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold">{method.name}</h3>
+                        <Badge className="bg-amber-500 hover:bg-amber-600">Method</Badge>
+                      </div>
+                    </div>
+                    
+                    {method.description && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                        <p>{method.description}</p>
+                      </div>
+                    )}
+                    
+                    {method.params && method.params.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Parameters</h4>
+                        <div className="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
+                          <table className="w-full">
+                            <thead className="bg-slate-50 dark:bg-slate-800/50">
+                              <tr>
+                                <th className="text-left p-2 font-medium">Name</th>
+                                <th className="text-left p-2 font-medium">Type</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {method.params.map((param, paramIndex) => (
+                                <tr key={paramIndex} className="border-t border-slate-100 dark:border-slate-800">
+                                  <td className="p-2 font-medium">{param.name}</td>
+                                  <td className="p-2 text-muted-foreground">{param.type || 'any'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {method.returnType && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Return Type</h4>
+                        <p className="font-mono text-sm">{method.returnType}</p>
+                      </div>
+                    )}
+                    
+                    {method.code && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Code</h4>
+                        <CodeBlock code={method.code} language="tsx" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
+        
         <TabsContent value="relationships">
           <div className="space-y-8">
             <CodeRelationships entityId={slug.toLowerCase()} entityType="component" />

@@ -1,19 +1,85 @@
 "use client"
 import * as React from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Badge } from "./ui/badge"
 import { CodeBlock } from "./code-block"
-import { Component, Code, ActivityIcon as Function, FileCode } from "lucide-react"
-import { CodeEntity } from "./code-graph"
+import { Component, Code, ActivityIcon as Function, FileCode, ChevronDown, ChevronRight } from "lucide-react"
+// Extending the CodeEntity interface to include slug property
+interface ExtendedCodeEntity extends Omit<import('./code-graph').CodeEntity, 'type'> {
+  type: "component" | "class" | "function" | "method" | string;
+  slug?: string;
+}
+
+interface SubFunction {
+  name: string;
+  code: string;
+  params?: { name: string; type: string }[];
+  returnType?: string;
+}
 
 interface CodeEntityDetailsProps {
-  entity: CodeEntity | null
+  entity: ExtendedCodeEntity | null
   isOpen: boolean
   onClose: () => void
 }
 
 export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetailsProps) {
+  const [subFunctions, setSubFunctions] = useState<SubFunction[]>([])
+  const [expandedFunctions, setExpandedFunctions] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(false)
+  
+  useEffect(() => {
+    if (entity && isOpen) {
+      fetchSubFunctions()
+    }
+  }, [entity, isOpen])
+  
+  const fetchSubFunctions = async () => {
+    if (!entity) return
+    
+    // Get the slug from the entity or create one from the name
+    const slug = entity.slug || entity.name.toLowerCase().replace(/\s+/g, '-')
+    
+    setLoading(true)
+    try {
+      const res = await fetch(`/docs-data/${slug}.json`)
+      if (!res.ok) {
+        console.error(`Failed to fetch entity details: ${res.status}`)
+        setLoading(false)
+        return
+      }
+      
+      const data = await res.json()
+      if (data.methods && Array.isArray(data.methods)) {
+        // Filter out the main function/component if it's included in methods
+        const filteredMethods = data.methods.filter(
+          (method: SubFunction) => method.name !== entity.name
+        )
+        setSubFunctions(filteredMethods)
+      } else {
+        setSubFunctions([])
+      }
+    } catch (error) {
+      console.error('Error fetching sub-functions:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const toggleFunction = (functionName: string) => {
+    setExpandedFunctions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(functionName)) {
+        newSet.delete(functionName)
+      } else {
+        newSet.add(functionName)
+      }
+      return newSet
+    })
+  }
+  
   if (!entity) return null
 
   const getEntityIcon = () => {
@@ -26,6 +92,8 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
         return <Function className="h-5 w-5 text-emerald-500" />
       case "method":
         return <FileCode className="h-5 w-5 text-amber-500" />
+      default:
+        return <Component className="h-5 w-5 text-violet-500" />
     }
   }
 
@@ -55,6 +123,12 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
             Method
           </Badge>
         )
+      default:
+        return (
+          <Badge className="bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800">
+            Component
+          </Badge>
+        )
     }
   }
 
@@ -73,17 +147,65 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
         <Tabs defaultValue="code">
           <TabsList className="mb-4">
             <TabsTrigger value="code">Code</TabsTrigger>
+            {subFunctions.length > 0 && (
+              <TabsTrigger value="methods">Methods & Sub-functions ({subFunctions.length})</TabsTrigger>
+            )}
             <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
           </TabsList>
+          
           <TabsContent value="code">
             <CodeBlock code={entity.code || ""} language="tsx" />
           </TabsContent>
+          
+          {subFunctions.length > 0 && (
+            <TabsContent value="methods" className="space-y-4">
+              {loading ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  Loading sub-functions...
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {subFunctions.map((func) => (
+                    <div key={func.name} className="border rounded-md overflow-hidden">
+                      <div 
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 cursor-pointer"
+                        onClick={() => toggleFunction(func.name)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileCode className="h-4 w-4 text-amber-500" />
+                          <span className="font-medium">{func.name}</span>
+                          {func.params && (
+                            <span className="text-sm text-muted-foreground">
+                              ({func.params.map(p => `${p.name}: ${p.type}`).join(', ')})
+                              {func.returnType && ` → ${func.returnType}`}
+                            </span>
+                          )}
+                        </div>
+                        {expandedFunctions.has(func.name) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </div>
+                      {expandedFunctions.has(func.name) && (
+                        <div className="p-0">
+                          <CodeBlock code={func.code || ""} language="tsx" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+          
           <TabsContent value="usage">
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
               <p className="text-muted-foreground">Usage examples will appear here.</p>
             </div>
           </TabsContent>
+          
           <TabsContent value="dependencies">
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
               <p className="text-muted-foreground">Dependencies will appear here.</p>

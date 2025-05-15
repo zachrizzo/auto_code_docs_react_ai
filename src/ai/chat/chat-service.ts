@@ -136,22 +136,40 @@ export class CodebaseChatService {
    * const results = await chatService.searchCodebase('How does Button handle clicks?');
    */
   async searchCodebase(query: string): Promise<CodebaseSearchResult[]> {
+    console.log(`Searching codebase for: "${query}"`);
+    
+    // Generate embedding for the query
     const queryEmbedding = await this.generateQueryEmbedding(query);
+    console.log(`Generated query embedding with length: ${queryEmbedding.length}`);
+    
     const results: CodebaseSearchResult[] = [];
 
     // Get the vector database from the service
     const vectorDbString = this.vectorService.exportVectorDatabase();
     const vectorDb = JSON.parse(vectorDbString);
+    console.log(`Vector database contains ${vectorDb.length} entries`);
+
+    if (vectorDb.length === 0) {
+      console.warn("Vector database is empty! Make sure components are properly loaded.");
+      return [];
+    }
 
     // Calculate similarity with all methods in the database
+    let matchCount = 0;
     for (const entry of vectorDb) {
+      if (!entry.vector || entry.vector.length === 0) {
+        console.warn(`Entry for ${entry.componentName}.${entry.methodName} has no valid embedding vector`);
+        continue;
+      }
+      
       const similarity = this.calculateCosineSimilarity(
         queryEmbedding,
         entry.vector
       );
 
-      if (similarity > 0.6) {
-        // Use a lower threshold for queries
+      // Use a lower threshold (0.5) for queries to ensure we get some results
+      if (similarity > 0.5) {
+        matchCount++;
         results.push({
           componentName: entry.componentName,
           methodName: entry.methodName,
@@ -162,8 +180,13 @@ export class CodebaseChatService {
       }
     }
 
-    // Sort by similarity score (highest first)
-    return results.sort((a, b) => b.similarity - a.similarity).slice(0, 5); // Return top 5 results
+    console.log(`Found ${matchCount} matches above similarity threshold`);
+    
+    // Sort by similarity score (highest first) and return top results
+    const sortedResults = results.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+    console.log(`Returning top ${sortedResults.length} search results`);
+    
+    return sortedResults;
   }
 
   /**
