@@ -1,0 +1,15 @@
+{
+  "name": "Sidebar",
+  "slug": "sidebar",
+  "description": "Navigation sidebar component for the documentation site",
+  "filePath": "/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/sidebar.tsx",
+  "methods": [
+    {
+      "name": "toggleMode",
+      "description": "Toggles between light and dark mode",
+      "code": "const toggleMode = () => {\n  setMode(mode === 'light' ? 'dark' : 'light');\n}",
+      "params": [],
+      "returnType": "void"
+    }
+  ]
+}

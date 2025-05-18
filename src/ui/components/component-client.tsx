@@ -107,10 +107,18 @@ export default function ComponentClient({ slug }: { slug: string }) {
     fetchComponent()
   }, [slug])
 
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [modelUsed, setModelUsed] = useState<string | null>(null);
+
   const generateDescription = async () => {
     if (!componentData) return;
-    setIsGenerating(true)
+    setIsGenerating(true);
+    setGenerationError(null);
+    setModelUsed(null);
+    
     try {
+      console.log('Generating description for component:', componentData.name);
+      
       const response = await fetch('/api/describe', {
         method: 'POST',
         headers: {
@@ -122,13 +130,24 @@ export default function ComponentClient({ slug }: { slug: string }) {
           filePath: componentData.filePath,
         }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to generate description');
-      }
+      
       const data = await response.json();
+      
+      if (!response.ok || data.error) {
+        console.error('Error from API:', data.error || 'Unknown error');
+        setGenerationError(data.error || 'Failed to generate description');
+        return;
+      }
+      
       setDescription(data.description);
+      if (data.model) {
+        setModelUsed(data.model);
+      }
+      
+      console.log('Description generated successfully using model:', data.model);
     } catch (error) {
       console.error('Error generating description:', error);
+      setGenerationError(error instanceof Error ? error.message : 'Unknown error occurred');
     } finally {
       setIsGenerating(false);
     }
@@ -177,8 +196,25 @@ export default function ComponentClient({ slug }: { slug: string }) {
       </div>
       {description && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm mb-10 border border-slate-100 dark:border-slate-800">
-          <h3 className="font-medium mb-3 text-violet-600 dark:text-violet-400">AI Description</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-medium text-violet-600 dark:text-violet-400">AI Description</h3>
+            {modelUsed && (
+              <span className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md text-slate-600 dark:text-slate-400">
+                Generated with {modelUsed}
+              </span>
+            )}
+          </div>
           <p className="text-lg">{description}</p>
+        </div>
+      )}
+      
+      {generationError && !description && (
+        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl shadow-sm mb-10 border border-red-100 dark:border-red-900/30">
+          <h3 className="font-medium mb-3 text-red-600 dark:text-red-400">Error Generating Description</h3>
+          <p className="text-md">{generationError}</p>
+          <p className="text-sm mt-2 text-slate-600 dark:text-slate-400">
+            Make sure Ollama is running locally or check your environment configuration.
+          </p>
         </div>
       )}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-10">

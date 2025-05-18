@@ -25,7 +25,7 @@ export class VectorSimilarityService {
       options.similarityThreshold ||
       (process.env.SIMILARITY_THRESHOLD
         ? parseFloat(process.env.SIMILARITY_THRESHOLD)
-        : 0.65); // Use a 65% threshold by default for better detection
+        : 0.3); // Use a 30% threshold by default for better detection
 
     console.log(
       `Vector similarity service initialized with Ollama embeddings (model: ${this.ollamaEmbeddingModel}) at ${this.ollamaUrl} and threshold: ${this.similarityThreshold}`
@@ -36,25 +36,44 @@ export class VectorSimilarityService {
    * Generate embedding vector using Ollama
    */
   private async generateOllamaEmbedding(text: string): Promise<number[]> {
+    // Ensure we have text to embed
+    if (!text || text.trim() === "") {
+      console.warn("Empty text provided for embedding generation");
+      return new Array(1536).fill(0);
+    }
+    
+    // Trim text if it's too long (Ollama may have token limits)
+    const trimmedText = text.length > 8000 ? text.substring(0, 8000) : text;
+    
     try {
-      console.log(`Generating embedding for text (length: ${text.length}) with model: ${this.ollamaEmbeddingModel}`);
+      console.log(`Generating embedding for text (length: ${trimmedText.length}) with model: ${this.ollamaEmbeddingModel}`);
       
+      // Make the request to Ollama
       const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
         model: this.ollamaEmbeddingModel,
-        prompt: text,
+        prompt: trimmedText,
       });
 
-      if (response.data && response.data.embedding) {
+      // Validate the response
+      if (response.data && response.data.embedding && response.data.embedding.length > 0) {
         console.log(`Successfully generated embedding vector with length: ${response.data.embedding.length}`);
         return response.data.embedding;
       } else {
         console.error("Unexpected response format from Ollama:", response.data);
-        // Return a zero vector as fallback
-        return new Array(1536).fill(0);
+        throw new Error("Invalid embedding response from Ollama");
       }
     } catch (error) {
       console.error("Error generating embedding with Ollama:", error);
       console.error("Make sure Ollama is running and the embedding model is available");
+      
+      // For debugging purposes, let's try to make a simple request to Ollama
+      try {
+        const testResponse = await axios.get(`${this.ollamaUrl}/api/tags`);
+        console.log("Ollama is running. Available models:", testResponse.data);
+      } catch (testError) {
+        console.error("Failed to connect to Ollama server. Is it running?", testError);
+      }
+      
       // Return a zero vector as fallback
       return new Array(1536).fill(0);
     }
@@ -164,11 +183,46 @@ export class VectorSimilarityService {
     methods: MethodDefinition[],
     filePath: string
   ): Promise<MethodDefinition[]> {
-    for (const method of methods) {
-      await this.addMethod(method, componentName, filePath);
-      const warnings = await this.findSimilarMethods(method, componentName, filePath);
-      method.similarityWarnings = warnings;
+    console.log(`Processing ${methods.length} methods for component: ${componentName}`);
+    
+    // Skip if no methods to process
+    if (!methods || methods.length === 0) {
+      console.warn(`No methods to process for component: ${componentName}`);
+      return methods;
     }
+    
+    // Process each method
+    let processedCount = 0;
+    let errorCount = 0;
+    
+    for (const method of methods) {
+      try {
+        // Skip methods without code
+        if (!method.code || method.code.trim() === "") {
+          console.warn(`Skipping method without code: ${method.name} in ${componentName}`);
+          continue;
+        }
+        
+        // Add method to vector database
+        await this.addMethod(method, componentName, filePath);
+        processedCount++;
+        
+        // Find similar methods
+        const warnings = await this.findSimilarMethods(method, componentName, filePath);
+        method.similarityWarnings = warnings;
+        
+        if (warnings.length > 0) {
+          console.log(`Found ${warnings.length} similar methods for ${method.name} in ${componentName}`);
+        }
+      } catch (error) {
+        console.error(`Error processing method ${method.name} in ${componentName}:`, error);
+        errorCount++;
+      }
+    }
+    
+    console.log(`Processed ${processedCount}/${methods.length} methods for ${componentName} (${errorCount} errors)`);
+    console.log(`Vector database now contains ${this.vectorDb.length} entries`);
+    
     return methods;
   }
 

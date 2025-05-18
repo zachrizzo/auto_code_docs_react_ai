@@ -224,7 +224,7 @@ export interface ComponentDefinition {
   displayName?: string;
 
   /**
-   * Type of the component (component, function, etc.)
+   * Type of the component (e.g., "component", "class", "function")
    */
   type?: string;
 
@@ -234,12 +234,12 @@ export interface ComponentDefinition {
   description?: string;
 
   /**
-   * Path to the file containing the component
+   * File path of the component
    */
   filePath: string;
 
   /**
-   * Name of the file containing the component
+   * File name of the component
    */
   fileName?: string;
 
@@ -269,7 +269,7 @@ export interface ComponentDefinition {
   category?: string;
 
   /**
-   * Similarity score of the component (0-1)
+   * Similarity score of the component
    */
   similarityScore?: number;
 
@@ -282,6 +282,26 @@ export interface ComponentDefinition {
    * AI-generated content for this component
    */
   ai?: AIGeneratedContent;
+
+  /**
+   * URL-friendly slug for the component
+   */
+  slug?: string;
+
+  /**
+   * List of imported components
+   */
+  imports?: string[];
+
+  /**
+   * List of components referenced in JSX
+   */
+  references?: string[];
+
+  /**
+   * Relationships with other components
+   */
+  relationships?: any[];
 }
 
 /**

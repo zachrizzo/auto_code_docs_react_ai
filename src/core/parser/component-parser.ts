@@ -9,6 +9,7 @@ import * as fs from "fs-extra";
 import { ComponentDefinition, PropDefinition } from "../types";
 import { debug, extractImportedComponentPaths, shouldIncludeFile } from "./file-utils";
 import { extractComponentMethods, extractComponentSourceCode } from "./ast-utils";
+import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships } from "./relationship-extractor";
 
 /**
  * Parse a single component file to extract component definitions.
@@ -66,6 +67,24 @@ export function parseComponentFile(
       // Extract component source code
       const sourceCode = extractComponentSourceCode(fileContent, componentName);
 
+      // Extract relationships data
+      const imports = extractImports(fileContent);
+      const references = extractComponentReferences(fileContent);
+      const inheritance = extractInheritance(fileContent);
+      const methodCalls = extractMethodCalls(fileContent);
+      
+      // Generate slug for the component
+      const slug = componentName.toLowerCase().replace(/\s+/g, "-");
+      
+      // Generate relationships
+      const relationships = generateRelationships(
+        slug,
+        imports,
+        references,
+        inheritance,
+        methodCalls
+      );
+
       // Create component definition
       const componentDef: ComponentDefinition = {
         name: componentName,
@@ -78,7 +97,11 @@ export function parseComponentFile(
         props,
         methods,
         childComponents: [],
-        similarityWarnings: []
+        similarityWarnings: [],
+        slug,
+        imports,
+        references,
+        relationships
       };
 
       debug(`Added component: ${componentName} with ${methods.length} methods`);

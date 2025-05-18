@@ -109,6 +109,10 @@ export function ChatBubble() {
     <ReactMarkdown
       rehypePlugins={[rehypeRaw, rehypeHighlight]}
       components={{
+        // Override paragraph to avoid nesting issues
+        p({ children }) {
+          return <div className="my-3 text-slate-700 dark:text-slate-300 leading-relaxed">{children}</div>
+        },
         // Style for code blocks
         code({ className, children, ...props }: React.HTMLProps<HTMLElement> & { inline?: boolean }) {
           const match = /language-(\w+)/.exec(className || '')
@@ -161,10 +165,6 @@ export function ChatBubble() {
         },
         h3({ children }) {
           return <h3 className="text-md font-semibold my-2 text-slate-700 dark:text-slate-300">{children}</h3>
-        },
-        // Style for paragraphs
-        p({ children }) {
-          return <p className="my-3 text-slate-700 dark:text-slate-300 leading-relaxed">{children}</p>
         },
         // Style for blockquotes
         blockquote({ children }) {

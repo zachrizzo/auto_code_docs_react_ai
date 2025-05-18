@@ -1,6 +1,7 @@
 "use client"
 import * as React from "react"
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { ComponentStats } from "@/components/component-stats"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,6 +19,10 @@ interface ComponentCounts {
 }
 
 export default function Home() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const activeTab = tabParam && ['components', 'classes', 'methods'].includes(tabParam) ? tabParam : 'components'
+
   const [counts, setCounts] = useState<ComponentCounts>({
     components: 0,
     classes: 0,
@@ -143,7 +148,7 @@ export default function Home() {
           </div>
 
           <div className="mt-16">
-            <Tabs defaultValue="components" className="mb-8">
+            <Tabs defaultValue={activeTab} value={activeTab} className="mb-8">
               <TabsList className="bg-white dark:bg-slate-900 p-1 rounded-lg">
                 <TabsTrigger value="components" className="rounded-md">
                   Components
@@ -169,7 +174,7 @@ export default function Home() {
               </TabsContent>
             </Tabs>
 
-            <div className="mt-16">
+            <div id="structure" className="mt-16">
               <h2 className="text-2xl font-bold mb-8">Code Structure</h2>
               <CodeStructure />
             </div>
