@@ -1,5 +1,5 @@
 import { OpenAI } from "openai";
-import { MethodDefinition, SimilarityWarning } from "../../core/types";
+import { ComponentDefinition, MethodDefinition, SimilarityWarning } from "../../core/types";
 import axios from "axios";
 import crypto from "crypto";
 import path from "path";
@@ -74,8 +74,8 @@ export class VectorSimilarityService {
         console.error("Failed to connect to Ollama server. Is it running?", testError);
       }
       
-      // Return a zero vector as fallback
-      return new Array(1536).fill(0);
+      // Return a zero vector as fallback (nomic-embed-text uses 768 dimensions)
+      return new Array(768).fill(0);
     }
   }
 
@@ -92,6 +92,63 @@ export class VectorSimilarityService {
 
     // Always use Ollama for embeddings
     return this.generateOllamaEmbedding(methodText);
+  }
+
+  /**
+   * Generate embedding vector for a component definition
+   */
+  private async generateComponentEmbedding(component: ComponentDefinition): Promise<number[]> {
+    // Create a text representation of the component
+    const componentText = `
+Component Name: ${component.name}
+Description: ${component.description || ""}
+File Path: ${component.filePath || "unknown-path"}
+Kind: ${component.type || "component"} 
+Source Code:
+${component.sourceCode || component.code || ""}
+    `.trim();
+
+    // Always use Ollama for embeddings
+    return this.generateOllamaEmbedding(componentText);
+  }
+
+  /**
+   * Add a component definition to the vector database
+   */
+  private async addComponentDefinitionToDb(component: ComponentDefinition): Promise<void> {
+    // Don't add components without source code (either sourceCode or code property)
+    if (!(component.sourceCode?.trim() || component.code?.trim())) {
+      console.warn(`Skipping component definition ${component.name} without source code.`);
+      return;
+    }
+    if (!component.filePath) {
+      console.warn(`Skipping component definition ${component.name} due to missing filePath.`);
+      return;
+    }
+
+    try {
+      // Generate embedding vector for the component definition
+      const vector = await this.generateComponentEmbedding(component);
+
+      const normalizedPath = path.normalize(component.filePath);
+      const id = `${component.name}__COMPONENT_DEFINITION__${normalizedPath}`;
+
+      this.vectorDb.push({
+        id,
+        vector,
+        componentName: component.name,
+        methodName: "", // Empty string for component-level entries
+        filePath: normalizedPath,
+        code: component.sourceCode || component.code || "", // This is what's used for display
+        description: component.description || "",
+      });
+      console.log(`Added component definition to vector DB: ${id}`);
+    } catch (error) {
+      console.error(
+        `Error adding component definition ${component.name} to vector database:`,
+        error
+      );
+    }
   }
 
   /**
@@ -176,6 +233,34 @@ export class VectorSimilarityService {
   }
 
   /**
+   * Process a component definition to add its main information to the vector database.
+   */
+  async processComponentDefinition(component: ComponentDefinition): Promise<void> {
+    console.log(`Processing component definition for: ${component.name}`);
+    
+    if (!component.name) {
+      console.warn("Skipping component definition with no name.");
+      return;
+    }
+    // Check for main code in either sourceCode or code property
+    if (!(component.sourceCode?.trim() || component.code?.trim())) {
+      console.warn(`Skipping component definition ${component.name} due to empty source code.`);
+      return;
+    }
+    if (!component.filePath) {
+      console.warn(`Skipping component definition ${component.name} due to missing filePath.`);
+      return;
+    }
+
+    try {
+      await this.addComponentDefinitionToDb(component);
+      console.log(`Successfully processed component definition for: ${component.name}`);
+    } catch (error) {
+      console.error(`Error processing component definition ${component.name}:`, error);
+    }
+  }
+
+  /**
    * Process all methods in a component to find similarities
    */
   async processComponentMethods(
@@ -231,6 +316,23 @@ export class VectorSimilarityService {
    */
   exportVectorDatabase(): string {
     return JSON.stringify(this.vectorDb, null, 2);
+  }
+
+  /**
+   * Clear the in-memory vector database
+   */
+  public clearVectorDatabase(): void {
+    this.vectorDb = [];
+    console.log("In-memory vector database cleared.");
+    // Optionally, also delete the file if it exists to prevent reloading old data on next full app restart
+    // if (fs.existsSync(this.vectorDbPath)) {
+    //   try {
+    //     fs.unlinkSync(this.vectorDbPath);
+    //     console.log(`Deleted vector database file: ${this.vectorDbPath}`);
+    //   } catch (err) {
+    //     console.error(`Error deleting vector database file ${this.vectorDbPath}:`, err);
+    //   }
+    // }
   }
 
   /**

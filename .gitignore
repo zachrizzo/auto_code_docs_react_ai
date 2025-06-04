@@ -39,3 +39,8 @@ test-docs-project/
 
 # Large files
 code-y-0.1.0.tgz
+
+# Code-y documentation
+documentation/
+
+test-docs/

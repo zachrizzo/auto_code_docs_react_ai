@@ -247,6 +247,7 @@ export interface ComponentDefinition {
    * Source code of the component
    */
   sourceCode?: string;
+  code?: string; // Actual source code, especially for function components or when sourceCode is the container for a larger component
 
   /**
    * Properties of the component

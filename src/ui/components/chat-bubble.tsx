@@ -111,25 +111,25 @@ export function ChatBubble() {
       components={{
         // Override paragraph to avoid nesting issues
         p({ children }) {
-          return <div className="my-3 text-slate-700 dark:text-slate-300 leading-relaxed">{children}</div>
+          return <div className="my-3 text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{children}</div>
         },
         // Style for code blocks
         code({ className, children, ...props }: React.HTMLProps<HTMLElement> & { inline?: boolean }) {
           const match = /language-(\w+)/.exec(className || '')
           const inline = props.inline
           return !inline ? (
-            <div className="relative rounded-md overflow-hidden my-3 shadow-md">
-              <div className="px-4 py-1.5 bg-slate-700 text-xs font-mono text-slate-200 rounded-t-md border-b border-slate-600 flex items-center justify-between">
-                <span>{match?.[1] || 'code'}</span>
+            <div className="relative rounded-lg overflow-hidden my-4 shadow-lg border border-slate-200 dark:border-slate-700">
+              <div className="px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-xs font-mono text-slate-200 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wider">{match?.[1] || 'code'}</span>
               </div>
-              <pre className="p-4 overflow-x-auto bg-[#161b22] text-white">
+              <pre className="p-4 overflow-x-auto bg-[#1a1b26] text-[#c9d1d9] text-sm">
                 <code className={className} {...props}>
                   {children}
                 </code>
               </pre>
             </div>
           ) : (
-            <code className="px-1.5 py-0.5 mx-0.5 bg-gray-200 dark:bg-slate-700 dark:text-gray-200 text-gray-800 rounded text-sm font-mono" {...props}>
+            <code className="px-2 py-1 mx-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-md text-sm font-mono" {...props}>
               {children}
             </code>
           )
@@ -147,28 +147,28 @@ export function ChatBubble() {
         },
         // Style for lists
         ul({ children }) {
-          return <ul className="list-disc pl-6 my-3 space-y-2">{children}</ul>
+          return <ul className="list-disc pl-6 my-3 space-y-2 marker:text-violet-500">{children}</ul>
         },
         ol({ children }) {
-          return <ol className="list-decimal pl-6 my-3 space-y-2">{children}</ol>
+          return <ol className="list-decimal pl-6 my-3 space-y-2 marker:text-violet-500">{children}</ol>
         },
         // Style for list items
         li({ children }) {
-          return <li className="text-slate-700 dark:text-slate-300">{children}</li>
+          return <li className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{children}</li>
         },
         // Style for headings
         h1({ children }) {
-          return <h1 className="text-xl font-bold my-4 pb-1 border-b border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">{children}</h1>
+          return <h1 className="text-2xl font-bold my-4 pb-2 border-b-2 border-violet-200 dark:border-violet-800 text-slate-900 dark:text-white">{children}</h1>
         },
         h2({ children }) {
-          return <h2 className="text-lg font-bold my-3 text-slate-800 dark:text-slate-200">{children}</h2>
+          return <h2 className="text-xl font-bold my-3 text-violet-700 dark:text-violet-400">{children}</h2>
         },
         h3({ children }) {
-          return <h3 className="text-md font-semibold my-2 text-slate-700 dark:text-slate-300">{children}</h3>
+          return <h3 className="text-lg font-semibold my-2 text-slate-800 dark:text-slate-200">{children}</h3>
         },
         // Style for blockquotes
         blockquote({ children }) {
-          return <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 py-1 my-3 text-slate-600 dark:text-slate-400 italic">{children}</blockquote>
+          return <blockquote className="border-l-4 border-violet-400 dark:border-violet-600 pl-4 py-2 my-3 bg-violet-50 dark:bg-violet-900/10 rounded-r-lg text-slate-700 dark:text-slate-300 italic">{children}</blockquote>
         },
         // Style for horizontal rules
         hr() {
@@ -221,8 +221,8 @@ export function ChatBubble() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className={`fixed ${isExpanded ? "inset-4 md:inset-10" : "bottom-6 right-6 w-96 sm:w-[460px] h-[600px]"
-              } bg-white dark:bg-slate-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 z-50`}
+            className={`fixed ${isExpanded ? "inset-4 md:inset-8" : "bottom-6 right-6 w-[90vw] max-w-[600px] h-[80vh] max-h-[700px]"
+              } bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 z-50`}
           >
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-violet-500 to-indigo-600 text-white">
               <div className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export function ChatBubble() {
                   <AvatarImage src="/placeholder.svg?height=32&width=32" />
                   <AvatarFallback>AI</AvatarFallback>
                 </Avatar>
-                <h3 className="font-medium">Code Assistant hh</h3>
+                <h3 className="font-medium">Code Assistant</h3>
               </div>
               <div className="flex items-center gap-1">
                 <Button
@@ -256,7 +256,7 @@ export function ChatBubble() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {messages.map((message, i) => (
                 <div key={i} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
                   {!message.isUser && (
@@ -266,9 +266,9 @@ export function ChatBubble() {
                     </Avatar>
                   )}
                   <div
-                    className={`max-w-[87%] rounded-xl ${message.isUser
-                      ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-3"
-                      : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4"
+                    className={`max-w-[85%] rounded-2xl ${message.isUser
+                      ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-4 py-3 shadow-md"
+                      : "bg-gray-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm px-5 py-4"
                       }`}
                   >
                     {message.isUser ? (
@@ -291,22 +291,22 @@ export function ChatBubble() {
                     <AvatarImage src="/placeholder.svg?height=32&width=32" />
                     <AvatarFallback>AI</AvatarFallback>
                   </Avatar>
-                  <div className="max-w-[87%] rounded-xl p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-gray-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex space-x-2">
-                      <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
-              <div className="flex gap-2 items-end">
+            <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 backdrop-blur-sm">
+              <div className="flex gap-3 items-end">
                 <Textarea
-                  placeholder="Ask about your code..."
-                  className="min-h-10 resize-none rounded-xl border-slate-200 dark:border-slate-700 focus-visible:ring-violet-500"
+                  placeholder="Ask me anything about your code..."
+                  className="min-h-12 max-h-32 resize-none rounded-2xl border-slate-200 dark:border-slate-700 focus-visible:ring-2 focus-visible:ring-violet-500 bg-white dark:bg-slate-800 text-sm md:text-base"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -320,10 +320,10 @@ export function ChatBubble() {
                 <Button
                   onClick={handleSend}
                   size="icon"
-                  className="h-10 w-10 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700"
+                  className="h-12 w-12 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg transition-all hover:shadow-xl"
                   disabled={isLoading}
                 >
-                  <PaperPlaneIcon className="h-4 w-4" />
+                  <PaperPlaneIcon className="h-5 w-5" />
                 </Button>
               </div>
             </div>

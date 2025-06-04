@@ -167,5 +167,5 @@ export async function parseAllCodeItems(rootDir: string): Promise<CodeItem[]> {
 
 // Re-export utility functions that may be useful to consumers
 export { parseSingleComponentFile } from "./component-parser";
-export { calculateCosineSimilarity } from "./similarity";
+export { calculateCosineSimilarity, processComponentListSimilarities } from "./similarity";
 export { debug } from "./file-utils";

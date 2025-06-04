@@ -11,6 +11,7 @@ export interface VectorEntry {
   componentName: string;
   filePath: string;
   code: string;
+  description?: string; // Optional description for the component or method
 }
 
 /**

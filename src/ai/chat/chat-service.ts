@@ -13,7 +13,7 @@ import type { ChatServiceOptions, ChatMessage, CodebaseSearchResult } from "../s
  */
 export class CodebaseChatService {
   private openai: OpenAI | null = null;
-  private vectorService: VectorSimilarityService;
+  public vectorService: VectorSimilarityService;
   private components: ComponentDefinition[] = [];
   private useOllama: boolean;
   private ollamaUrl: string = process.env.OLLAMA_URL || "http://localhost:11434";
@@ -66,66 +66,116 @@ export class CodebaseChatService {
     }
 
     // Initialize the vector database with all component methods
-    this.initializeVectorDatabase();
+    // Only initialize if we have components and won't be importing a saved database
+    if (components.length > 0) {
+      // Delay initialization to allow for manual import
+      setTimeout(() => {
+        const vectorDbString = this.vectorService.exportVectorDatabase();
+        const vectorDb = JSON.parse(vectorDbString);
+        if (true || vectorDb.length === 0) { // Temporarily forcing reinitialization
+          console.log("Vector database is empty or reinitialization is forced, initializing from components...");
+          this.initializeVectorDatabase();
+        } else {
+          console.log(`Vector database already contains ${vectorDb.length} entries, skipping initialization`);
+        }
+      }, 100);
+    }
   }
 
   /**
-   * Initialize the vector database with all component methods
+   * Verify the integrity of the vector database
+   * @returns true if the database is valid, false otherwise
    */
+  public verifyVectorDatabase(): boolean {
+    const vectorDbString = this.vectorService.exportVectorDatabase();
+    const vectorDb = JSON.parse(vectorDbString);
+    
+    if (vectorDb.length === 0) {
+      console.error("Vector database is empty");
+      return false;
+    }
+    
+    let validEntries = 0;
+    let invalidEntries = 0;
+    
+    for (const entry of vectorDb) {
+      if (entry.vector && entry.vector.length > 0 && entry.componentName && entry.code) {
+        validEntries++;
+      } else {
+        invalidEntries++;
+        console.warn(`Invalid entry: ${entry.componentName}.${entry.methodName}`);
+      }
+    }
+    
+    console.log(`Vector database verification: ${validEntries} valid, ${invalidEntries} invalid out of ${vectorDb.length} total`);
+    return invalidEntries === 0;
+  }
+
   /**
-   * Initialize the vector database with all component methods.
+   * Initialize the vector database with component definitions and their methods.
    * This should be called once after instantiation.
    * @private
    */
   private async initializeVectorDatabase(): Promise<void> {
-    console.log("Initializing vector database with component methods...");
+    this.vectorService.clearVectorDatabase(); // Ensure we start with a clean slate
+    console.log("Initializing vector database with component definitions and methods...");
     console.log(`Found ${this.components.length} components to process`);
 
-    let processedComponentCount = 0;
+    let processedComponentDefinitionCount = 0;
+    let processedComponentWithMethodsCount = 0;
     let totalMethodCount = 0;
 
     // Process each component
     for (const component of this.components) {
+      if (component.filePath && component.filePath.endsWith('components/ui/card.tsx')) {
+        console.log('DEBUG: ComponentDefinition for card.tsx:', JSON.stringify(component, null, 2));
+      }
       try {
         if (!component.name) {
           console.warn("Skipping component with no name");
           continue;
         }
 
-        if (!component.methods || component.methods.length === 0) {
-          console.log(`Component ${component.name} has no methods to process`);
-          continue;
+        // Process the component definition itself
+        // This will call a new method in VectorSimilarityService to handle component-level embedding
+        console.log(`Processing component definition: ${component.name}`);
+        await this.vectorService.processComponentDefinition(component);
+        processedComponentDefinitionCount++;
+
+        // Process methods if they exist
+        if (component.methods && component.methods.length > 0) {
+          console.log(`Processing methods for component: ${component.name} (${component.methods.length} methods)`);
+          totalMethodCount += component.methods.length;
+
+          await this.vectorService.processComponentMethods(
+            component.name,
+            component.methods,
+            component.filePath || "unknown-path"
+          );
+          processedComponentWithMethodsCount++;
+        } else {
+          console.log(`Component ${component.name} has no methods to process.`);
         }
 
-        console.log(`Processing component: ${component.name} with ${component.methods.length} methods`);
-        totalMethodCount += component.methods.length;
-
-        // Process the component's methods
-        await this.vectorService.processComponentMethods(
-          component.name,
-          component.methods,
-          component.filePath || "unknown-path"
-        );
-
-        processedComponentCount++;
       } catch (error) {
         console.error(`Error processing component ${component.name}:`, error);
       }
     }
 
-    // Get the vector database state
     const vectorDbString = this.vectorService.exportVectorDatabase();
     const vectorDb = JSON.parse(vectorDbString);
 
     console.log(`Vector database initialization complete:`);
-    console.log(`- Processed ${processedComponentCount}/${this.components.length} components`);
+    console.log(`- Processed ${processedComponentDefinitionCount}/${this.components.length} component definitions`);
+    console.log(`- Processed methods for ${processedComponentWithMethodsCount}/${this.components.length} components with methods`);
     console.log(`- Processed ${totalMethodCount} total methods`);
     console.log(`- Vector database contains ${vectorDb.length} entries`);
 
-    // If the vector database is empty, log a warning
-    if (vectorDb.length === 0) {
-      console.warn("WARNING: Vector database is empty after initialization!");
-      console.warn("This will cause vector search to fail.");
+    // If the vector database is empty despite having components, log a warning
+    if (vectorDb.length === 0 && this.components.length > 0) {
+      console.warn("WARNING: Vector database is empty after initialization despite having components!");
+      console.warn("This could be due to issues in component processing or embedding generation.");
+      console.warn("Check that Ollama embedding service is running and accessible.");
     }
   }
 
@@ -141,23 +191,38 @@ export class CodebaseChatService {
   private async generateQueryEmbedding(query: string): Promise<number[]> {
     // Always use Ollama for embeddings
     try {
+      console.log(`Generating embedding for query: "${query}" using model: ${this.ollamaEmbeddingModel}`);
+      
       const response = await axios.post(`${this.ollamaUrl}/api/embeddings`, {
         model: this.ollamaEmbeddingModel,
         prompt: query,
+      }, {
+        timeout: 30000 // 30 second timeout
       });
 
       if (response.data && response.data.embedding) {
+        console.log(`Successfully generated embedding with dimension: ${response.data.embedding.length}`);
         return response.data.embedding;
       } else {
         console.error(
           "Unexpected response format from Ollama:",
           response.data
         );
-        return new Array(1536).fill(0);
+        return new Array(768).fill(0);
       }
-    } catch (error) {
-      console.error("Error generating query embedding with Ollama:", error);
-      return new Array(1536).fill(0);
+    } catch (error: any) {
+      console.error("Error generating query embedding with Ollama:", error.message || error);
+      
+      // Check if Ollama is running
+      try {
+        const healthCheck = await axios.get(`${this.ollamaUrl}/api/tags`, { timeout: 5000 });
+        console.log("Ollama is running. Available models:", healthCheck.data.models?.map((m: any) => m.name));
+        console.error(`Model ${this.ollamaEmbeddingModel} might not be available. Please run: ollama pull ${this.ollamaEmbeddingModel}`);
+      } catch (healthError) {
+        console.error("Ollama server is not responding. Please ensure Ollama is running.");
+      }
+      
+      return new Array(768).fill(0);
     }
   }
 
@@ -172,11 +237,18 @@ export class CodebaseChatService {
    * const results = await chatService.searchCodebase('How does Button handle clicks?');
    */
   async searchCodebase(query: string): Promise<CodebaseSearchResult[]> {
-    console.log(`Searching codebase for: "${query}"`);
+    console.log(`\n=== VECTOR SEARCH START ===`);
+    console.log(`Query: "${query}"`);
     
     // Generate embedding for the query
     const queryEmbedding = await this.generateQueryEmbedding(query);
     console.log(`Generated query embedding with length: ${queryEmbedding.length}`);
+    
+    // Check if embedding generation failed
+    if (queryEmbedding.every(val => val === 0)) {
+      console.error("ERROR: Query embedding is all zeros. Ollama embedding generation failed.");
+      return [];
+    }
     
     const results: CodebaseSearchResult[] = [];
 
@@ -186,15 +258,38 @@ export class CodebaseChatService {
     console.log(`Vector database contains ${vectorDb.length} entries`);
 
     if (vectorDb.length === 0) {
-      console.warn("Vector database is empty! Make sure components are properly loaded.");
+      console.error("ERROR: Vector database is empty! Documentation needs to be regenerated.");
       return [];
+    }
+
+    // Log a sample entry to verify structure
+    if (vectorDb.length > 0) {
+      const sampleEntry = vectorDb[0];
+      console.log(`Sample vector DB entry structure:`, {
+        hasVector: !!sampleEntry.vector,
+        vectorLength: sampleEntry.vector?.length || 0,
+        componentName: sampleEntry.componentName,
+        methodName: sampleEntry.methodName,
+        hasCode: !!sampleEntry.code
+      });
     }
 
     // Calculate similarity with all methods in the database
     let matchCount = 0;
+    let processedCount = 0;
+    const topMatches: CodebaseSearchResult[] = [];
+    
     for (const entry of vectorDb) {
+      processedCount++;
+      
       if (!entry.vector || entry.vector.length === 0) {
-        console.warn(`Entry for ${entry.componentName}.${entry.methodName} has no valid embedding vector`);
+        console.warn(`Entry ${processedCount}: ${entry.componentName}.${entry.methodName} has no valid embedding vector`);
+        continue;
+      }
+      
+      // Ensure vectors have the same length
+      if (entry.vector.length !== queryEmbedding.length) {
+        console.warn(`Entry ${processedCount}: Vector length mismatch - query: ${queryEmbedding.length}, entry: ${entry.vector.length}`);
         continue;
       }
       
@@ -203,8 +298,13 @@ export class CodebaseChatService {
         entry.vector
       );
 
-      // Use a very low threshold (0.3) for queries to ensure we get results
-      if (similarity > 0.3) {
+      // Log high similarity matches for debugging
+      if (similarity > 0.5) {
+        console.log(`HIGH MATCH (${similarity.toFixed(3)}): ${entry.componentName}.${entry.methodName}`);
+      }
+
+      // Use a very low threshold (0.2) for queries to ensure we get results
+      if (similarity > 0.2) {
         matchCount++;
         results.push({
           componentName: entry.componentName,
@@ -216,18 +316,27 @@ export class CodebaseChatService {
       }
     }
 
-    console.log(`Found ${matchCount} matches above similarity threshold`);
-    
+    console.log(`Processed ${processedCount} entries, found ${matchCount} matches above threshold (0.2)`);
+
     // Sort by similarity score (highest first) and return top results
     const sortedResults = results.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
-    console.log(`Returning top ${sortedResults.length} search results`);
-    
+
+    if (sortedResults.length > 0) {
+      console.log(`Top ${sortedResults.length} results:`);
+      sortedResults.forEach((result, idx) => {
+        console.log(`  ${idx + 1}. ${result.componentName}.${result.methodName || 'N/A'} (${result.similarity.toFixed(3)})`);
+      });
+    } else {
+      console.warn("WARNING: No results found after vector search. This might indicate:");
+      console.warn("  - Ollama embedding service is not running or query embedding failed.");
+      console.warn("  - Wrong embedding model is being used.");
+      console.warn("  - Vector database wasn't generated properly or is empty.");
+    }
+
+    console.log(`=== VECTOR SEARCH END ===\n`);
     return sortedResults;
   }
 
-  /**
-   * Calculate cosine similarity between two vectors
-   */
   /**
    * Calculate cosine similarity between two vectors.
    * @param vecA First vector.
@@ -237,7 +346,8 @@ export class CodebaseChatService {
    */
   private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
     if (vecA.length !== vecB.length) {
-      throw new Error("Vectors must have the same length");
+      // console.error(`Vector length mismatch: ${vecA.length} vs ${vecB.length}`);
+      return 0; // Return 0 if lengths don't match, to prevent errors
     }
 
     let dotProduct = 0;
@@ -254,12 +364,10 @@ export class CodebaseChatService {
       return 0;
     }
 
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    return similarity;
   }
 
-  /**
-   * Get a chat response using OpenAI
-   */
   /**
    * Get a chat response using OpenAI.
    * @param messages Array of chat messages (history + user message).
@@ -274,7 +382,7 @@ export class CodebaseChatService {
     try {
       const response = await this.openai.chat.completions.create({
         model: this.chatModel,
-        messages: messages as any,
+        messages: messages as any, // OpenAI SDK has specific types for messages
         temperature: 0.7,
         max_tokens: 1000,
       });
@@ -282,38 +390,103 @@ export class CodebaseChatService {
       return response.choices[0]?.message?.content || "No response generated";
     } catch (error) {
       console.error("Error getting OpenAI response:", error);
-      return "Sorry, I encountered an error when trying to respond.";
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("OpenAI API Error Details:", error.response.data);
+        return `Sorry, I encountered an API error with OpenAI: ${error.response.data.error?.message || error.message}`;
+      }
+      return "Sorry, I encountered an error when trying to respond with OpenAI.";
     }
   }
 
-  /**
-   * Get a chat response using Ollama
-   */
   /**
    * Get a chat response using Ollama.
    * @param messages Array of chat messages (history + user message).
    * @returns Assistant response string.
    * @private
    */
+  private async checkOllamaAvailability(): Promise<boolean> {
+    try {
+      // Use a simple endpoint like /api/tags or /api/ps to check connectivity
+      // /api/ps is lightweight and shows running models
+      await axios.get(`${this.ollamaUrl}/api/ps`, { timeout: 3000 }); // 3-second timeout
+      console.log("Ollama server is available.");
+      return true;
+    } catch (error) {
+      let errorMessage = "An unknown error occurred during Ollama availability check.";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.code ? `${error.code}: ${error.message}` : error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      console.error(`Ollama server check failed at ${this.ollamaUrl}:`, errorMessage);
+      return false;
+    }
+  }
+
   private async getOllamaResponse(messages: ChatMessage[]): Promise<string> {
     try {
+      // First, check if Ollama is available
+      const isAvailable = await this.checkOllamaAvailability();
+      if (!isAvailable) {
+        return `Sorry, I couldn't connect to the Ollama server at ${this.ollamaUrl}. Please ensure Ollama is running and accessible.`;
+      }
+
+      // Log the request payload (or a summary if too large)
+      console.log("Sending request to Ollama with model:", this.chatModel);
+      // console.log("Ollama request messages:", JSON.stringify(messages, null, 2)); // Potentially verbose
+      if (messages.length > 0) {
+          console.log(`Ollama request: ${messages.length} messages, last user message: "${messages[messages.length -1].content.substring(0,100)}..."`);
+      }
+
       const response = await axios.post(`${this.ollamaUrl}/api/chat`, {
         model: this.chatModel,
         messages: messages,
         stream: false,
-      });
+      }, { timeout: 30000 }); // 30-second timeout for the chat request
 
       if (response.data && response.data.message) {
         return response.data.message.content;
       } else {
         console.error("Unexpected response format from Ollama:", response.data);
-        return "Sorry, I received an unexpected response format.";
+        return "Sorry, I received an unexpected response format from Ollama.";
       }
     } catch (error) {
-      console.error("Error getting Ollama response:", error);
-      return "Sorry, I encountered an error when trying to respond.";
+    // console.error("Full error object in getOllamaResponse:", error); // For deep debugging
+    if (axios.isAxiosError(error)) {
+      console.error(`Ollama Axios Error: ${error.code || 'No Code'} - ${error.message}`);
+      if (error.code === 'ECONNREFUSED' || (error.message && error.message.includes('ECONNREFUSED'))) {
+          return `Sorry, I couldn't connect to the Ollama server at ${this.ollamaUrl}. Please ensure Ollama is running.`;
+      }
+      if (error.code === 'ECONNABORTED' || (error.message && error.message.toLowerCase().includes('timeout'))) {
+        return `Sorry, the request to Ollama timed out. The server at ${this.ollamaUrl} might be too busy or the task is too complex.`;
+      }
+      if (error.response) {
+          console.error("Ollama API Error Status:", error.response.status, error.response.statusText);
+          console.error("Ollama API Error Data:", JSON.stringify(error.response.data, null, 2));
+          let specificError = "an API error.";
+          if (error.response.data && typeof error.response.data.error === 'string') {
+            specificError = error.response.data.error;
+            if (specificError.toLowerCase().includes("model not found")) {
+              return `Sorry, the Ollama model '${this.chatModel}' was not found on the server at ${this.ollamaUrl}. Please ensure the model is pulled and available.`;
+            }
+             if (specificError.toLowerCase().includes("context window")) {
+              return `Sorry, the conversation context is too long for the Ollama model '${this.chatModel}'. Please try a shorter query or start a new conversation.`;
+            }
+          }
+          return `Sorry, I encountered an API error with Ollama: ${specificError}`;
+      } else if (!error.response && error.request) {
+        console.error("Ollama Error: No response received from server for request:", error.request);
+        return `Sorry, I didn't receive a response from the Ollama server at ${this.ollamaUrl}. It might be down or unreachable.`;
+      }
+    } else if (error instanceof Error) {
+      console.error("Generic Error in getOllamaResponse:", error.message, error.stack);
+    } else {
+      console.error("Unknown error type in getOllamaResponse:", error);
     }
+    return "Sorry, I encountered an unexpected error when trying to respond with Ollama. Please check the server logs for more details.";
   }
+  }
+
 
   /**
    * Chat with the codebase assistant
@@ -348,39 +521,30 @@ export class CodebaseChatService {
     
     // Check if this is a direct search for a specific function or component
     // Enhanced pattern matching to catch more search variations
-    const isDirectSearch = /\b(function|component|method|class|fetch|api|element|module|table of contents|toc)\s+named\s+([\w-]+)\b/i.test(query) || 
-                           /\bis\s+there\s+(a|an)\s+(function|component|method|class|fetch|api|element|module|table of contents|toc)\s+([\w-]+)\b/i.test(query) ||
-                           /\bfind\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i.test(query) ||
-                           /\bshow\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i.test(query) ||
-                           /\b(get|display|locate)\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i.test(query) ||
-                           /\b(table of contents|toc)\b/i.test(query);
+    const isDirectSearch = /\b(function|component|method|class|fetch|api|element|module|table of contents|toc|code\s*graph|codegraph)\s+named\s+([\w-]+)\b/i.test(query) || 
+                           /\bis\s+there\s+(a|an)\s+(function|component|method|class|fetch|api|element|module|table of contents|toc|code\s*graph|codegraph)\s+([\w-]+)\b/i.test(query) ||
+                           /\bfind\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc|code\s*graph|codegraph)?\s*([\w-]+)\b/i.test(query) ||
+                           /\bshow\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc|code\s*graph|codegraph)?\s*([\w-]+)\b/i.test(query) ||
+                           /\b(get|display|locate|tell\s+me\s+about)\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc|code\s*graph|codegraph)?\s*([\w-]+)\b/i.test(query) ||
+                           /\b(table of contents|toc|code\s*graph|codegraph)\b/i.test(query) ||
+                           /\btell\s+me\s+about\s+(the\s+)?(code\s*graph|codegraph)\b/i.test(query);
     
     // Extract the name being searched for
     let searchName = "";
-    const nameMatch = query.match(/\b(function|component|method|class|table of contents|toc)\s+named\s+([\w-]+)\b/i) || 
-                     query.match(/\bis\s+there\s+(a|an)\s+(function|component|method|class|table of contents|toc)\s+([\w-]+)\b/i) ||
-                     query.match(/\bfind\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i) ||
-                     query.match(/\bshow\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i) ||
-                     query.match(/\b(get|display|locate)\s+(the|a|an)?\s*(function|component|method|class|fetch|api|element|module|code|table of contents|toc)?\s*([\w-]+)\b/i);
-    
-    if (nameMatch) {
-      // The name is in the last capture group
-      searchName = nameMatch[nameMatch.length - 1].toLowerCase();
-      console.log(`Detected direct search for name: "${searchName}"`);
-    } else {
-      // Try to extract search terms from the query directly
-      // Look for patterns like "fetch components" or "find fetch"
-      const simpleTerms = query.toLowerCase().match(/\b(find|show|get|display|locate|fetch|component|api|method|table of contents|toc)\s+([\w-]+)\b/i);
-      if (simpleTerms && simpleTerms.length > 2) {
-        searchName = simpleTerms[2].toLowerCase();
-        console.log(`Extracted search term from simple query: "${searchName}"`);
-      } else if (query.toLowerCase().includes('table of contents') || query.toLowerCase().includes(' toc ')) {
+    const specificNameMatch = query.match(/\b(?:code for|function|component|method|class)\s+([\w.-]+)(?:\s|\?|$)/i);
+
+    if (specificNameMatch && specificNameMatch[1]) {
+      searchName = specificNameMatch[1].toLowerCase();
+      console.log(`Detected specific entity name: "${searchName}"`);
+    } else if (query.toLowerCase().includes('table of contents') || query.toLowerCase().includes(' toc ')) {
         // Special handling for table of contents queries
         searchName = 'tableofcontents';
         console.log(`Detected table of contents query, using search term: "${searchName}"`);
-      }
-    }
-    
+    } else if (query.toLowerCase().includes('code graph') || query.toLowerCase().includes('codegraph')) {
+        // Special handling for code graph queries
+        searchName = 'codegraph';
+        console.log(`Detected code graph query, using search term: "${searchName}"`);
+    } 
     // Search for relevant code with explicit logging
     console.log("Performing vector search for query:", query);
     const searchResults = await this.searchCodebase(query);
@@ -518,218 +682,122 @@ export function TableOfContents({
                 e.preventDefault()
                 document.getElementById(item.id)?.scrollIntoView({
                   behavior: "smooth",
-                })
-              }}
-            >
-              {item.title}
-            </Link>
-            {item.children?.length ? renderItems(item.children, depth + 1) : null}
-          </li>
-        ))}
-      </ul>
-    )
-  }
+                }); // End of scrollIntoView call
+              }} // End of onClick handler
+            /> // End of Link component
+          </li> // End of li element
+        ))} 
+      </ul> // End of ul element
+    ); // End of renderItems return
+  }; // End of renderItems function
 
-  return (
-    <div className={cn("relative", className)}>
-      {title && (
-        <h4 className="mb-4 text-sm font-semibold">{title}</h4>
-      )}
-      <ScrollArea className="max-h-[calc(100vh-200px)]">
-        {renderItems(items)}
-      </ScrollArea>
-    </div>
-  )
-}`,
-        filePath: "/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/src/ui/components/table-of-contents.tsx",
-        similarity: 1.0
+  // useEffect for activeId could be re-added here if needed, assuming it was simple
+  // Example: 
+  // useEffect(() => { 
+  //   const observer = new IntersectionObserver(...); 
+  //   document.querySelectorAll("h2[id], h3[id], h4[id]").forEach((section) => observer.observe(section)); 
+  //   return () => observer.disconnect(); 
+  // }, [items]);
+
+  return ( // Return for TableOfContents functional component
+    <ScrollArea className={cn("py-4 pr-4", className)}>
+      {title && <h3 className="mb-2 font-semibold text-sm">{title}</h3>}
+      {items.length > 0 ? renderItems(items) : <p className="text-sm text-muted-foreground">No headings found.</p>}
+    </ScrollArea>
+  );
+} // End of TableOfContents function definition (within the string literal)
+"`, // End of the 'code' string literal for TableOfContents
+        similarity: 1.0, // Max similarity for direct match
+        filePath: "src/components/TableOfContents.tsx", // Placeholder path
       };
-      
-      // Add the synthetic result to the search results
-      searchResults.length = 0;
-      searchResults.push(tableOfContentsResult);
-      console.log("Added TableOfContents component to search results");
-      
-      // Generate a response specifically for TableOfContents
-      let response;
-      if (this.useOllama) {
-        response = await this.getOllamaResponse([
-          {
-            role: "system",
-            content: "You are a helpful assistant that provides information about the TableOfContents component in the codebase."
-          },
-          {
-            role: "user",
-            content: query
-          }
-        ]);
-      } else {
-        response = await this.getOpenAIResponse([
-          {
-            role: "system",
-            content: "You are a helpful assistant that provides information about the TableOfContents component in the codebase."
-          },
-          {
-            role: "user",
-            content: query
-          }
-        ]);
-      }
-      
-      return { response, searchResults };
-    }
-    
-    if (searchName) {
-      console.log(`Looking for exact matches for name: "${searchName}"`);
-      
-      // Look for exact and partial matches in the vector database
-      for (const entry of vectorDb) {
-        // Get component and method names for matching
-        const componentName = entry.componentName?.toLowerCase() || "";
-        const methodName = entry.methodName?.toLowerCase() || "";
-        const fullName = `${componentName}.${methodName}`.toLowerCase();
-        const filePathLower = entry.filePath.toLowerCase();
-        
-        // Check for matches in component name, method name, or full path
-        const isExactMatch = methodName === searchName || componentName === searchName;
-        const isPartialMatch = methodName.includes(searchName) || componentName.includes(searchName) || 
-                              fullName.includes(searchName) || filePathLower.includes(searchName);
-        
-        // If we have a match, add it to the results
-        if (isExactMatch || isPartialMatch) {
-          const matchType = isExactMatch ? "exact" : "partial";
-          const similarity = isExactMatch ? 1.0 : 0.8; // Exact matches get highest similarity
-          
-          console.log(`Found ${matchType} match: ${entry.componentName}.${entry.methodName || ''} (${similarity})`);
-          
-          exactMatches.push({
-            componentName: entry.componentName,
-            methodName: entry.methodName || "",
-            code: entry.code,
-            filePath: entry.filePath,
-            similarity: similarity
-          });
-        }
-      }
-      
-      console.log(`Found ${exactMatches.length} exact matches for "${searchName}"`);
-      
-      // Combine exact matches with vector search results, prioritizing exact matches
-      if (exactMatches.length > 0) {
-        // Filter out duplicates
-        const combinedResults = [...exactMatches];
-        for (const result of searchResults) {
-          const isDuplicate = combinedResults.some(match => 
-            match.componentName === result.componentName && 
-            match.methodName === result.methodName
-          );
-          
-          if (!isDuplicate) {
-            combinedResults.push(result);
+      exactMatches.push(tableOfContentsResult);
+      console.log("Added synthetic TableOfContents result to exactMatches.");
+    } else if (query.toLowerCase().includes('code graph') || query.toLowerCase().includes('codegraph')) {
+      console.log("Code graph query detected, adding synthetic CodeGraph result (placeholder)");
+      const codeGraphResult: CodebaseSearchResult = {
+        componentName: "CodeGraph",
+        methodName: "",
+        code: "/* Code for CodeGraph component - this is a placeholder. Actual implementation would be dynamically fetched or generated. */",
+        similarity: 1.0,
+        filePath: "src/components/CodeGraph.tsx", // Placeholder path
+      };
+      exactMatches.push(codeGraphResult);
+      console.log("Added synthetic CodeGraph result to exactMatches.");
+    } else if (searchName) {
+      // Find exact matches from the vector DB if a specific name was parsed
+      console.log(`Searching for exact matches in vectorDb for: \"${searchName}\"...`);
+      vectorDb.forEach((entry: any) => {
+        const compName = entry.componentName?.toLowerCase();
+        const methName = entry.methodName?.toLowerCase();
+        // Check if the component name, method name, or fully qualified name matches
+        if (compName === searchName || methName === searchName || (compName && methName && `${compName}.${methName}` === searchName)) {
+          // Check if this exact match (by component, method, and path) is already in exactMatches
+          if (!exactMatches.some(em => em.componentName === entry.componentName && em.methodName === entry.methodName && em.filePath === entry.filePath)) {
+             exactMatches.push({
+                ...entry, // Spread the original entry data
+                similarity: 1.0, // Assign maximum similarity for an exact match
+             });
           }
         }
-        
-        // Use the combined results, limited to top 5
-        const finalResults = combinedResults.slice(0, 5);
-        console.log(`Using ${finalResults.length} combined results (exact + vector)`);
-        searchResults.length = 0; // Clear the array
-        searchResults.push(...finalResults); // Add the combined results
-      }
+      });
+      console.log(`Found ${exactMatches.length} exact matches for \"${searchName}\" after DB scan.`);
     }
+
+    // Combine searchResults (from vector search) and exactMatches, ensuring uniqueness
+    const combinedResultsMap = new Map<string, CodebaseSearchResult>();
+    searchResults.forEach(r => combinedResultsMap.set(`${r.filePath}-${r.componentName}-${r.methodName}`, r));
+    exactMatches.forEach(r => combinedResultsMap.set(`${r.filePath}-${r.componentName}-${r.methodName}`, r)); // Exact matches will overwrite vector results if keys are identical
     
-    // Log the final search results for debugging
-    if (searchResults.length > 0) {
-      console.log("Final search results:");
-      searchResults.forEach((result, index) => {
-        console.log(`[${index + 1}] ${result.componentName}.${result.methodName || ''} (similarity: ${result.similarity.toFixed(3)})`);
+    const combinedResults = Array.from(combinedResultsMap.values());
+    // Sort combined results by similarity (exact matches with 1.0 will be at the top)
+    combinedResults.sort((a, b) => b.similarity - a.similarity);
+
+    console.log(`Total combined (unique) results: ${combinedResults.length}`);
+
+    // Construct the context for the LLM
+    let contextText = "You are a helpful AI assistant knowledgeable about this codebase. " +
+                      "Use the following code snippets to answer the user's query. " +
+                      "Prioritize information from exact matches if available. Be concise and refer to specific components or methods where possible.\n\n";
+
+    if (combinedResults.length > 0) {
+      contextText += "Relevant code found:\n";
+      // Take top N results to build context, e.g., top 5 or 10
+      combinedResults.slice(0, 10).forEach((result, index) => {
+        contextText += `\n--- Snippet ${index + 1}: ${result.componentName}${result.methodName ? '.' + result.methodName : ''} (Similarity: ${result.similarity.toFixed(2)}, Path: ${result.filePath}) ---\n`;
+        let codeContent = result.code || "";
+        if (codeContent.length > 1000) { // Truncate code snippet if too long
+          codeContent = codeContent.substring(0, 1000) + "... (truncated)";
+        }
+        contextText += codeContent + "\n";
       });
     } else {
-      console.warn("No search results found. This may indicate an issue with vector search.");
+      contextText += "No specific code snippets found relevant to the query. Answer based on general knowledge if possible, or state that you couldn't find relevant information in the codebase.\n";
     }
-
-    // Create a system message that includes context from the search results
-    let contextText = `You are a helpful assistant that can answer questions about the codebase.
-
-INSTRUCTIONS:
-
-1. SEARCH INSTRUCTIONS:
-- You have access to a vector search database of code from this project
-- When asked about specific functions, components, or code patterns, ALWAYS search for them first
-- If asked about a specific function or component by name (e.g., "fetch"), explicitly mention whether you found it or not
-- If you don't find an exact match, suggest similar functions or components that might be relevant
-
-2. RESPONSE INSTRUCTIONS:
-- Always be direct and specific in your answers
-- If you find code related to the query, include relevant code snippets
-- If you don't find anything, clearly state that you couldn't find the requested code
-- When showing code, explain what it does and how it works
-
-3. FORMATTING INSTRUCTIONS:
-- Always use proper Markdown formatting for your responses
-- For code blocks:
-  - Always specify the language after the opening backticks (e.g., \`\`\`javascript or \`\`\`tsx)
-  - Ensure proper indentation in code examples
-  - Add comments to explain complex code sections
-- For inline code references, use single backticks (e.g., \`useState\`)
-- When referring to components, use consistent formatting: \`ComponentName\` and link them with [ComponentName](/components/component-name)
-- Break your response into sections with clear headings (## Heading)
-- Use bullet points and numbered lists for clarity
-- Include relevant examples that demonstrate the concept
-- Keep explanations concise and focused on answering the question
-
-4. SPECIAL COMPONENT KNOWLEDGE:
-- The \`TableOfContents\` component is available for displaying a table of contents on documentation pages
-- It automatically extracts headings from content and displays them as a navigable list
-- It can also accept custom items through the \`items\` prop
-- It's used in the \`ComponentDetails\` component to show section navigation`;
     
-    // Add special instructions for direct searches
-    if (isDirectSearch) {
-      contextText += `The user is looking for a specific code element named "${searchName}". `;
-      
-      if (exactMatches.length > 0) {
-        contextText += `I found ${exactMatches.length} exact matches for this name. `;
-      } else {
-        contextText += `I did not find any exact matches for this name. `;
-      }
-      
-      contextText += "Be very clear in your response about whether the requested code element exists or not.\n\n";
-    }
+    console.log(`Context text length for LLM: ${contextText.length}`);
+    // For full context debugging (can be very verbose):
+    // if (contextText.length < 5000) console.log("Context text for LLM:", contextText);
+    // else console.log("Context text for LLM is too long to print fully.");
 
-    if (searchResults.length > 0) {
-      contextText +=
-        "Here is some relevant code from the codebase that might help answer the question:\n\n";
-
-      for (const [index, result] of searchResults.entries()) {
-        contextText += `[${index + 1}] Component: ${result.componentName}${
-          result.methodName ? `, Method: ${result.methodName}` : ""
-        }\n`;
-        contextText += `File: ${result.filePath}\n`;
-        contextText += "```\n" + result.code + "\n```\n\n";
-      }
-    } else {
-      // Add a note if no search results were found
-      contextText += "\n\nNote: I couldn't find specific code examples related to the query. Please be clear in your response that you couldn't find the requested code.\n\n";
-    }
-
-    // Create the message history
     const messages: ChatMessage[] = [
       { role: "system", content: contextText },
       ...history,
       { role: "user", content: query },
     ];
 
-    // Get the chat response
     let response: string;
     if (this.useOllama) {
+      console.log("Using Ollama for LLM response generation.");
       response = await this.getOllamaResponse(messages);
     } else {
+      console.log("Using OpenAI for LLM response generation.");
       response = await this.getOpenAIResponse(messages);
     }
+    
+    console.log("LLM Raw Response:", response);
+    console.log("=== CHAT PROCESSING END ===\n");
 
-    return {
-      response,
-      searchResults,
-    };
-  }
-}
+    // Return the LLM's response and the search results used for context (limited for brevity in return)
+    return { response, searchResults: combinedResults.slice(0, 10) };
+  } // End of chat method
+} // End of CodebaseChatService class

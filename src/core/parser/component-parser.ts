@@ -64,8 +64,8 @@ export function parseComponentFile(
       // Extract methods using TypeScript AST
       const methods = extractComponentMethods(fileContent, componentName);
 
-      // Extract component source code
-      const sourceCode = extractComponentSourceCode(fileContent, componentName);
+      // The full fileContent will be used for componentDef.sourceCode
+      // const sourceCode = extractComponentSourceCode(fileContent, componentName); // This line is no longer needed for componentDef.sourceCode
 
       // Extract relationships data
       const imports = extractImports(fileContent);
@@ -93,7 +93,7 @@ export function parseComponentFile(
         description: component.description || "",
         filePath,
         fileName: path.basename(filePath),
-        sourceCode,
+        sourceCode: fileContent, // Use full file content
         props,
         methods,
         childComponents: [],

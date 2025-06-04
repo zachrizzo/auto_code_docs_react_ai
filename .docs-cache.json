@@ -1,0 +1,116 @@
+{
+  "useTheme:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/theme.ts": {
+    "componentHash": "457e1ee5ebdedf7a5527ae0848c2c74a",
+    "description": "A React component that renders a useTheme element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.555Z"
+  },
+  "applyTheme:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/theme.ts": {
+    "componentHash": "258ea9b177a48d7bbb22fc9048ce075d",
+    "description": "A React component that renders a applyTheme element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.558Z"
+  },
+  "setCSSVariable:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/theme.ts": {
+    "componentHash": "d5b685a2261da772630c535e27fe33f8",
+    "description": "A React component that renders a setCSSVariable element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.559Z"
+  },
+  "Logger:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/logger.ts": {
+    "componentHash": "c647e294f62ad9b340f48d3e9d33209d",
+    "description": "A React component that renders a Logger element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.561Z"
+  },
+  "logAction:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/logger.ts": {
+    "componentHash": "e9daa8cf1300305e9fc2bee52244c519",
+    "description": "A React component that renders a logAction element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.562Z"
+  },
+  "logError:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/logger.ts": {
+    "componentHash": "e5757e6a6eb1338ab30a78e16bbc2c44",
+    "description": "A React component that renders a logError element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.564Z"
+  },
+  "logDebug:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/utils/logger.ts": {
+    "componentHash": "bba19889b2b95a90d5c56f9533d559d0",
+    "description": "A React component that renders a logDebug element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.565Z"
+  },
+  "ApiService:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/services/api.ts": {
+    "componentHash": "9048888f26d7b094b0a221929a872734",
+    "description": "A React component that renders a ApiService element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.566Z"
+  },
+  "fetchUser:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/services/api.ts": {
+    "componentHash": "36482da64e1f79d65578853f263597fa",
+    "description": "A React component that renders a fetchUser element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.567Z"
+  },
+  "createUserObject:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/services/api.ts": {
+    "componentHash": "67425096e7b42a1006327a53c4c226de",
+    "description": "A React component that renders a createUserObject element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.569Z"
+  },
+  "validateEmail:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/services/api.ts": {
+    "componentHash": "8947604f0b2a32ee47f56961061d457c",
+    "description": "A React component that renders a validateEmail element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.570Z"
+  },
+  "updateUserProfile:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/services/api.ts": {
+    "componentHash": "a8385621382af31aebdba24bca3276d1",
+    "description": "A React component that renders a updateUserProfile element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.571Z"
+  },
+  "Card:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Card.tsx": {
+    "componentHash": "4a5f0ea9fda589a50b7911d2a2d57c14",
+    "description": "A React component that renders a Card element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.572Z"
+  },
+  "Button:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "a9a0ae5ede35d757b4c592d8ebd6ea0a",
+    "description": "A React component that renders a Button element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.574Z"
+  },
+  "handleClick:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "970e757510575f193d86b26e072855e9",
+    "description": "A React component that renders a handleClick element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.575Z"
+  },
+  "getButtonClasses:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "fa8a4ecee86a6ddd1d85afefe618cf4f",
+    "description": "A React component that renders a getButtonClasses element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.576Z"
+  },
+  "renderContent:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "7ea5ce929d40c9b4e30c56fbb3e54a06",
+    "description": "A React component that renders a renderContent element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.577Z"
+  },
+  "wrapInSpan:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "d9fe3d3b9bef06854516b56418c090ff",
+    "description": "A React component that renders a wrapInSpan element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.578Z"
+  },
+  "addIcon:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-project/src/components/Button.tsx": {
+    "componentHash": "2a94a409440a1cafaa0329d1b93d2afe",
+    "description": "A React component that renders a addIcon element.",
+    "props": {},
+    "lastUpdated": "2025-05-22T21:48:54.579Z"
+  }
+}

@@ -112,6 +112,21 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
               })
             }
 
+            // Check for explicit relationships array
+            if (data.relationships && Array.isArray(data.relationships)) {
+              data.relationships.forEach((rel: Relationship) => {
+                // Only add the relationship if the target exists in our components
+                const targetComp = componentsData.find(c => c.id === rel.target || c.slug === rel.target || c.name.toLowerCase().replace(/\s+/g, "-") === rel.target)
+                if (targetComp) {
+                  relationshipsData.push({
+                    source: comp.slug,
+                    target: targetComp.id,
+                    type: rel.type
+                  })
+                }
+              })
+            }
+            
             // Check for similarity warnings (these can indicate relationships)
             if (data.similarityWarnings && Array.isArray(data.similarityWarnings)) {
               data.similarityWarnings.forEach((warning: { similarTo: string; score: number; reason: string }) => {

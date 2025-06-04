@@ -12,6 +12,8 @@ async function getComponentDefinitions() {
     
     // Try multiple possible locations for docs-data
     const possiblePaths = [
+      path.join(process.cwd(), "public/docs-data/docs-data"),  // Symlinked path
+      path.join(process.cwd(), "public/docs-data"),
       path.join(process.cwd(), "docs-data"),
       path.join(process.cwd(), "src/ui/docs-data"),
       path.join(process.cwd(), "test-docs-project/documentation/docs-data"),
@@ -133,25 +135,113 @@ async function getComponentDefinitions() {
   }
 }
 
+// Load the saved vector database
+async function loadVectorDatabase() {
+  try {
+    console.log("Loading saved vector database...");
+    
+    // Try multiple possible locations for the vector database
+    const possiblePaths = [
+      path.join(process.cwd(), "public/docs-data/docs-data/vector-database.json"),  // Symlinked path
+      path.join(process.cwd(), "public/docs-data/vector-database.json"),
+      path.join(process.cwd(), "docs-data/vector-database.json"),
+      path.join(process.cwd(), "src/ui/public/docs-data/vector-database.json"),
+      path.join(process.cwd(), "src/ui/docs-data/vector-database.json"),
+      path.join(process.cwd(), "test-docs-project/documentation/docs-data/vector-database.json"),
+      path.join(process.cwd(), "../test-docs-project/documentation/docs-data/vector-database.json")
+    ];
+    
+    for (const possiblePath of possiblePaths) {
+      if (await fs.exists(possiblePath)) {
+        console.log(`Found vector database at: ${possiblePath}`);
+        const vectorDb = await fs.readJson(possiblePath);
+        console.log(`Loaded vector database with ${vectorDb.length} entries`);
+        return vectorDb;
+      }
+    }
+    
+    console.warn("Vector database file not found in any of the expected locations");
+    return null;
+  } catch (error) {
+    console.error("Error loading vector database:", error);
+    return null;
+  }
+}
+
 // Initialize the chat service (lazy loading)
 let chatService: CodebaseChatService | null = null;
 
 async function getChatService() {
   if (!chatService) {
     console.log("=== CREATING NEW CHAT SERVICE INSTANCE ===");
-    const components = await getComponentDefinitions();
-    if (components.length === 0) {
-      console.error("WARNING: No components loaded. Vector search will not work!");
+    
+    // Load the saved vector database FIRST
+    const savedVectorDb = await loadVectorDatabase();
+    if (!savedVectorDb || savedVectorDb.length === 0) {
+      console.error("ERROR: No saved vector database found. Documentation needs to be regenerated.");
+      throw new Error("Vector database not found. Please regenerate documentation.");
     }
+    
+    const components = await getComponentDefinitions();
+    console.log(`Loaded ${components.length} component definitions`);
+    
+    // Log details about loaded components
+    let totalMethods = 0;
+    components.forEach(comp => {
+      if (comp.methods && comp.methods.length > 0) {
+        totalMethods += comp.methods.length;
+      }
+    });
+    console.log(`Total methods across all components: ${totalMethods}`);
+    
     const config = {
       useOllama: true,
       ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
       ollamaModel: process.env.OLLAMA_MODEL || "nomic-embed-text:latest",
       ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest",
       chatModel: process.env.CHAT_MODEL || "gemma3:4b",
-      similarityThreshold: process.env.SIMILARITY_THRESHOLD ? parseFloat(process.env.SIMILARITY_THRESHOLD) : 0.3
+      similarityThreshold: process.env.SIMILARITY_THRESHOLD ? parseFloat(process.env.SIMILARITY_THRESHOLD) : 0.2
     };
+    
+    console.log("Chat service configuration:", {
+      ollamaUrl: config.ollamaUrl,
+      embeddingModel: config.ollamaEmbeddingModel,
+      chatModel: config.chatModel,
+      similarityThreshold: config.similarityThreshold
+    });
+    
+    // Create service but skip initialization since we'll import the vector DB
     chatService = new CodebaseChatService(components, config);
+    
+    // Import the saved vector database immediately
+    console.log(`Importing saved vector database with ${savedVectorDb.length} entries...`);
+    chatService.vectorService.importVectorDatabase(JSON.stringify(savedVectorDb));
+    
+    // Verify the import worked
+    const vectorDbString = chatService.vectorService.exportVectorDatabase();
+    const importedDb = JSON.parse(vectorDbString);
+    console.log(`Vector database after import: ${importedDb.length} entries`);
+    
+    // Verify database integrity
+    const isValid = chatService.verifyVectorDatabase();
+    if (!isValid) {
+      console.error("WARNING: Vector database contains invalid entries!");
+    }
+    
+    // Test Ollama connectivity
+    try {
+      const testResponse = await axios.get(`${config.ollamaUrl}/api/tags`, { timeout: 5000 });
+      console.log("Ollama server is running. Available models:", testResponse.data.models?.map((m: any) => m.name));
+      
+      // Check if the embedding model is available
+      const hasEmbeddingModel = testResponse.data.models?.some((m: any) => m.name === config.ollamaEmbeddingModel);
+      if (!hasEmbeddingModel) {
+        console.warn(`WARNING: Embedding model '${config.ollamaEmbeddingModel}' not found in Ollama. Run: ollama pull ${config.ollamaEmbeddingModel}`);
+      }
+    } catch (error) {
+      console.error("WARNING: Cannot connect to Ollama server. Vector search will fail!");
+    }
+    
     console.log("=== CHAT SERVICE INITIALIZATION COMPLETE ===");
   }
 
@@ -165,47 +255,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
     
-    console.log(`\n=== PROCESSING CHAT REQUEST: "${query}" ===`);
+    console.log(`\n=== PROCESSING CHAT REQUEST ===`);
+    console.log(`User query: "${query}"`);
+    console.log(`History length: ${history?.length || 0}`);
+    
     const service = await getChatService();
     
-    // Extract potential component names from the query (words starting with uppercase)
-    const potentialComponentNames = query.match(/\b[A-Z][a-zA-Z]*\b/g) || [];
-    console.log(`Potential component names extracted: ${potentialComponentNames.join(', ')}`);
+    // Verify vector database is loaded
+    const vectorDbString = service.vectorService.exportVectorDatabase();
+    const vectorDb = JSON.parse(vectorDbString);
+    console.log(`Vector database status: ${vectorDb.length} entries loaded`);
     
-    // Always perform vector search for every query
-    const searchResults = await service.searchCodebase(query);
-    console.log(`Vector search found ${searchResults.length} results`);
-    
-    // Deduplicate search results by component+method name
-    const uniqueResults = [];
-    const seenKeys = new Set();
-    
-    for (const result of searchResults) {
-      const key = `${result.componentName}.${result.methodName || ''}`;
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key);
-        uniqueResults.push(result);
-      }
+    if (vectorDb.length === 0) {
+      console.error("ERROR: Vector database is empty in API route!");
+      return NextResponse.json({ 
+        error: "Vector database not loaded. Please regenerate documentation.",
+        response: "I'm sorry, but the documentation database is not loaded. Please regenerate the documentation using 'code-y generate' command.",
+        searchResults: []
+      }, { status: 503 });
     }
     
-    console.log(`After deduplication: ${uniqueResults.length} unique results`);
+    // Use the chat service directly - it handles vector search internally
+    console.log("Calling chat service...");
+    const { response, searchResults } = await service.chat(history || [], query);
     
-    // Build the prompt for the AI, including search results context
-    let prompt = query;
+    console.log(`Chat service returned ${searchResults.length} search results`);
+    console.log(`Response length: ${response.length} characters`);
     
-    if (uniqueResults.length > 0) {
-      prompt += "\n\nRelevant code context from vector search:";
-      for (const result of uniqueResults.slice(0, 5)) {
-        prompt += `\n- [${result.componentName}.${result.methodName || ''}] ${result.description || ''}`;
-        prompt += `\n  Code: ${result.code ? result.code.substring(0, 200) + (result.code.length > 200 ? '...' : '') : 'No code available'}`;
-      }
+    // Log search results for debugging
+    if (searchResults.length > 0) {
+      console.log("Search results summary:");
+      searchResults.forEach((result, idx) => {
+        console.log(`  ${idx + 1}. ${result.componentName}.${result.methodName || 'N/A'} (similarity: ${result.similarity?.toFixed(3) || 'N/A'})`);
+      });
+    } else {
+      console.warn("No search results found for the query");
     }
     
-    // Get chat response
-    const { response } = await service.chat(history || [], prompt);
-    return NextResponse.json({ response, searchResults: uniqueResults });
-  } catch (error) {
-    console.error("Error processing chat request:", error);
-    return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
+    console.log("=== CHAT REQUEST COMPLETE ===\n");
+    
+    return NextResponse.json({ response, searchResults });
+  } catch (error: any) {
+    console.error("Error processing chat request:", error.message || error);
+    console.error("Stack trace:", error.stack);
+    
+    return NextResponse.json({ 
+      error: "Failed to process request",
+      details: error.message || "Unknown error"
+    }, { status: 500 });
   }
 }

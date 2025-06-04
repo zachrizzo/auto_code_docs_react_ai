@@ -1,287 +1,270 @@
-# Recursive React Docs AI
+# Code-y: AI-Powered React Documentation Generator
 
-Automatically generate AI-powered documentation for React components with recursive component discovery and function similarity detection.
+Code-y is an AI-powered documentation generator for React applications that provides automated documentation generation with AI chat capabilities, vector search, and component relationship visualization.
 
-## Features
+## 🚀 Features
 
-- **Recursive Component Analysis**: Automatically analyzes your React component structure recursively.
-- **AI-Powered Descriptions**: Uses OpenAI to generate human-readable descriptions for components, props, and methods.
-- **Function Similarity Detection**: Identifies methods with similar functionality to prevent duplicated code.
-- **Interactive UI**: Explore components, visualize component relationships, and understand function similarities.
-- **Modern Design**: Clean, responsive documentation with light/dark mode support.
+- **Automated Documentation Generation**: Analyzes React components, TypeScript classes, and functions
+- **AI-Powered Descriptions**: Generates meaningful descriptions using OpenAI or Ollama
+- **Vector Search**: Semantic search across your codebase using embeddings
+- **Interactive Chat**: Ask questions about your code with AI assistance
+- **Component Relationships**: Visualize dependencies and prop flows
+- **Modern UI**: Clean, responsive Next.js interface with dark mode support
+- **CLI Interface**: Simple commands for initialization, generation, and serving
 
-## Installation
-
-```bash
-npm install recursive-react-docs-ai
-```
-
-## Quick Start
-
-Generate documentation for your React project:
+## 📦 Installation
 
 ```bash
-npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
+npm install -g code-y
+# or
+yarn global add code-y
+# or use directly with npx
+npx code-y
 ```
 
-## Using as an npm package
+## 🚀 Quick Start
 
-You can install and use this package in your own projects in several ways:
-
-### Installation
+### 1. Initialize Configuration
 
 ```bash
-# Install from npm
-npm install recursive-react-docs-ai
-
-# Or using yarn
-yarn add recursive-react-docs-ai
-
-# Or using pnpm
-pnpm add recursive-react-docs-ai
+npx code-y init
 ```
 
-### Usage in your project
+This creates a `codey.config.js` file with default settings.
 
-Once installed, you can use it in your project in three ways:
-
-1. **Using the CLI**:
+### 2. Generate and Serve Documentation
 
 ```bash
-# Using npx
-npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
-
-# Or if installed globally
-docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
+npx code-y serve
 ```
 
-2. **Using the UI script**:
+This command:
+- Scans your React project
+- Generates documentation with AI
+- Starts the documentation UI server
+- Opens your browser automatically
+
+## 🛠️ CLI Commands
+
+### `code-y init`
+Initialize Code-y configuration in your project.
+
+### `code-y generate`
+Generate documentation without starting the server.
 
 ```bash
-# Will generate docs and start the UI server
-npx docs-ui
+npx code-y generate [options]
 ```
 
-3. **Using the API programmatically**:
+**Options:**
+- `-r, --root <path>` - Root directory of the project (default: current directory)
+- `-c, --component <path>` - Path to root component file (optional)
+- `-o, --output <path>` - Output directory (default: "documentation")
+- `-p, --port <number>` - Port for documentation server (default: 3000)
+- `--generate-descriptions` - Generate AI descriptions for components
+- `--use-ollama` - Use Ollama for local AI processing
+- `--ollama-url <url>` - Ollama server URL (default: http://localhost:11434)
+- `--ollama-model <model>` - Ollama model for chat (default: gemma3:4b)
+
+### `code-y serve`
+Generate documentation and start the UI server.
+
+```bash
+npx code-y serve [options]
+```
+
+**Options:**
+- `-r, --root <path>` - Root directory to scan
+- `-p, --port <number>` - Port for UI server
+- `--ollama-url <url>` - URL for Ollama API
+- `--ollama-model <model>` - Model for chat
+- `--ollama-embedding-model <model>` - Model for embeddings
+
+### `code-y build`
+Build static documentation files.
+
+```bash
+npx code-y build [options]
+```
+
+## ⚙️ Configuration
+
+After running `code-y init`, customize your `codey.config.js`:
 
 ```javascript
-// In your script.js or script.ts
-import { generateDocumentation } from "recursive-react-docs-ai";
-
-async function generateDocs() {
-  const outputPath = await generateDocumentation({
-    rootDir: "./your-project",
-    componentPath: "src/App.jsx",
-    outputDir: "docs",
-    apiKey: "YOUR_OPENAI_API_KEY", // Optional, use if you want AI-powered descriptions
-    // Other options as needed
-  });
-
-  console.log(`Documentation generated at ${outputPath}`);
-}
-
-generateDocs().catch(console.error);
+module.exports = {
+  // AI Provider: 'openai' or 'ollama'
+  aiProvider: 'ollama',
+  
+  // OpenAI API Key (if using OpenAI)
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  
+  // Ollama configuration (if using Ollama)
+  ollamaBaseUrl: 'http://localhost:11434',
+  ollamaModel: 'gemma3:4b',
+  ollamaEmbeddingModel: 'nomic-embed-text:latest',
+  
+  // Target directory for scanning
+  targetDir: '.',
+  
+  // Patterns to exclude from scanning
+  excludePatterns: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/.next/**',
+    '**/coverage/**'
+  ],
+  
+  // Patterns to include in scanning
+  includePatterns: [
+    '**/*.tsx',
+    '**/*.jsx',
+    '**/*.ts',
+    '**/*.js'
+  ],
+  
+  // Output directory for documentation
+  outputDir: 'documentation',
+  
+  // Port for documentation UI server
+  uiPort: 3000,
+  
+  // Theme for documentation
+  theme: 'light',
+  
+  // Feature flags
+  showCode: true,
+  showMethods: true,
+  showSimilarity: true,
+  generateDescriptions: false
+};
 ```
 
-### Using with npm scripts
+## 🤖 AI Integration
 
-Add convenient scripts to your project's package.json:
+### Using Ollama (Recommended for Local Development)
 
-```json
-{
-  "scripts": {
-    "docs": "docs-by-zach generate -r . -c src/App.jsx",
-    "docs:ai": "docs-by-zach generate -r . -c src/App.jsx --ai $OPENAI_API_KEY"
-  }
-}
-```
-
-## Command Options
-
-| Option                            | Description                                                         |
-| --------------------------------- | ------------------------------------------------------------------- |
-| `-r, --root <path>`               | Root directory of the project                                       |
-| `-c, --component <path>`          | Path to the root component, relative to root                        |
-| `-o, --output <path>`             | Output directory (default: "docs")                                  |
-| `-p, --port <number>`             | Port to serve documentation (default: 3000)                         |
-| `-e, --exclude <patterns>`        | Glob patterns to exclude (comma-separated)                          |
-| `-i, --include <patterns>`        | Glob patterns to include (comma-separated)                          |
-| `-d, --depth <number>`            | Maximum recursion depth (default: Infinity)                         |
-| `--open`                          | Open documentation in browser when done                             |
-| `--ai <apiKey>`                   | OpenAI API key for generating descriptions                          |
-| `--similarity-threshold <number>` | Threshold for function similarity detection (0.0-1.0, default: 0.8) |
-| `--theme <theme>`                 | Theme for documentation (light, dark, auto)                         |
-| `--use-ollama`                    | Use Ollama for local embeddings instead of OpenAI                   |
-| `--ollama-url <url>`              | URL for Ollama API (default: http://localhost:11434)                |
-| `--ollama-model <model>`          | Model to use with Ollama (default: gemma3:27b)                      |
-
-## Function Similarity Detection
-
-This tool helps identify potentially duplicated or similar functions across your codebase. It works by:
-
-1. Extracting function code and metadata from your components
-2. Using OpenAI's embedding models to vectorize function characteristics
-3. Computing similarity scores between functions
-4. Visualizing relationships between similar functions
-
-Benefits:
-
-- Identify code duplication opportunities
-- Understand function relationships
-- Refactor similar functions into shared utilities
-- Improve code maintainability
-
-The similarity visualization tab shows connections between functions that are functionally similar, even if they have different names or implementations.
-
-### How to Use Similarity Detection
-
-1. Provide your OpenAI API key when generating documentation:
-
+1. [Install Ollama](https://ollama.ai/download)
+2. Pull required models:
    ```bash
-   npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY
+   ollama pull gemma3:4b
+   ollama pull nomic-embed-text:latest
+   ```
+3. Ensure Ollama is running:
+   ```bash
+   ollama serve
    ```
 
-2. Adjust the similarity threshold if needed (default is 0.8 or 80%):
+### Using OpenAI
 
-   ```bash
-   npx docs-by-zach generate -r ./your-project -c src/App.jsx --ai YOUR_OPENAI_API_KEY --similarity-threshold 0.7
+1. Get an API key from [OpenAI](https://platform.openai.com)
+2. Set in your config or environment:
+   ```javascript
+   // codey.config.js
+   module.exports = {
+     aiProvider: 'openai',
+     openaiApiKey: 'your-api-key-here',
+     // ...
+   };
    ```
 
-3. Open the generated documentation and navigate to the "Function Similarities" tab to view the visualization.
+## 🎨 Features in Detail
 
-### Using Ollama for Local Embeddings
+### Component Analysis
+- Parses React components using `react-docgen-typescript`
+- Extracts props, methods, and relationships
+- Supports TypeScript and JavaScript
+- Handles class components and functional components
 
-You can now use [Ollama](https://ollama.ai) for generating embeddings locally without requiring an OpenAI API key:
+### Vector Search
+- Creates embeddings for all code elements
+- Enables semantic search across your codebase
+- Find similar functions and components
+- Powered by Ollama or OpenAI embeddings
 
-1. [Install Ollama](https://ollama.ai/download) on your machine
-2. Start the Ollama server: `ollama serve`
-3. Pull a model that supports embeddings: `ollama pull gemma3:27b` (or another model of your choice)
-4. Generate documentation using Ollama:
+### AI Chat Interface
+- Ask questions about your codebase
+- Get explanations for specific components
+- Understand relationships between code elements
+- Context-aware responses using vector search
 
-   ```bash
-   # Using the CLI
-   npx docs-by-zach generate -r ./your-project -c src/App.jsx --use-ollama
+### Relationship Visualization
+- Interactive dependency graphs
+- Component hierarchy views
+- Import/export relationships
+- Method call tracking
 
-   # Or using the provided script
-   ./generate-docs-with-ollama.sh
-   ```
-
-5. You can customize the Ollama settings:
-
-   ```bash
-   npx docs-by-zach generate -r ./your-project -c src/App.jsx \
-     --use-ollama \
-     --ollama-url "http://localhost:11434" \
-     --ollama-model "gemma3:27b" \
-     --similarity-threshold 0.6
-   ```
-
-Benefits of using Ollama:
-
-- Completely local and private analysis
-- No API keys or internet connection required
-- Free to use without limitations
-- Support for various embedding models
-
-## API Usage
-
-You can also use the library programmatically:
+## 🔧 Programmatic Usage
 
 ```javascript
-import {
-  parseComponents,
-  generateDocumentation,
-} from "recursive-react-docs-ai";
+import { parseComponents, generateDocumentation } from 'code-y';
 
-// Option 1: Parse components with OpenAI similarity detection
-const componentsWithOpenAI = await parseComponents({
-  rootDir: "./your-project",
-  componentPath: "src/App.jsx",
-  apiKey: "YOUR_OPENAI_API_KEY",
-  similarityThreshold: 0.8,
-});
-
-// Option 2: Parse components with Ollama for local embeddings
-const componentsWithOllama = await parseComponents({
-  rootDir: "./your-project",
-  componentPath: "src/App.jsx",
+// Parse components with AI
+const components = await parseComponents({
+  rootDir: './src',
   useOllama: true,
-  ollamaUrl: "http://localhost:11434", // Default Ollama URL
-  ollamaModel: "gemma3:27b", // Model to use for embeddings
-  similarityThreshold: 0.6,
+  ollamaUrl: 'http://localhost:11434',
+  similarityThreshold: 0.3
 });
 
-// Generate documentation (works with either approach)
-const outputPath = await generateDocumentation({
-  componentPath: "src/App.jsx",
-  rootDir: "./your-project",
-  outputDir: "docs",
-  theme: "light",
-  // Include either apiKey or useOllama options here
+// Generate documentation
+const outputPath = await generateDocumentation(components, {
+  outputDir: './docs',
+  theme: 'dark',
+  showCode: true,
+  showMethods: true
 });
-
-console.log(`Documentation generated at ${outputPath}`);
 ```
 
-## License
+## 🐛 Troubleshooting
 
-MIT
+### Common Issues
 
-# auto_code_docs_react_ai
+**1. "Module not found" errors**
+- Ensure you've run `npm install` after cloning
+- Try rebuilding: `npm run build`
 
-## For Package Maintainers: Publishing to npm
+**2. Ollama connection issues**
+- Check if Ollama is running: `curl http://localhost:11434/api/tags`
+- Verify models are installed: `ollama list`
 
-If you want to publish this package to npm to make it available for others:
+**3. Port conflicts**
+- Code-y automatically finds free ports
+- Or specify a different port: `npx code-y serve -p 3001`
 
-1. **Prepare for publication**:
+**4. No components found**
+- Check your include/exclude patterns in config
+- Ensure your React components are properly exported
 
-   Ensure all files are set up correctly:
+## 📁 Project Structure
 
-   - `package.json` has the correct name, version, description, and entry points
-   - `.npmignore` excludes files not needed in the package
-   - The `files` field in package.json includes all necessary files
+```
+code-y/
+├── src/
+│   ├── cli/          # CLI implementation
+│   ├── core/         # Core parsing logic
+│   ├── ai/           # AI services
+│   └── ui/           # Next.js documentation UI
+├── dist/             # Compiled output
+└── codey.config.js   # User configuration
+```
 
-2. **Test the package**:
+## 🤝 Contributing
 
-   ```bash
-   # Build the package
-   npm run build
+Contributions are welcome! Please:
 
-   # Create a tarball for testing
-   npm pack
-   ```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-   This will create a `.tgz` file that you can install in another project for testing:
+## 📄 License
 
-   ```bash
-   # In a test project
-   npm install /path/to/recursive-react-docs-ai-0.1.0.tgz
-   ```
+MIT © [Zach]
 
-3. **Publish to npm**:
+## 🔗 Links
 
-   ```bash
-   # Login to npm (if not already logged in)
-   npm login
-
-   # Publish the package
-   npm publish
-   ```
-
-4. **Update the package**:
-
-   When making updates, increment the version in package.json following semantic versioning:
-
-   - Patch (0.1.x): Bug fixes and minor changes
-   - Minor (0.x.0): New features, backward compatible
-   - Major (x.0.0): Breaking changes
-
-   ```bash
-   # Update the version
-   npm version patch|minor|major
-
-   # Publish the updated version
-   npm publish
-   ```
-
-Remember to make sure the CLI works correctly with the `docs-by-zach` and `docs-ui` commands by testing them before publishing.
+- [GitHub Repository](https://github.com/zachrizzo/auto_code_docs_react_ai)
+- [Issue Tracker](https://github.com/zachrizzo/auto_code_docs_react_ai/issues)
+- [NPM Package](https://www.npmjs.com/package/code-y)
