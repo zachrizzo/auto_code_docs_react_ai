@@ -64,7 +64,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular' | 'grouped'>('force')
   const [showLabels, setShowLabels] = useState(true)
   const [showConnectionsOnly, setShowConnectionsOnly] = useState(false)
-  const [nodeSpacing, setNodeSpacing] = useState(150)
+  const [nodeSpacing, setNodeSpacing] = useState(250)
   const [isAutoLayouting, setIsAutoLayouting] = useState(false)
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -72,14 +72,15 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const [groupDragOffset, setGroupDragOffset] = useState({ x: 0, y: 0 })
   const [groupingMode, setGroupingMode] = useState<'none' | 'file' | 'parent'>('none')
   const [showGroupContainers, setShowGroupContainers] = useState(true)
+  const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('straight')
   const animationRef = useRef<number>()
   const nodesRef = useRef<Node[]>(nodes)
   const edgesRef = useRef<Edge[]>(edges)
 
-  // Physics simulation parameters
-  const FORCE_STRENGTH = layoutMode === 'force' ? 0.03 : 0.01
-  const DAMPING = 0.85
-  const CENTER_FORCE = layoutMode === 'force' ? 0.005 : 0.001
+  // Physics simulation parameters - adjusted for grouped layouts
+  const FORCE_STRENGTH = layoutMode === 'grouped' ? 0.01 : layoutMode === 'force' ? 0.02 : 0.008
+  const DAMPING = 0.88
+  const CENTER_FORCE = layoutMode === 'grouped' ? 0.001 : layoutMode === 'force' ? 0.003 : 0.001
 
   // Create groups based on grouping mode
   const nodeGroups = useMemo(() => {
@@ -173,6 +174,88 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     nodesRef.current = layoutNodes
     edgesRef.current = edges
   }, [nodes, edges, layoutMode, nodeGroups, groupingMode])
+  
+  // Calculate tree layout for nodes within a group
+  const calculateTreeLayout = (groupNodes: Node[], spacing: number) => {
+    if (groupNodes.length === 0) return []
+    if (groupNodes.length === 1) return [{ x: 0, y: 0 }]
+    
+    const positions: { x: number, y: number }[] = []
+    
+    // Sort nodes by type and connections for better tree structure
+    const sortedNodes = [...groupNodes].sort((a, b) => {
+      // Primary components at root, functions as branches, methods as leaves
+      const typeOrder = { component: 0, class: 1, function: 2, method: 3 }
+      const aOrder = typeOrder[a.type as keyof typeof typeOrder] ?? 4
+      const bOrder = typeOrder[b.type as keyof typeof typeOrder] ?? 4
+      
+      if (aOrder !== bOrder) return aOrder - bOrder
+      return (b.connections || 0) - (a.connections || 0) // More connected nodes higher
+    })
+    
+    if (sortedNodes.length <= 3) {
+      // Small groups: horizontal line layout
+      const totalWidth = (sortedNodes.length - 1) * spacing
+      sortedNodes.forEach((_, index) => {
+        positions.push({
+          x: -totalWidth / 2 + index * spacing,
+          y: 0
+        })
+      })
+    } else if (sortedNodes.length <= 6) {
+      // Medium groups: 2-level tree structure
+      const root = sortedNodes[0]
+      const children = sortedNodes.slice(1)
+      
+      // Root at top center
+      positions.push({ x: 0, y: -spacing })
+      
+      // Children arranged in a horizontal line below
+      const childWidth = (children.length - 1) * spacing * 0.8
+      children.forEach((_, index) => {
+        positions.push({
+          x: -childWidth / 2 + index * spacing * 0.8,
+          y: spacing * 0.5
+        })
+      })
+    } else {
+      // Large groups: 3-level tree structure
+      const root = sortedNodes[0]
+      const level2Count = Math.min(3, Math.ceil(sortedNodes.length / 3))
+      const level2Nodes = sortedNodes.slice(1, 1 + level2Count)
+      const level3Nodes = sortedNodes.slice(1 + level2Count)
+      
+      // Root at top center
+      positions.push({ x: 0, y: -spacing * 1.2 })
+      
+      // Level 2: spread horizontally
+      const level2Width = (level2Count - 1) * spacing
+      level2Nodes.forEach((_, index) => {
+        positions.push({
+          x: level2Count === 1 ? 0 : -level2Width / 2 + index * spacing,
+          y: 0
+        })
+      })
+      
+      // Level 3: arrange under level 2 nodes
+      const nodesPerParent = Math.ceil(level3Nodes.length / level2Count)
+      level3Nodes.forEach((_, index) => {
+        const parentIndex = Math.floor(index / nodesPerParent)
+        const childIndex = index % nodesPerParent
+        const parentX = level2Count === 1 ? 0 : -level2Width / 2 + parentIndex * spacing
+        
+        const siblingCount = Math.min(nodesPerParent, level3Nodes.length - parentIndex * nodesPerParent)
+        const siblingWidth = (siblingCount - 1) * spacing * 0.6
+        
+        positions.push({
+          x: parentX + (siblingCount === 1 ? 0 : -siblingWidth / 2 + childIndex * spacing * 0.6),
+          y: spacing * 1.2
+        })
+      })
+    }
+    
+    return positions
+  }
 
   const getNodeGradient = (type: string) => {
     const gradients = {
@@ -214,7 +297,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         const dx = targetNode.x - sourceNode.x
         const dy = targetNode.y - sourceNode.y
         const distance = Math.sqrt(dx * dx + dy * dy)
-        const idealDistance = nodeSpacing
+        const idealDistance = nodeSpacing * (1 + Math.random() * 0.2) // Add slight randomness to prevent rigid patterns
         
         if (distance > 0) {
           const force = (distance - idealDistance) * FORCE_STRENGTH
@@ -239,18 +322,21 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         const dy = nodeB.y - nodeA.y
         const distance = Math.sqrt(dx * dx + dy * dy)
         
-        const minDistance = nodeSpacing * 0.8 // Minimum safe distance
-        const repulsionDistance = nodeSpacing * 1.5
+        // Adjust distances based on layout mode for better grouping
+        const minDistance = layoutMode === 'grouped' ? nodeSpacing * 0.6 : nodeSpacing * 0.9
+        const repulsionDistance = layoutMode === 'grouped' ? nodeSpacing * 1.2 : nodeSpacing * 1.8
         
         if (distance > 0) {
           let force = 0
           
           if (distance < minDistance) {
-            // Strong repulsion for overlapping nodes
-            force = (minDistance - distance) * 0.1
+            // Adjust repulsion based on layout mode
+            const repulsionStrength = layoutMode === 'grouped' ? 0.1 : 0.15
+            force = (minDistance - distance) * repulsionStrength
           } else if (distance < repulsionDistance) {
-            // Normal repulsion
-            force = (repulsionDistance - distance) * 0.02
+            // Softer repulsion for grouped layouts
+            const softRepulsion = layoutMode === 'grouped' ? 0.015 : 0.025
+            force = (repulsionDistance - distance) * softRepulsion
           }
           
           if (force > 0) {
@@ -265,18 +351,19 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         } else {
           // Nodes at exact same position - push them apart immediately
           const randomAngle = Math.random() * Math.PI * 2
-          const pushDistance = minDistance
-          nodeA.x += Math.cos(randomAngle) * pushDistance * 0.5
-          nodeA.y += Math.sin(randomAngle) * pushDistance * 0.5
-          nodeB.x -= Math.cos(randomAngle) * pushDistance * 0.5
-          nodeB.y -= Math.sin(randomAngle) * pushDistance * 0.5
+          const pushDistance = minDistance * 1.5
+          nodeA.x += Math.cos(randomAngle) * pushDistance * 0.7
+          nodeA.y += Math.sin(randomAngle) * pushDistance * 0.7
+          nodeB.x -= Math.cos(randomAngle) * pushDistance * 0.7
+          nodeB.y -= Math.sin(randomAngle) * pushDistance * 0.7
         }
       }
     }
 
-    // Center force
-    const centerX = 400
-    const centerY = 300
+    // Center force - dynamic based on canvas size
+    const canvas = canvasRef.current
+    const centerX = canvas && canvas.width > 0 ? canvas.width / 2 : 400
+    const centerY = canvas && canvas.height > 0 ? canvas.height / 2 : 300
     currentNodes.forEach(node => {
       const dx = centerX - node.x
       const dy = centerY - node.y
@@ -521,9 +608,31 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
             ctx.setLineDash([])
         }
         
+        // Draw edge with selected style
         ctx.beginPath()
-        ctx.moveTo(startX, startY)
-        ctx.lineTo(endX, endY)
+        
+        if (edgeStyle === 'straight') {
+          ctx.moveTo(startX, startY)
+          ctx.lineTo(endX, endY)
+        } else if (edgeStyle === 'curved') {
+          // Curved bezier path
+          const midX = (startX + endX) / 2
+          const midY = (startY + endY) / 2
+          const controlOffset = distance * 0.2
+          const controlX = midX + (dy / distance) * controlOffset
+          const controlY = midY - (dx / distance) * controlOffset
+          
+          ctx.moveTo(startX, startY)
+          ctx.quadraticCurveTo(controlX, controlY, endX, endY)
+        } else if (edgeStyle === 'step') {
+          // Step/orthogonal path
+          const midX = (startX + endX) / 2
+          ctx.moveTo(startX, startY)
+          ctx.lineTo(midX, startY)
+          ctx.lineTo(midX, endY)
+          ctx.lineTo(endX, endY)
+        }
+        
         ctx.stroke()
         
         ctx.shadowBlur = 0
@@ -622,8 +731,8 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       // Modern card-based node design
       ctx.save()
       
-      const nodeSize = node.radius * 2.5
-      const cornerRadius = 16
+      const nodeSize = Math.max(80, node.radius * 3)
+      const cornerRadius = 20
       
       // Outer glow for selected/hovered nodes
       if (isSelected || isHovered) {
@@ -649,9 +758,25 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       ctx.shadowOffsetY = isSelected ? 8 : isHovered ? 6 : 4
       
       // Main node background - glassmorphism effect
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
       ctx.beginPath()
-      roundRect(ctx, node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+      } else {
+        // Fallback for browsers that don't support roundRect
+        const x = node.x - nodeSize/2
+        const y = node.y - nodeSize/2
+        const r = cornerRadius
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + nodeSize - r, y)
+        ctx.quadraticCurveTo(x + nodeSize, y, x + nodeSize, y + r)
+        ctx.lineTo(x + nodeSize, y + nodeSize - r)
+        ctx.quadraticCurveTo(x + nodeSize, y + nodeSize, x + nodeSize - r, y + nodeSize)
+        ctx.lineTo(x + r, y + nodeSize)
+        ctx.quadraticCurveTo(x, y + nodeSize, x, y + nodeSize - r)
+        ctx.lineTo(x, y + r)
+        ctx.quadraticCurveTo(x, y, x + r, y)
+      }
       ctx.fill()
       
       // Reset shadow for inner elements
@@ -668,9 +793,25 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       borderGradient.addColorStop(1, color2)
       
       ctx.strokeStyle = borderGradient
-      ctx.lineWidth = isSelected ? 3 : isHovered ? 2 : 1
+      ctx.lineWidth = isSelected ? 4 : isHovered ? 3 : 2
       ctx.beginPath()
-      roundRect(ctx, node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+      } else {
+        // Fallback for browsers that don't support roundRect
+        const x = node.x - nodeSize/2
+        const y = node.y - nodeSize/2
+        const r = cornerRadius
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + nodeSize - r, y)
+        ctx.quadraticCurveTo(x + nodeSize, y, x + nodeSize, y + r)
+        ctx.lineTo(x + nodeSize, y + nodeSize - r)
+        ctx.quadraticCurveTo(x + nodeSize, y + nodeSize, x + nodeSize - r, y + nodeSize)
+        ctx.lineTo(x + r, y + nodeSize)
+        ctx.quadraticCurveTo(x, y + nodeSize, x, y + nodeSize - r)
+        ctx.lineTo(x, y + r)
+        ctx.quadraticCurveTo(x, y, x + r, y)
+      }
       ctx.stroke()
       
       // Type icon background
@@ -1094,7 +1235,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     })
     
     // Apply group collision detection and adjustment
-    const adjustedGroups = resolveGroupCollisions(groupBoxes)
+    const adjustedGroups = resolveGroupCollisions(groupBoxes, groups, layoutNodes)
     
     // Store group boxes for drawing
     ;(layoutNodes as any).groupBoxes = adjustedGroups
@@ -1235,9 +1376,15 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   }
 
   // Resolve collisions between group boxes with enhanced algorithm
-  const resolveGroupCollisions = (groupBoxes: Map<string, any>) => {
+  const resolveGroupCollisions = (groupBoxes: Map<string, any>, groups?: Map<string, Node[]>, layoutNodes?: Node[]) => {
     const boxes = Array.from(groupBoxes.entries())
-    const maxIterations = 15
+    const maxIterations = 25 // More iterations for better separation
+    
+    // Store original positions to track movement
+    const originalPositions = new Map()
+    boxes.forEach(([key, box]) => {
+      originalPositions.set(key, { x: box.x, y: box.y, centerX: box.centerX, centerY: box.centerY })
+    })
     
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       let hasCollisions = false
@@ -1247,9 +1394,9 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           const [, boxA] = boxes[i]
           const [, boxB] = boxes[j]
           
-          // Dynamic padding based on box sizes
+          // Increased padding between groups to prevent overlapping
           const avgSize = (boxA.width + boxA.height + boxB.width + boxB.height) / 4
-          const padding = Math.max(60, avgSize * 0.15)
+          const padding = Math.max(120, avgSize * 0.25) // Much larger padding
           
           if (boxA.x < boxB.x + boxB.width + padding &&
               boxA.x + boxA.width + padding > boxB.x &&
@@ -1276,7 +1423,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
               
               if (distance < requiredDistance) {
                 const overlap = requiredDistance - distance
-                const pushDistance = Math.max(40, overlap * 0.6)
+                const pushDistance = Math.max(80, overlap * 1.2) // Much stronger separation
                 const normalX = dx / distance
                 const normalY = dy / distance
                 
@@ -1294,7 +1441,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
             } else {
               // Handle exact center overlap
               const randomAngle = Math.random() * 2 * Math.PI
-              const pushDistance = Math.max(100, avgSize * 0.5)
+              const pushDistance = Math.max(150, avgSize * 0.8) // Stronger random separation
               
               boxA.x -= Math.cos(randomAngle) * pushDistance / 2
               boxA.y -= Math.sin(randomAngle) * pushDistance / 2
@@ -1313,6 +1460,29 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       if (!hasCollisions) break
     }
     
+    // Move nodes along with their groups if collision resolution moved them
+    if (groups && layoutNodes) {
+      boxes.forEach(([groupKey, box]) => {
+        const originalPos = originalPositions.get(groupKey)
+        if (originalPos) {
+          const deltaX = box.centerX - originalPos.centerX
+          const deltaY = box.centerY - originalPos.centerY
+          
+          // Only move nodes if the group was significantly moved
+          if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+            const groupNodes = groups.get(groupKey) || []
+            groupNodes.forEach(groupNode => {
+              const layoutNode = layoutNodes.find(n => n.id === groupNode.id)
+              if (layoutNode) {
+                layoutNode.x += deltaX
+                layoutNode.y += deltaY
+              }
+            })
+          }
+        }
+      })
+    }
+    
     // Update the map with adjusted positions
     const adjustedMap = new Map()
     boxes.forEach(([key, box]) => {
@@ -1323,7 +1493,75 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   }
 
   const applyGroupedLayout = (nodes: Node[], groups: Map<string, Node[]>) => {
-    return applyAdvancedForceLayout(nodes, groups)
+    const layoutNodes = [...nodes]
+    const groupBoxes = new Map()
+    const canvas = canvasRef.current
+    const canvasWidth = canvas ? canvas.width : 1200
+    const canvasHeight = canvas ? canvas.height : 800
+    
+    // Calculate initial group positions with proper spacing
+    const groupEntries = Array.from(groups.entries()).filter(([_, nodes]) => nodes.length > 0)
+    const groupsPerRow = Math.min(3, Math.ceil(Math.sqrt(groupEntries.length))) // Max 3 groups per row
+    const groupPadding = 200 // Large padding between groups
+    const availableWidth = canvasWidth - groupPadding * 2
+    const availableHeight = canvasHeight - groupPadding * 2
+    const groupWidth = availableWidth / groupsPerRow
+    const groupHeight = availableHeight / Math.ceil(groupEntries.length / groupsPerRow)
+    
+    groupEntries.forEach(([groupKey, groupNodes], groupIndex) => {
+      if (groupNodes.length === 0) return
+      
+      // Calculate this group's center position with padding
+      const row = Math.floor(groupIndex / groupsPerRow)
+      const col = groupIndex % groupsPerRow
+      const groupCenterX = groupPadding + (col + 0.5) * groupWidth
+      const groupCenterY = groupPadding + (row + 0.5) * groupHeight
+      
+      // Get tree layout positions relative to center
+      const internalSpacing = nodeSpacing * 0.5
+      const treePositions = calculateTreeLayout(groupNodes, internalSpacing)
+      
+      // Apply absolute positions to nodes within this group
+      groupNodes.forEach((node, index) => {
+        const layoutNode = layoutNodes.find(n => n.id === node.id)
+        if (layoutNode && treePositions[index]) {
+          // Position nodes relative to group center
+          layoutNode.x = groupCenterX + treePositions[index].x
+          layoutNode.y = groupCenterY + treePositions[index].y
+        }
+      })
+      
+      // Calculate group container after positioning nodes
+      const groupNodePositions = groupNodes.map(node => {
+        const layoutNode = layoutNodes.find(n => n.id === node.id)
+        return layoutNode ? { x: layoutNode.x, y: layoutNode.y, radius: layoutNode.radius } : null
+      }).filter(Boolean)
+      
+      if (groupNodePositions.length > 0) {
+        const padding = 100 // Generous padding for group containers
+        const minX = Math.min(...groupNodePositions.map(p => p!.x - p!.radius)) - padding
+        const maxX = Math.max(...groupNodePositions.map(p => p!.x + p!.radius)) + padding
+        const minY = Math.min(...groupNodePositions.map(p => p!.y - p!.radius)) - padding
+        const maxY = Math.max(...groupNodePositions.map(p => p!.y + p!.radius)) + padding
+        
+        groupBoxes.set(groupKey, {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          centerX: (minX + maxX) / 2,
+          centerY: (minY + maxY) / 2
+        })
+      }
+    })
+    
+    // Apply collision resolution and move nodes with their groups
+    const resolvedBoxes = resolveGroupCollisions(groupBoxes, groups, layoutNodes)
+    
+    // Attach resolved group boxes to nodes for rendering
+    ;(layoutNodes as any).groupBoxes = resolvedBoxes
+    
+    return layoutNodes
   }
 
   // Check if two nodes overlap
@@ -1555,10 +1793,10 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
 
   const fitToView = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas || nodesRef.current.length === 0) return
+    if (!canvas || nodesRef.current.length === 0 || canvas.width === 0 || canvas.height === 0) return
 
     const nodes = nodesRef.current
-    const padding = 50
+    const padding = 80
 
     // Calculate bounding box of all nodes
     const minX = Math.min(...nodes.map(n => n.x)) - padding
@@ -1569,10 +1807,13 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     const contentWidth = maxX - minX
     const contentHeight = maxY - minY
 
-    // Calculate scale to fit content
+    // Avoid division by zero
+    if (contentWidth === 0 || contentHeight === 0) return
+
+    // Calculate scale to fit content with more conservative scaling
     const scaleX = canvas.width / contentWidth
     const scaleY = canvas.height / contentHeight
-    const newScale = Math.min(scaleX, scaleY, 2) // Cap at 2x zoom
+    const newScale = Math.max(0.1, Math.min(scaleX, scaleY, 1.5)) // More reasonable scale range
 
     // Calculate offset to center content
     const centerX = (minX + maxX) / 2
@@ -1903,25 +2144,50 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     if (!canvas || !container) return
 
     const resizeCanvas = () => {
-      canvas.width = container.clientWidth
-      canvas.height = container.clientHeight
+      // Force a reflow to get accurate dimensions
+      container.style.width = container.style.width
+      
+      // Get the container dimensions with proper calculations
+      const rect = container.getBoundingClientRect()
+      const computedStyle = window.getComputedStyle(container)
+      
+      // Calculate available space minus padding and borders
+      const paddingX = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight)
+      const paddingY = parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom)
+      const borderX = parseFloat(computedStyle.borderLeftWidth) + parseFloat(computedStyle.borderRightWidth)
+      const borderY = parseFloat(computedStyle.borderTopWidth) + parseFloat(computedStyle.borderBottomWidth)
+      
+      // Set canvas size to fill container
+      const availableWidth = Math.max(600, rect.width - paddingX - borderX)
+      const availableHeight = Math.max(400, rect.height - paddingY - borderY)
+      
+      canvas.width = availableWidth
+      canvas.height = availableHeight
+      
+      // Set CSS size to match
+      canvas.style.width = availableWidth + 'px'
+      canvas.style.height = availableHeight + 'px'
     }
 
     // Prevent page scrolling when interacting with the graph
     const preventScroll = (e: WheelEvent) => {
-      if (canvas && canvas.contains(e.target as Node)) {
+      if (canvas && canvas.contains(e.target as globalThis.Node)) {
         e.preventDefault()
         e.stopPropagation()
       }
     }
 
     const preventTouch = (e: TouchEvent) => {
-      if (canvas && canvas.contains(e.target as Node)) {
+      if (canvas && canvas.contains(e.target as globalThis.Node)) {
         e.preventDefault()
       }
     }
 
     resizeCanvas()
+    // Force initial resize after a short delay to ensure container is rendered
+    setTimeout(resizeCanvas, 100)
+    setTimeout(resizeCanvas, 500)
+    
     window.addEventListener('resize', resizeCanvas)
     document.addEventListener('wheel', preventScroll, { passive: false })
     document.addEventListener('touchmove', preventTouch, { passive: false })
@@ -1936,216 +2202,235 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const relationshipTypes = ['uses', 'inherits', 'contains']
 
   return (
-    <div className="w-full h-full space-y-6">
-      {/* Enhanced Controls Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-        <div className="flex flex-col gap-6">
-          {/* Top Row: Search and Layout Controls */}
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Search:</div>
-              <Input
-                placeholder="Search nodes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
+    <Card 
+      ref={containerRef} 
+      className="w-full h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-xl"
+    >
+      {/* Compact Controls Header */}
+      <CardHeader className="flex flex-col gap-3 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 z-10 shadow-sm">
+        {/* Primary Controls Row */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Search Section */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">🔍</div>
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-32 h-8 text-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
+            />
+          </div>
+          
+          {/* Layout Section */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📐</div>
+            <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
+              <SelectTrigger className="w-32 h-8 text-sm border-slate-300 dark:border-slate-600">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="force">Force</SelectItem>
+                <SelectItem value="hierarchical">Hierarchy</SelectItem>
+                <SelectItem value="circular">Circular</SelectItem>
+                <SelectItem value="grouped">Grouped</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Auto Layout Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={autoLayout}
+            disabled={isAutoLayouting}
+            className="h-8 px-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 text-xs"
+          >
+            <Shuffle className={`h-3 w-3 mr-1 ${isAutoLayouting ? 'animate-spin' : ''}`} />
+            {isAutoLayouting ? 'Organizing...' : 'Auto Layout'}
+          </Button>
+        </div>
+        
+        {/* Secondary Controls Row */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* View Options */}
+          <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showLabels}
+                onChange={(e) => setShowLabels(e.target.checked)}
+                className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
               />
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Layout:</div>
-              <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
-                <SelectTrigger className="w-40">
+              Labels
+            </label>
+            <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showConnectionsOnly}
+                onChange={(e) => setShowConnectionsOnly(e.target.checked)}
+                className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                disabled={!selectedNode}
+              />
+              Connected
+            </label>
+          </div>
+          
+          {/* Line Style Control */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📏</div>
+            <Select value={edgeStyle} onValueChange={(value: any) => setEdgeStyle(value)}>
+              <SelectTrigger className="w-20 h-8 text-xs border-slate-300 dark:border-slate-600">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="straight">Straight</SelectItem>
+                <SelectItem value="curved">Curved</SelectItem>
+                <SelectItem value="step">Step</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Grouping Options */}
+          {layoutMode === 'grouped' && (
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+              <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📦</div>
+              <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
+                <SelectTrigger className="w-20 h-8 text-xs border-slate-300 dark:border-slate-600">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="force">Force-Directed</SelectItem>
-                  <SelectItem value="hierarchical">Hierarchical</SelectItem>
-                  <SelectItem value="circular">Circular</SelectItem>
-                  <SelectItem value="grouped">Grouped</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="file">File</SelectItem>
+                  <SelectItem value="parent">Parent</SelectItem>
                 </SelectContent>
               </Select>
+              <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showGroupContainers}
+                  onChange={(e) => setShowGroupContainers(e.target.checked)}
+                  className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                Boxes
+              </label>
+            </div>
+          )}
+          
+          {/* Spacing Control */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📏</div>
+            <div className="flex items-center gap-2 w-24">
+              <Slider
+                value={[nodeSpacing]}
+                onValueChange={(value) => setNodeSpacing(value[0])}
+                min={150}
+                max={500}
+                step={20}
+                className="flex-1"
+              />
+              <span className="text-xs text-slate-600 dark:text-slate-400 min-w-[2.5rem] font-mono text-center">{nodeSpacing}</span>
             </div>
           </div>
           
-          {/* Middle Row: View Options */}
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={showLabels}
-                  onChange={(e) => setShowLabels(e.target.checked)}
-                  className="rounded"
-                />
-                Show Labels
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={showConnectionsOnly}
-                  onChange={(e) => setShowConnectionsOnly(e.target.checked)}
-                  className="rounded"
-                  disabled={!selectedNode}
-                />
-                Show Connections Only
-              </label>
-              {layoutMode === 'grouped' && (
-                <>
-                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Group by:</div>
-                  <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="file">File</SelectItem>
-                      <SelectItem value="parent">Parent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={showGroupContainers}
-                      onChange={(e) => setShowGroupContainers(e.target.checked)}
-                      className="rounded"
-                    />
-                    Show Containers
-                  </label>
-                </>
-              )}
-            </div>
-            
-            {/* Spacing & Layout Controls */}
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Spacing:</div>
-                <div className="flex items-center gap-3 w-32">
-                  <Slider
-                    value={[nodeSpacing]}
-                    onValueChange={(value) => setNodeSpacing(value[0])}
-                    min={50}
-                    max={300}
-                    step={10}
-                    className="flex-1"
-                  />
-                  <span className="text-xs text-slate-600 dark:text-slate-400 min-w-[2rem]">{nodeSpacing}px</span>
-                </div>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={autoLayout}
-                disabled={isAutoLayouting}
-                className="h-8 px-3 hover:bg-green-50 dark:hover:bg-green-900/20 border-green-200 dark:border-green-800"
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded p-1 border border-slate-300 dark:border-slate-600">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
+                className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                title="Zoom In (+)"
               >
-                <Shuffle className={`h-4 w-4 mr-1 ${isAutoLayouting ? 'animate-spin' : ''}`} />
-                {isAutoLayouting ? 'Layouting...' : 'Auto Layout'}
+                <ZoomIn className="h-3 w-3" />
               </Button>
-              
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Zoom:</div>
-                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
-                    className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                    title="Zoom In (+)"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </Button>
-                  <div className="px-2 py-1 text-sm font-mono text-slate-600 dark:text-slate-400 min-w-[3rem] text-center">
-                    {Math.round(scale * 100)}%
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
-                    className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                    title="Zoom Out (-)"
-                  >
-                    <ZoomOut className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={fitToView}
-                    className="h-8 px-3 hover:bg-green-100 dark:hover:bg-green-900/30"
-                    title="Fit to View (F)"
-                  >
-                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                    Fit
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={resetView}
-                    className="h-8 px-3 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                    title="Reset View (R)"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
-                </div>
+              <div className="px-2 text-xs font-mono text-slate-600 dark:text-slate-400 min-w-[2.5rem] text-center">
+                {Math.round(scale * 100)}%
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
+                className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                title="Zoom Out (-)"
+              >
+                <ZoomOut className="h-3 w-3" />
+              </Button>
             </div>
-          </div>
-          
-          {/* Bottom Row: Relationship Type Filters */}
-          <div className="flex flex-col gap-3">
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Filter Relationships:</div>
-            <div className="flex gap-2 flex-wrap">
-              {relationshipTypes.map(type => (
-                <Badge
-                  key={type}
-                  variant={filteredTypes.has(type) ? "outline" : "default"}
-                  className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                    filteredTypes.has(type) ? 'opacity-50 grayscale' : 'shadow-sm hover:shadow-md'
-                  }`}
-                  onClick={() => toggleFilter(type)}
-                  style={{
-                    backgroundColor: filteredTypes.has(type) ? 'transparent' : getEdgeColor(type, 0.1),
-                    borderColor: getEdgeColor(type, 1),
-                    color: filteredTypes.has(type) ? 'currentColor' : getEdgeColor(type, 1)
-                  }}
-                >
-                  <span className="inline-block w-2 h-2 rounded-full mr-2" 
-                        style={{ backgroundColor: getEdgeColor(type, 1) }}></span>
-                  {type}
-                </Badge>
-              ))}
-            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={fitToView}
+              className="h-6 px-2 hover:bg-green-100 dark:hover:bg-green-900/30 text-xs"
+              title="Fit to View (F)"
+            >
+              Fit
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={resetView}
+              className="h-6 px-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-xs"
+              title="Reset View (R)"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </Button>
           </div>
         </div>
-      </div>
+        
+        {/* Relationship Filters Row */}
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
+          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <Filter className="h-3 w-3" />
+            Filters:
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {relationshipTypes.map(type => (
+              <Badge
+                key={type}
+                variant={filteredTypes.has(type) ? "outline" : "default"}
+                className={`cursor-pointer transition-all duration-200 hover:scale-105 px-2 py-1 text-xs font-medium ${
+                  filteredTypes.has(type) ? 'opacity-50 grayscale bg-slate-100 dark:bg-slate-800' : 'shadow-sm hover:shadow-md'
+                }`}
+                onClick={() => toggleFilter(type)}
+                style={{
+                  backgroundColor: filteredTypes.has(type) ? 'transparent' : getEdgeColor(type, 0.15),
+                  borderColor: getEdgeColor(type, 0.8),
+                  color: filteredTypes.has(type) ? 'currentColor' : getEdgeColor(type, 1)
+                }}
+              >
+                <span className="inline-block w-2 h-2 rounded-full mr-1" 
+                      style={{ backgroundColor: getEdgeColor(type, 1) }}></span>
+                {type}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
       
       {/* Enhanced Graph Container */}
       <div
-        ref={containerRef}
-        className="relative w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700"
+        className="relative w-full flex-1 shadow-lg border border-slate-200 dark:border-slate-700 rounded-xl"
         style={{ 
           background: 'linear-gradient(135deg, rgb(248 250 252) 0%, rgb(255 255 255) 50%, rgb(248 250 252) 100%)',
-          // Dark mode gradient will be handled by CSS
+          overflow: 'hidden',
+          minHeight: '80vh',
+          height: '80vh'
         }}
       >
-        {/* Decorative Grid Background - properly contained with rounded corners */}
-        <div className="absolute inset-0 opacity-30 rounded-xl overflow-hidden">
-          <svg width="100%" height="100%" className="text-slate-300 dark:text-slate-700 rounded-xl">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
-              </pattern>
-              <clipPath id="roundedContainer">
-                <rect width="100%" height="100%" rx="12" ry="12" />
-              </clipPath>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" clipPath="url(#roundedContainer)" />
-          </svg>
-        </div>
+        {/* Enhanced Decorative Grid Background */}
+        <div 
+          className="absolute inset-0 opacity-20 dark:opacity-10"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 25px 25px, rgb(59 130 246 / 0.3) 2px, transparent 2px),
+              linear-gradient(rgb(148 163 184 / 0.2) 1px, transparent 1px), 
+              linear-gradient(90deg, rgb(148 163 184 / 0.2) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px, 50px 50px, 50px 50px',
+            borderRadius: '16px'
+          }}
+        ></div>
         
         <canvas
           ref={canvasRef}
@@ -2155,7 +2440,12 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
           className="w-full h-full relative z-10 cursor-grab active:cursor-grabbing"
-          style={{ touchAction: 'none' }} // Prevent touch scrolling
+          style={{ 
+            touchAction: 'none',
+            display: 'block',
+            width: '100%',
+            height: '100%'
+          }}
         />
         
         {/* Minimap */}
@@ -2231,6 +2521,6 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

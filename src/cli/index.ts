@@ -543,7 +543,7 @@ program.action(async (options: CodeYOptions) => {
   console.log("📚 Generating documentation...");
 
   // Process options
-  const rootDir = path.resolve(options.root);
+  const rootDir = path.resolve(options.root || process.cwd());
   console.log(`Using root directory: ${rootDir}`);
 
   const excludePatterns = options.exclude.split(",");
@@ -1009,7 +1009,7 @@ program
     console.log("📚 Generating documentation...");
 
     // Process options
-    const rootDir = path.resolve(options.root);
+    const rootDir = path.resolve(options.root || process.cwd());
     console.log(`Using root directory: ${rootDir}`);
 
     let excludePatterns = options.exclude.split(",");
@@ -1617,7 +1617,7 @@ program
     try {
       console.log("🏗️  Building static documentation...");
       
-      const rootDir = path.resolve(options.root);
+      const rootDir = path.resolve(options.root || process.cwd());
       const outputDir = path.resolve(rootDir, options.output);
       
       // Check if documentation has been generated

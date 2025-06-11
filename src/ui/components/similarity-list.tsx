@@ -1,11 +1,22 @@
 "use client"
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 import Link from "next/link"
 import { ComparisonModal } from "./comparison-modal"
 import { ArrowRightIcon } from "@radix-ui/react-icons"
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table"
+import { Progress } from "./ui/progress"
+import { Input } from "./ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 
 interface SimilarityListProps {
   threshold: number
@@ -60,6 +71,7 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
   }[]>([])
   const [loading, setLoading] = useState(!preloadedComponents)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Example method that demonstrates the functionality
   // This is intentionally similar to methods in other components for testing
@@ -503,6 +515,21 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
     });
   }, [components, threshold])
 
+  const filteredComponents = useMemo(() => {
+    if (!searchTerm) {
+      return similarComponents
+    }
+    return similarComponents.filter((item) => {
+      const lowerCaseSearch = searchTerm.toLowerCase()
+      return (
+        item.pair[0].toLowerCase().includes(lowerCaseSearch) ||
+        item.pair[1].toLowerCase().includes(lowerCaseSearch) ||
+        (item.method1 && item.method1.toLowerCase().includes(lowerCaseSearch)) ||
+        (item.method2 && item.method2.toLowerCase().includes(lowerCaseSearch))
+      )
+    })
+  }, [similarComponents, searchTerm])
+
   const handleCompare = (item: {
     component1: ComponentData
     component2: ComponentData
@@ -583,121 +610,97 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
 
   if (loading) {
     return (
-      <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
-        <p className="text-lg">Loading similarity data...</p>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-lg text-muted-foreground">Analyzing similarities...</p>
       </div>
     )
   }
 
   if (error) {
-    return (
-      <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-red-300">
-        <p className="text-lg text-red-600">{error}</p>
-        <p className="text-sm text-muted-foreground mt-2">Check console for more details.</p>
-      </div>
-    )
+    return <p className="text-red-500">Error: {error}</p>
   }
 
   if (similarComponents.length === 0) {
     return (
-      <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
-        <p className="text-lg text-muted-foreground">No similar components found at {threshold}% threshold.</p>
-        <p className="text-sm text-muted-foreground mt-2">Try lowering the threshold to see more results.</p>
-      </div>
+      <Card className="shadow-md bg-white dark:bg-slate-900">
+        <CardContent className="p-6 text-center">
+          <h3 className="text-lg font-medium">No Similarities Found</h3>
+          <p className="text-muted-foreground mt-2">
+            No component similarities were found above the selected threshold.
+          </p>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <>
-      <div className="space-y-8">
-        {similarComponents.map((item, index) => (
-          <div key={index} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-medium">{item.pair[0]}</span>
-                  {item.isMethodLevel && (
-                    <span className="text-sm text-muted-foreground">.{item.method1}</span>
-                  )}
-                </div>
-                <ArrowRightIcon className="h-4 w-4 text-muted-foreground" />
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-medium">{item.pair[1]}</span>
-                  {item.isMethodLevel && (
-                    <span className="text-sm text-muted-foreground">.{item.method2}</span>
-                  )}
-                </div>
-                <Badge
-                  className={`ml-2 ${item.component1.code && item.component2.code &&
-                    item.component1.code.trim().replace(/\s+/g, ' ') === item.component2.code.trim().replace(/\s+/g, ' ')
-                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
-                    : item.similarity >= 80
-                      ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-                      : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
-                    }`}
-                >
-                  {item.component1.code && item.component2.code &&
-                    item.component1.code.trim().replace(/\s+/g, ' ') === item.component2.code.trim().replace(/\s+/g, ' ')
-                    ? "Identical Components"
-                    : `${item.similarity}% Similar`}
-                </Badge>
-                {item.isMethodLevel && (
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
-                    Method Level
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="p-6">
-              <p className="mb-6 text-lg">{item.reason}</p>
-              <div className="flex gap-3 flex-wrap">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/components/${item.component1.slug || item.pair[0].toLowerCase()}`}>View {item.pair[0]}</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/components/${item.component2.slug || item.pair[1].toLowerCase()}`}>View {item.pair[1]}</Link>
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700"
-                  onClick={() => handleCompare(item)}
-                >
-                  Compare Components
-                </Button>
-              </div>
-            </div>
-          </div>
-        ))}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">
+          Found {filteredComponents.length} Similar Pairs
+        </h2>
+        <div className="w-1/3">
+          <Input
+            placeholder="Filter by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
       </div>
-
-      {selectedPair && (
-        <ComparisonModal
-          key={`comparison-${selectedPair.component1.name}-${selectedPair.component2.name}`}
-          isOpen={comparisonOpen}
-          onClose={() => setComparisonOpen(false)}
-          component1={{
-            name: selectedPair.component1.name,
-            code: selectedPair.component1.code,
-            filePath: selectedPair.component1.filePath,
-          }}
-          component2={{
-            name: selectedPair.component2.name,
-            code: selectedPair.component2.code,
-            filePath: selectedPair.component2.filePath,
-          }}
-          similarityScore={selectedPair.similarity}
-          isMethodComparison={!!similarComponents.find(item =>
-            item.isMethodLevel &&
-            item.component1.name === selectedPair.component1.name &&
-            item.component2.name === selectedPair.component2.name
-          )}
-          methodName={similarComponents.find(item =>
-            item.isMethodLevel &&
-            item.component1.name === selectedPair.component1.name &&
-            item.component2.name === selectedPair.component2.name
-          )?.method1}
-        />
-      )}
-    </>
+      <Card className="shadow-md bg-white dark:bg-slate-900">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-2/5">Component / Method</TableHead>
+                <TableHead className="w-1/5 text-center">Similarity</TableHead>
+                <TableHead className="w-2/5">Reason</TableHead>
+                <TableHead className="w-1/5 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredComponents.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <div className="font-medium">
+                      {item.isMethodLevel ? `${item.component1.name} :: ${item.method1}` : item.component1.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      vs {item.isMethodLevel ? `${item.component2.name} :: ${item.method2}` : item.component2.name}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Progress value={item.similarity} className="w-20" />
+                      <span className="font-semibold">{item.similarity.toFixed(0)}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-sm truncate">{item.reason}</p>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCompare(item)}
+                    >
+                      Compare
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      {selectedPair && <ComparisonModal
+        isOpen={comparisonOpen}
+        onClose={() => setComparisonOpen(false)}
+        component1={selectedPair.component1}
+        component2={selectedPair.component2}
+        similarityScore={selectedPair.similarity}
+      />}
+    </div>
   )
 }

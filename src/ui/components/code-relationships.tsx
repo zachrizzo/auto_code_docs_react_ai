@@ -13,6 +13,7 @@ import { ArrowRightIcon } from "@radix-ui/react-icons"
 import { InteractiveGraph } from "./interactive-graph"
 import { CodeBlock } from "./code-block"
 import { McpServerControl } from "./mcp-server-control"
+import { CodeSimilaritySearch } from "./code-similarity-search"
 
 // Define types locally
 export interface CodeEntity {
@@ -462,9 +463,9 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
           id: comp.id,
           name: comp.name,
           type: comp.type as 'component' | 'class' | 'function' | 'method',
-          x: Math.random() * 600 + 100,
-          y: Math.random() * 400 + 100,
-          radius: Math.max(20, Math.min(40, 20 + connections * 3)),
+          x: Math.random() * 1200 + 300,
+          y: Math.random() * 800 + 200,
+          radius: Math.max(25, Math.min(45, 25 + connections * 2)),
           color: '',
           connections,
           filePath: comp.filePath
@@ -574,6 +575,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   return (
     <div className="space-y-6 pb-16">
       <McpServerControl />
+      <CodeSimilaritySearch />
 
       {/* Statistics Panel */}
       {filteredRelationships.length > 0 && (
@@ -657,7 +659,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             )}
           </div>
         ) : graphView === "graph" ? (
-          <div className="h-[calc(100vh-450px)] min-h-[600px] max-h-[800px]">
+          <div className="h-[85vh] w-full min-h-[700px]">
             <InteractiveGraph
               nodes={graphNodes}
               edges={graphEdges}

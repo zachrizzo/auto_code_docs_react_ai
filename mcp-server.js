@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const stringSimilarity = require('string-similarity');
 
 const app = express();
 const port = 6270;
@@ -52,21 +53,55 @@ app.get('/entity/:slug', async (req, res) => {
     }
 });
 
-// Placeholder for code similarity
-app.post('/similarity', (req, res) => {
-    const { code } = req.body;
+async function getAllEntities() {
+    const indexFile = await fs.readFile(path.join(DOCS_PATH, 'component-index.json'), 'utf-8');
+    const indexData = JSON.parse(indexFile);
+    
+    const entities = await Promise.all(indexData.map(async (item) => {
+        try {
+            const entityFile = await fs.readFile(path.join(DOCS_PATH, `${item.slug}.json`), 'utf-8');
+            return JSON.parse(entityFile);
+        } catch (e) {
+            return null; // Handle cases where a file might be missing
+        }
+    }));
+    return entities.filter(e => e !== null);
+}
+
+// Endpoint for code similarity
+app.post('/similarity', async (req, res) => {
+    const { code, limit = 5 } = req.body;
     if (!code) {
         return res.status(400).json({ error: 'Code snippet is required' });
     }
-    // In a real implementation, this would involve vectorizing the code
-    // and comparing it against a vector database of the codebase.
-    res.json({
-        message: 'Similarity feature not implemented yet.',
-        similar_functions: [
-            { name: 'dummyFunction1', similarity: 0.9, path: 'src/utils/dummy1.ts' },
-            { name: 'dummyFunction2', similarity: 0.8, path: 'src/utils/dummy2.ts' }
-        ]
-    });
+
+    try {
+        const allEntities = await getAllEntities();
+        
+        const entitiesWithCode = allEntities.filter(e => e.code && typeof e.code === 'string' && e.code.length > 20);
+
+        if (entitiesWithCode.length === 0) {
+            return res.json({ message: 'No code found in the documentation to compare against.' });
+        }
+        
+        const comparisons = entitiesWithCode.map(entity => {
+            const similarity = stringSimilarity.compareTwoStrings(code, entity.code);
+            return {
+                name: entity.name,
+                similarity: similarity,
+                path: entity.filePath || entity.route,
+                id: entity.slug
+            };
+        });
+
+        const sortedComparisons = comparisons.sort((a, b) => b.similarity - a.similarity);
+        
+        res.json(sortedComparisons.slice(0, limit));
+
+    } catch (error) {
+        console.error('Error in similarity endpoint:', error);
+        res.status(500).json({ error: 'Failed to calculate similarity' });
+    }
 });
 
 // Placeholder for code completion

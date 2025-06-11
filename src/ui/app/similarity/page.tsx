@@ -142,7 +142,7 @@ export default function SimilarityPage() {
   }
 
   return (
-    <div className="container max-w-5xl py-12">
+    <div className="container max-w-7xl py-12">
       <div className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight">Component Similarity</h1>
         <p className="text-muted-foreground text-xl mt-2">
@@ -150,23 +150,38 @@ export default function SimilarityPage() {
         </p>
       </div>
 
-      <Card className="mb-10 border-none shadow-md bg-white dark:bg-slate-900">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-6">
-            <h3 className="text-lg font-medium">Similarity Threshold</h3>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">{threshold}%</span>
-              <span className="text-sm text-muted-foreground">Higher values show fewer, more similar matches</span>
-            </div>
-            <Slider value={threshold} onValueChange={setThreshold} min={50} max={95} step={5} className="py-4" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="md:col-span-1">
+          <Card className="sticky top-24 border-none shadow-md bg-white dark:bg-slate-900">
+            <CardContent className="p-6">
+              <div className="flex flex-col gap-6">
+                <h3 className="text-lg font-medium">Similarity Threshold</h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold">{threshold}%</span>
+                  <span className="text-sm text-muted-foreground">
+                    Higher values show fewer, more similar matches
+                  </span>
+                </div>
+                <Slider
+                  value={threshold}
+                  onValueChange={setThreshold}
+                  min={50}
+                  max={95}
+                  step={5}
+                  className="py-4"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <SimilarityList
-        threshold={threshold[0]}
-        preloadedComponents={componentsData}
-      />
+        <div className="md:col-span-3">
+          <SimilarityList
+            threshold={threshold[0]}
+            preloadedComponents={componentsData}
+          />
+        </div>
+      </div>
     </div>
   )
 }
