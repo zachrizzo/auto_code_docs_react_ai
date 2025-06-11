@@ -17,12 +17,16 @@ export async function generateDocUI(components: any[], options: any = {}) {
     showSimilarity = true,
   } = options;
 
-  // Ensure the output directory exists
-  await fs.ensureDir(outputDir);
-
   // Write component data directly to the specified outputDir
   // rather than creating a nested docs-data folder
   const docsDataDir = outputDir;
+
+  // Clear the output directory to prevent duplicates from previous runs
+  if (await fs.pathExists(docsDataDir)) {
+    await fs.remove(docsDataDir);
+  }
+  // Ensure the output directory exists (it will be recreated if removed)
+  await fs.ensureDir(docsDataDir);
 
   // Create component index file
   const componentIndex = components.map((comp) => ({

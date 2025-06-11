@@ -7,12 +7,12 @@ import path from "path";
 import fs from "fs-extra";
 import { glob } from "glob";
 import * as reactDocgen from "react-docgen-typescript";
-import { ComponentDefinition, ParserOptions, CodeItem } from "../types";
+import { ComponentDefinition, ParserOptions, CodeItem, EntityDeclaration } from "../types";
 import { findTsConfig, debug } from "./file-utils";
 import { parseSingleComponentFile } from "./component-parser";
 import { processComponentListSimilarities } from "./similarity";
 import { VectorSimilarityService } from "../../ai/vector-similarity/vector-similarity";
-import { extractAllTopLevelCodeItems } from "./ast-utils";
+import { extractAllTopLevelCodeItems, extractAllEntities, extractEntityDeclarations } from "./ast-utils";
 
 /**
  * Recursively parse React components starting from the root component.
@@ -103,8 +103,17 @@ export async function parseComponents(
     ? reactDocgen.withCustomConfig(tsconfigPath, parserOptions)
     : reactDocgen.withDefaultConfig(parserOptions);
 
-  // Parse components
-  debug(`Starting component parsing with react-docgen-typescript...`);
+  // First pass: Extract all available entities for relationship validation
+  debug(`First pass: Extracting all entities...`);
+  const availableEntities = await extractAllEntities(
+    absoluteRootDir,
+    includePatterns,
+    excludePatterns
+  );
+  debug(`Found ${availableEntities.size} entities in codebase`);
+
+  // Parse components with entity validation
+  debug(`Second pass: Starting component parsing with react-docgen-typescript...`);
   const allParsedComponents = await parseSingleComponentFile(
     {
       rootDir,
@@ -112,6 +121,7 @@ export async function parseComponents(
       excludePatterns,
       includePatterns,
       maxDepth,
+      availableEntities,
     },
     parser
   );
@@ -137,6 +147,55 @@ export async function parseComponents(
 }
 
 
+
+/**
+ * Build a map of all entity declarations in the codebase
+ * @param rootDir - Root directory to scan
+ * @param includePatterns - Patterns to include
+ * @param excludePatterns - Patterns to exclude
+ * @returns Map of entity slug to declaration info
+ */
+export async function buildEntityDeclarationMap(
+  rootDir: string,
+  includePatterns: string[] = ["**/*.tsx", "**/*.jsx", "**/*.js", "**/*.ts"],
+  excludePatterns: string[] = ["node_modules/**", "**/node_modules/**"]
+): Promise<Map<string, EntityDeclaration>> {
+  const entityMap = new Map<string, EntityDeclaration>();
+  
+  try {
+    const files = await glob(includePatterns, {
+      cwd: rootDir,
+      ignore: excludePatterns,
+      absolute: true
+    });
+    
+    for (const filePath of files) {
+      try {
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const declarations = extractEntityDeclarations(fileContent, filePath);
+        
+        // Add each declaration to the map
+        declarations.forEach(decl => {
+          // If we already have this entity, prefer exported versions
+          const existing = entityMap.get(decl.entitySlug);
+          if (!existing || 
+              (decl.exportType !== 'none' && existing.exportType === 'none') ||
+              (decl.exportType === 'default' && existing.exportType === 'named')) {
+            entityMap.set(decl.entitySlug, decl);
+          }
+        });
+      } catch (error) {
+        debug(`Error processing file ${filePath}:`, error);
+      }
+    }
+    
+    debug(`Built entity map with ${entityMap.size} entities`);
+    return entityMap;
+  } catch (error) {
+    console.error('Error building entity declaration map:', error);
+    return entityMap;
+  }
+}
 
 /**
  * Parse all top-level functions and classes in all JS/TS files in a directory tree (excluding node_modules)

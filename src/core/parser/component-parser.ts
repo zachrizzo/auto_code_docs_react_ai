@@ -6,10 +6,11 @@
 import * as reactDocgen from "react-docgen-typescript";
 import * as path from "path";
 import * as fs from "fs-extra";
-import { ComponentDefinition, PropDefinition } from "../types";
+import * as ts from "typescript";
+import { ComponentDefinition, PropDefinition, EntityDeclaration } from "../types";
 import { debug, extractImportedComponentPaths, shouldIncludeFile } from "./file-utils";
-import { extractComponentMethods, extractComponentSourceCode } from "./ast-utils";
-import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships } from "./relationship-extractor";
+import { extractComponentMethods, extractComponentSourceCode, extractEntityDeclarations } from "./ast-utils";
+import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages } from "./relationship-extractor";
 
 /**
  * Parse a single component file to extract component definitions.
@@ -23,7 +24,8 @@ import { extractImports, extractComponentReferences, extractInheritance, extract
 export function parseComponentFile(
   filePath: string,
   rootDir: string,
-  parser: reactDocgen.FileParser
+  parser: reactDocgen.FileParser,
+  availableEntities?: Set<string>
 ): ComponentDefinition[] {
   try {
     debug(`Parsing component file: ${filePath}`);
@@ -67,23 +69,62 @@ export function parseComponentFile(
       // The full fileContent will be used for componentDef.sourceCode
       // const sourceCode = extractComponentSourceCode(fileContent, componentName); // This line is no longer needed for componentDef.sourceCode
 
-      // Extract relationships data
-      const imports = extractImports(fileContent);
-      const references = extractComponentReferences(fileContent);
-      const inheritance = extractInheritance(fileContent);
-      const methodCalls = extractMethodCalls(fileContent);
-      
       // Generate slug for the component
       const slug = componentName.toLowerCase().replace(/\s+/g, "-");
       
-      // Generate relationships
+      // Extract entity usages instead of individual relationship types
+      const usages = extractEntityUsages(fileContent, filePath, slug, availableEntities);
+      
+      // Extract declaration info for this component
+      const declarations = extractEntityDeclarations(fileContent, filePath);
+      const thisDeclaration = declarations.find(d => d.entityName === componentName);
+      
+      // For backward compatibility, still generate relationships
+      const imports = extractImports(fileContent);
+      const references = extractComponentReferences(fileContent);
+      const inheritance = extractInheritance(fileContent);
+      const methodCalls = extractMethodCalls(fileContent, filePath, slug, availableEntities);
+      
       const relationships = generateRelationships(
         slug,
         imports,
         references,
         inheritance,
-        methodCalls
+        methodCalls,
+        availableEntities
       );
+
+      // Find component declaration line numbers
+      let declarationLineStart: number | undefined = undefined;
+      let declarationLineEnd: number | undefined = undefined;
+
+      const sourceFile = ts.createSourceFile(filePath, fileContent, ts.ScriptTarget.Latest, true);
+
+      function findComponentNode(node: ts.Node) {
+        if (declarationLineStart !== undefined) return; // Already found
+
+        if (ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node)) {
+          if (node.name && node.name.getText(sourceFile) === componentName) {
+            declarationLineStart = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+            declarationLineEnd = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+            return;
+          }
+        }
+        // Handle const MyComponent = () => { ... }
+        if (ts.isVariableStatement(node)) {
+          for (const decl of node.declarationList.declarations) {
+            if (ts.isIdentifier(decl.name) && decl.name.getText(sourceFile) === componentName) {
+              if (decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
+                declarationLineStart = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+                declarationLineEnd = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+                return;
+              }
+            }
+          }
+        }
+        ts.forEachChild(node, findComponentNode);
+      }
+      ts.forEachChild(sourceFile, findComponentNode);
 
       // Create component definition
       const componentDef: ComponentDefinition = {
@@ -101,7 +142,11 @@ export function parseComponentFile(
         slug,
         imports,
         references,
-        relationships
+        relationships,
+        declarationLineStart,
+        declarationLineEnd,
+        declaration: thisDeclaration,
+        usages
       };
 
       debug(`Added component: ${componentName} with ${methods.length} methods`);
@@ -137,7 +182,8 @@ export async function collectComponentsRecursively(
   depth: number,
   maxDepth: number,
   processedPaths: Set<string>,
-  collectedComponents: ComponentDefinition[]
+  collectedComponents: ComponentDefinition[],
+  availableEntities?: Set<string>
 ): Promise<void> {
   debug(`Collecting component at depth ${depth}: ${componentPath}`);
 
@@ -182,7 +228,8 @@ export async function collectComponentsRecursively(
           depth + 1,
           maxDepth,
           processedPaths,
-          collectedComponents
+          collectedComponents,
+          availableEntities
         );
       }
     } 
@@ -195,7 +242,7 @@ export async function collectComponentsRecursively(
         debug(`Parsing file: ${relativePath}`);
         
         // Parse the current file
-        const components = parseComponentFile(componentPath, rootDir, parser);
+        const components = parseComponentFile(componentPath, rootDir, parser, availableEntities);
         
         // Add components to the collection
         for (const component of components) {
@@ -255,7 +302,8 @@ export async function collectComponentsRecursively(
             depth + 1,
             maxDepth,
             processedPaths,
-            collectedComponents
+            collectedComponents,
+            availableEntities
           );
         }
       } else {
@@ -285,6 +333,7 @@ export async function parseSingleComponentFile(
     excludePatterns?: string[];
     includePatterns?: string[];
     maxDepth?: number;
+    availableEntities?: Set<string>;
   },
   parserInstance: reactDocgen.FileParser
 ): Promise<ComponentDefinition[]> {
@@ -294,6 +343,7 @@ export async function parseSingleComponentFile(
     excludePatterns = [],
     includePatterns = ["**/*.tsx", "**/*.jsx", "**/*.js", "**/*.ts"],
     maxDepth = Infinity,
+    availableEntities,
   } = options;
 
   // Resolve absolute paths
@@ -313,7 +363,8 @@ export async function parseSingleComponentFile(
     0, // Start depth at 0
     maxDepth,
     new Set(), // New set for each file parse to handle its own recursion tracking
-    collectedComponents
+    collectedComponents,
+    availableEntities
   );
 
   debug(

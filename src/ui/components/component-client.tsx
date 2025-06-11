@@ -379,7 +379,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
         
         <TabsContent value="relationships">
           <div className="space-y-8">
-            <CodeRelationships entityId={slug.toLowerCase()} entityType="component" />
+            <CodeRelationships entityId={slug.toLowerCase()} />
             <CodeGraph entityId={slug.toLowerCase()} />
           </div>
         </TabsContent>

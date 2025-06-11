@@ -5,7 +5,6 @@
 
 import * as ts from "typescript";
 import * as path from "path";
-import { Relationship } from "../../ui/types/code-entities";
 
 /**
  * Extract imports from a file using TypeScript AST
@@ -30,21 +29,47 @@ export function extractImports(fileContent: string): string[] {
         if (ts.isStringLiteral(moduleSpecifier)) {
           const importPath = moduleSpecifier.text;
           
-          // Skip node_modules imports and relative paths with file extensions
+          // Skip node_modules imports and style files
           if (!importPath.includes('node_modules') && 
-              importPath.startsWith('.') && 
               !importPath.endsWith('.css') && 
               !importPath.endsWith('.scss') && 
-              !importPath.endsWith('.less')) {
+              !importPath.endsWith('.less') &&
+              !importPath.endsWith('.svg') &&
+              !importPath.endsWith('.png') &&
+              !importPath.endsWith('.jpg') &&
+              !importPath.endsWith('.jpeg')) {
             
-            // Extract component name from the import path
-            const componentName = path.basename(importPath, path.extname(importPath));
+            // Handle different import patterns
+            if (node.importClause) {
+              // Named imports: import { Component } from './Component'
+              if (node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+                node.importClause.namedBindings.elements.forEach(element => {
+                  const importName = element.name.text;
+                  if (!imports.includes(importName) && /^[A-Z]/.test(importName)) {
+                    imports.push(importName);
+                  }
+                });
+              }
+              // Default import: import Component from './Component'
+              else if (node.importClause.name) {
+                const importName = node.importClause.name.text;
+                if (!imports.includes(importName) && /^[A-Z]/.test(importName)) {
+                  imports.push(importName);
+                }
+              }
+            }
             
-            // Add the component name to imports if it's not already there
-            if (!imports.includes(componentName) && 
-                componentName !== 'index' && 
-                componentName.length > 0) {
-              imports.push(componentName);
+            // Also extract from the path if it's a relative import
+            if (importPath.startsWith('.')) {
+              const componentName = path.basename(importPath, path.extname(importPath));
+              
+              // Add the component name if it looks like a component (PascalCase)
+              if (!imports.includes(componentName) && 
+                  componentName !== 'index' && 
+                  componentName.length > 0 &&
+                  /^[A-Z]/.test(componentName)) {
+                imports.push(componentName);
+              }
             }
           }
         }
@@ -69,6 +94,8 @@ export function extractImports(fileContent: string): string[] {
  */
 export function extractComponentReferences(fileContent: string): string[] {
   const references: string[] = [];
+  const seenComponents = new Set<string>();
+  
   try {
     const sourceFile = ts.createSourceFile(
       "temp.tsx",
@@ -78,15 +105,45 @@ export function extractComponentReferences(fileContent: string): string[] {
     );
 
     function visit(node: ts.Node) {
-      // Check for JSX elements with PascalCase tag names (likely components)
+      // Check for JSX elements (both opening and self-closing)
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-        const tagName = node.tagName.getText(sourceFile);
+        let tagName = '';
+        
+        // Handle different tag name types
+        if (ts.isIdentifier(node.tagName)) {
+          tagName = node.tagName.text;
+        } else if (ts.isPropertyAccessExpression(node.tagName)) {
+          // Handle namespaced components like React.Fragment
+          tagName = node.tagName.name.text;
+        }
         
         // Only include PascalCase component names (React convention)
-        if (/^[A-Z][A-Za-z0-9]*$/.test(tagName) && 
-            !references.includes(tagName) && 
-            !['Fragment', 'React'].includes(tagName)) {
+        if (tagName && 
+            /^[A-Z][A-Za-z0-9]*$/.test(tagName) && 
+            !seenComponents.has(tagName) &&
+            !['Fragment', 'React', 'Component', 'PureComponent'].includes(tagName)) {
+          seenComponents.add(tagName);
           references.push(tagName);
+        }
+      }
+      
+      // Also check for components passed as props or used in expressions
+      if (ts.isIdentifier(node) && /^[A-Z][A-Za-z0-9]*$/.test(node.text)) {
+        const parent = node.parent;
+        
+        // Check if this is a component being passed as a prop
+        if (parent && (
+          ts.isPropertyAssignment(parent) ||
+          ts.isJsxAttribute(parent) ||
+          ts.isCallExpression(parent) ||
+          ts.isArrayLiteralExpression(parent)
+        )) {
+          const componentName = node.text;
+          if (!seenComponents.has(componentName) &&
+              !['Fragment', 'React', 'Component', 'PureComponent', 'Array', 'Object', 'String', 'Number', 'Boolean', 'Date', 'Error', 'Promise'].includes(componentName)) {
+            seenComponents.add(componentName);
+            references.push(componentName);
+          }
         }
       }
       
@@ -105,10 +162,20 @@ export function extractComponentReferences(fileContent: string): string[] {
  * Extract method calls from a file
  * 
  * @param fileContent - The content of the file
+ * @param filePath - Path to the source file
+ * @param callingEntitySlug - Slug of the calling entity
+ * @param availableEntities - Set of available entity slugs to validate against
  * @returns Array of called method names
  */
-export function extractMethodCalls(fileContent: string): string[] {
-  const methodCalls: string[] = [];
+export function extractMethodCalls(
+  fileContent: string, 
+  filePath: string, 
+  callingEntitySlug: string,
+  availableEntities?: Set<string>
+): MethodCallInfo[] {
+  const methodCalls: MethodCallInfo[] = [];
+  const seenCalls = new Set<string>(); // Prevent duplicates
+  
   try {
     const sourceFile = ts.createSourceFile(
       "temp.tsx",
@@ -117,19 +184,74 @@ export function extractMethodCalls(fileContent: string): string[] {
       true
     );
 
+    // Built-in objects and functions to ignore
+    const builtInObjects = new Set([
+      'console', 'document', 'window', 'Array', 'Object', 'String', 'Math', 
+      'React', 'this', 'super', 'process', 'Buffer', 'global', 'Date', 
+      'Error', 'Promise', 'Set', 'Map', 'WeakSet', 'WeakMap', 'Symbol',
+      'JSON', 'Number', 'Boolean', 'RegExp', 'Infinity', 'NaN', 'undefined'
+    ]);
+    
+    const builtInFunctions = new Set([
+      'parseInt', 'parseFloat', 'setTimeout', 'setInterval', 'clearTimeout', 
+      'clearInterval', 'require', 'import', 'eval', 'isNaN', 'isFinite',
+      'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
+      'alert', 'confirm', 'prompt', 'toString', 'valueOf', 'hasOwnProperty',
+      'propertyIsEnumerable', 'isPrototypeOf', 'toLocaleString'
+    ]);
+
     function visit(node: ts.Node) {
-      // Look for property access expressions that might be method calls
-      if (ts.isCallExpression(node) && 
-          ts.isPropertyAccessExpression(node.expression)) {
+      // Look for call expressions
+      if (ts.isCallExpression(node)) {
+        let targetEntitySlug: string | undefined;
+        let targetMethodName: string | undefined;
         
-        const objectName = node.expression.expression.getText(sourceFile);
-        const methodName = node.expression.name.getText(sourceFile);
+        // Handle property access expressions (e.g., object.method())
+        if (ts.isPropertyAccessExpression(node.expression)) {
+          const objectName = node.expression.expression.getText(sourceFile).trim();
+          targetMethodName = node.expression.name.getText(sourceFile).trim();
+          
+          // Skip built-in methods, local variables, and common patterns
+          if (!builtInObjects.has(objectName) && 
+              !objectName.startsWith('_') && // Skip private variables
+              !/^[a-z]/.test(objectName) && // Skip camelCase variables (likely local)
+              objectName.length > 1) {
+            
+            // Convert PascalCase component names to slug format
+            targetEntitySlug = objectName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+          }
+        }
+        // Handle direct function calls (e.g., functionName())
+        else if (ts.isIdentifier(node.expression)) {
+          const functionName = node.expression.getText(sourceFile).trim();
+          
+          // Only consider PascalCase function names (likely components/classes)
+          if (!builtInFunctions.has(functionName) && 
+              /^[A-Z][A-Za-z0-9]*$/.test(functionName) && 
+              functionName.length > 1) {
+            
+            targetEntitySlug = functionName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+            targetMethodName = functionName;
+          }
+        }
         
-        // Skip built-in methods and common utility methods
-        if (!['console', 'document', 'window', 'Array', 'Object', 'String', 'Math'].includes(objectName)) {
-          const methodCall = `${objectName}.${methodName}`;
-          if (!methodCalls.includes(methodCall)) {
-            methodCalls.push(methodCall);
+        // Validate the relationship
+        if (targetEntitySlug && 
+            targetEntitySlug !== callingEntitySlug &&
+            (!availableEntities || availableEntities.has(targetEntitySlug))) {
+          
+          const callKey = `${callingEntitySlug}->${targetEntitySlug}:${targetMethodName}`;
+          if (!seenCalls.has(callKey)) {
+            seenCalls.add(callKey);
+            
+            const callInfo: MethodCallInfo = {
+              callingEntitySlug: callingEntitySlug,
+              targetEntitySlug: targetEntitySlug,
+              targetMethodName: targetMethodName,
+              sourceFile: filePath,
+              sourceLine: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+            };
+            methodCalls.push(callInfo);
           }
         }
       }
@@ -166,26 +288,60 @@ export function extractInheritance(fileContent: string): { extends: string[], im
     );
 
     function visit(node: ts.Node) {
+      // Check class declarations
       if (ts.isClassDeclaration(node)) {
-        // Check for class extension
         if (node.heritageClauses) {
           for (const clause of node.heritageClauses) {
             if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
               for (const type of clause.types) {
                 const extendedClass = type.expression.getText(sourceFile);
-                if (!inheritance.extends.includes(extendedClass)) {
-                  inheritance.extends.push(extendedClass);
+                // Clean up the name (remove generics, namespaces)
+                const cleanName = extendedClass.split('<')[0].split('.').pop() || extendedClass;
+                if (!inheritance.extends.includes(cleanName)) {
+                  inheritance.extends.push(cleanName);
                 }
               }
             } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
               for (const type of clause.types) {
                 const implementedInterface = type.expression.getText(sourceFile);
-                if (!inheritance.implements.includes(implementedInterface)) {
-                  inheritance.implements.push(implementedInterface);
+                const cleanName = implementedInterface.split('<')[0].split('.').pop() || implementedInterface;
+                if (!inheritance.implements.includes(cleanName)) {
+                  inheritance.implements.push(cleanName);
                 }
               }
             }
           }
+        }
+      }
+      
+      // Check interface declarations that extend other interfaces
+      if (ts.isInterfaceDeclaration(node)) {
+        if (node.heritageClauses) {
+          for (const clause of node.heritageClauses) {
+            if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+              for (const type of clause.types) {
+                const extendedInterface = type.expression.getText(sourceFile);
+                const cleanName = extendedInterface.split('<')[0].split('.').pop() || extendedInterface;
+                if (!inheritance.extends.includes(cleanName)) {
+                  inheritance.extends.push(cleanName);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Check type aliases that extend/intersect with other types
+      if (ts.isTypeAliasDeclaration(node) && node.type) {
+        if (ts.isIntersectionTypeNode(node.type)) {
+          node.type.types.forEach(type => {
+            if (ts.isTypeReferenceNode(type) && ts.isIdentifier(type.typeName)) {
+              const typeName = type.typeName.text;
+              if (/^[A-Z]/.test(typeName) && !inheritance.extends.includes(typeName)) {
+                inheritance.extends.push(typeName);
+              }
+            }
+          });
         }
       }
       
@@ -201,6 +357,129 @@ export function extractInheritance(fileContent: string): { extends: string[], im
 }
 
 /**
+ * Extract all entity usages from a file
+ * 
+ * @param fileContent - The content of the file
+ * @param filePath - Path to the file
+ * @param currentEntitySlug - Slug of the current entity being analyzed
+ * @param availableEntities - Set of available entity slugs
+ * @returns Array of entity usages
+ */
+export function extractEntityUsages(
+  fileContent: string,
+  filePath: string,
+  currentEntitySlug: string,
+  availableEntities?: Set<string>
+): EntityUsage[] {
+  const usages: EntityUsage[] = [];
+  const seenUsages = new Set<string>();
+  
+  try {
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      fileContent,
+      ts.ScriptTarget.Latest,
+      true
+    );
+
+    // Extract imports as usages
+    const imports = extractImports(fileContent);
+    imports.forEach(importName => {
+      const slug = importName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+      if (!availableEntities || availableEntities.has(slug)) {
+        const key = `import:${slug}`;
+        if (!seenUsages.has(key)) {
+          seenUsages.add(key);
+          usages.push({
+            entitySlug: slug,
+            usedInFile: filePath,
+            usedByEntity: currentEntitySlug,
+            usageType: 'import',
+            usageLine: 1 // TODO: Get actual import line
+          });
+        }
+      }
+    });
+
+    // Extract component references (JSX usage) as usages
+    const references = extractComponentReferences(fileContent);
+    references.forEach(refName => {
+      const slug = refName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+      if (!availableEntities || availableEntities.has(slug)) {
+        const key = `render:${slug}`;
+        if (!seenUsages.has(key)) {
+          seenUsages.add(key);
+          usages.push({
+            entitySlug: slug,
+            usedInFile: filePath,
+            usedByEntity: currentEntitySlug,
+            usageType: 'render',
+            usageLine: 1 // TODO: Get actual usage line
+          });
+        }
+      }
+    });
+
+    // Extract method calls as usages
+    const methodCalls = extractMethodCalls(fileContent, filePath, currentEntitySlug, availableEntities);
+    methodCalls.forEach(call => {
+      const key = `call:${call.targetEntitySlug}:${call.sourceLine}`;
+      if (!seenUsages.has(key)) {
+        seenUsages.add(key);
+        usages.push({
+          entitySlug: call.targetEntitySlug,
+          usedInFile: filePath,
+          usedByEntity: currentEntitySlug,
+          usageType: 'call',
+          usageLine: call.sourceLine
+        });
+      }
+    });
+
+    // Extract inheritance as usages
+    const inheritance = extractInheritance(fileContent);
+    inheritance.extends.forEach(extendedClass => {
+      const slug = extendedClass.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+      if (!availableEntities || availableEntities.has(slug)) {
+        const key = `extends:${slug}`;
+        if (!seenUsages.has(key)) {
+          seenUsages.add(key);
+          usages.push({
+            entitySlug: slug,
+            usedInFile: filePath,
+            usedByEntity: currentEntitySlug,
+            usageType: 'extends',
+            usageLine: 1 // TODO: Get actual extends line
+          });
+        }
+      }
+    });
+
+    inheritance.implements.forEach(implementedInterface => {
+      const slug = implementedInterface.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
+      if (!availableEntities || availableEntities.has(slug)) {
+        const key = `implements:${slug}`;
+        if (!seenUsages.has(key)) {
+          seenUsages.add(key);
+          usages.push({
+            entitySlug: slug,
+            usedInFile: filePath,
+            usedByEntity: currentEntitySlug,
+            usageType: 'implements',
+            usageLine: 1 // TODO: Get actual implements line
+          });
+        }
+      }
+    });
+
+    return usages;
+  } catch (error) {
+    console.error('Error extracting entity usages:', error);
+    return [];
+  }
+}
+
+/**
  * Generate relationships between components based on imports, references, and inheritance
  * 
  * @param componentName - The name of the component
@@ -209,62 +488,97 @@ export function extractInheritance(fileContent: string): { extends: string[], im
  * @param inheritance - Object with extends and implements arrays
  * @returns Array of relationships
  */
+import { MethodCallInfo, EntityUsage } from '../types';
+import { Relationship, CallRelationship, RelationshipType } from '../../ui/types/code-entities';
+
 export function generateRelationships(
   componentSlug: string,
   imports: string[],
   references: string[],
   inheritance: { extends: string[], implements: string[] },
-  methodCalls: string[]
+  methodCalls: MethodCallInfo[],
+  availableEntities?: Set<string>
 ): Relationship[] {
   const relationships: Relationship[] = [];
+  const seenRelationships = new Set<string>(); // Prevent duplicates
+  
+  // Helper function to convert name to slug
+  function toSlug(name: string): string {
+    return name.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '').replace(/\s+/g, "-");
+  }
+  
+  // Helper function to check if target exists and add relationship
+  function addRelationship(source: string, target: string, type: RelationshipType, extra?: Partial<CallRelationship>) {
+    const targetSlug = toSlug(target);
+    
+    // Skip self-references and validate target exists
+    if (source === targetSlug || 
+        (availableEntities && !availableEntities.has(targetSlug))) {
+      return;
+    }
+    
+    const relationshipKey = `${source}->${targetSlug}:${type}`;
+    if (!seenRelationships.has(relationshipKey)) {
+      seenRelationships.add(relationshipKey);
+      
+      if (type === "calls" && extra) {
+        const callRelationship: CallRelationship = {
+          source,
+          target: targetSlug,
+          type: "calls",
+          sourceFile: extra.sourceFile!,
+          sourceLine: extra.sourceLine!,
+          targetFunction: extra.targetFunction,
+        };
+        relationships.push(callRelationship);
+      } else {
+        relationships.push({
+          source,
+          target: targetSlug,
+          type
+        });
+      }
+    }
+  }
   
   // Add import relationships
   imports.forEach(importName => {
-    relationships.push({
-      source: componentSlug,
-      target: importName.toLowerCase().replace(/\s+/g, "-"), // Convert to slug format
-      type: "imports"
-    });
+    addRelationship(componentSlug, importName, "imports");
   });
   
   // Add render relationships (from JSX references)
   references.forEach(refName => {
-    // Skip if the component is already in imports to avoid duplicates
-    if (!imports.includes(refName)) {
-      relationships.push({
-        source: componentSlug,
-        target: refName.toLowerCase().replace(/\s+/g, "-"), // Convert to slug format
-        type: "renders"
-      });
+    // Only add if not already imported (to distinguish imports from renders)
+    const refSlug = toSlug(refName);
+    const importSlugs = imports.map(imp => toSlug(imp));
+    
+    if (!importSlugs.includes(refSlug)) {
+      addRelationship(componentSlug, refName, "renders");
     }
   });
   
   // Add inheritance relationships
   inheritance.extends.forEach(extendedClass => {
-    relationships.push({
-      source: componentSlug,
-      target: extendedClass.toLowerCase().replace(/\s+/g, "-"), // Convert to slug format
-      type: "extends"
-    });
+    addRelationship(componentSlug, extendedClass, "extends");
   });
   
   inheritance.implements.forEach(implementedInterface => {
-    relationships.push({
-      source: componentSlug,
-      target: implementedInterface.toLowerCase().replace(/\s+/g, "-"), // Convert to slug format
-      type: "implements"
-    });
+    addRelationship(componentSlug, implementedInterface, "implements");
   });
   
   // Add method call relationships
-  methodCalls.forEach(methodCall => {
-    const [targetComponent] = methodCall.split('.');
-    if (targetComponent && targetComponent !== componentSlug) {
-      relationships.push({
-        source: componentSlug,
-        target: targetComponent.toLowerCase().replace(/\s+/g, "-"), // Convert to slug format
-        type: "calls"
-      });
+  methodCalls.forEach(callInfo => {
+    if (callInfo.targetEntitySlug && callInfo.callingEntitySlug !== callInfo.targetEntitySlug) {
+      addRelationship(
+        callInfo.callingEntitySlug,
+        callInfo.targetEntitySlug,
+        "calls",
+        {
+          sourceFile: callInfo.sourceFile,
+          sourceLine: callInfo.sourceLine,
+          targetFunction: callInfo.targetMethodName
+        }
+      );
     }
   });
   

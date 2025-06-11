@@ -5,7 +5,7 @@
 
 import * as ts from "typescript";
 import { debug } from "./file-utils";
-import { MethodDefinition, ParamDefinition } from "../types";
+import { MethodDefinition, ParamDefinition, EntityDeclaration } from "../types";
 
 /**
  * Extract the source code for a specific component from a file using AST
@@ -326,6 +326,162 @@ export function extractAllTopLevelCodeItems(fileContent: string): Array<{
   }
 }
 
+/**
+ * Extract entity declarations from a file
+ * 
+ * @param fileContent - The content of the file
+ * @param filePath - Path to the file
+ * @returns Array of entity declarations
+ */
+export function extractEntityDeclarations(
+  fileContent: string,
+  filePath: string
+): EntityDeclaration[] {
+  const declarations: EntityDeclaration[] = [];
+  
+  try {
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      fileContent,
+      ts.ScriptTarget.Latest,
+      true
+    );
+
+    function visit(node: ts.Node) {
+      // Function declarations
+      if (ts.isFunctionDeclaration(node) && node.name) {
+        const name = node.name.text;
+        const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+        
+        declarations.push({
+          entitySlug: name.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, ''),
+          entityName: name,
+          entityType: 'function',
+          declarationFile: filePath,
+          declarationLine: line,
+          exportType: hasExportModifier(node) ? 'named' : 'none'
+        });
+      }
+      // Class declarations
+      else if (ts.isClassDeclaration(node) && node.name) {
+        const name = node.name.text;
+        const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+        
+        declarations.push({
+          entitySlug: name.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, ''),
+          entityName: name,
+          entityType: 'class',
+          declarationFile: filePath,
+          declarationLine: line,
+          exportType: hasExportModifier(node) ? 'named' : 'none'
+        });
+      }
+      // Variable declarations (arrow functions, const components)
+      else if (ts.isVariableStatement(node)) {
+        const isExported = hasExportModifier(node);
+        
+        for (const declaration of node.declarationList.declarations) {
+          if (declaration.name && ts.isIdentifier(declaration.name) &&
+              declaration.initializer &&
+              (ts.isArrowFunction(declaration.initializer) || 
+               ts.isFunctionExpression(declaration.initializer))) {
+            
+            const name = declaration.name.text;
+            const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+            
+            // Check if it's a React component (PascalCase and returns JSX)
+            const entityType = /^[A-Z]/.test(name) ? 'component' : 'function';
+            
+            declarations.push({
+              entitySlug: name.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, ''),
+              entityName: name,
+              entityType,
+              declarationFile: filePath,
+              declarationLine: line,
+              exportType: isExported ? 'named' : 'none'
+            });
+          }
+        }
+      }
+      // Export default statements
+      else if (ts.isExportAssignment(node) && !node.isExportEquals) {
+        // Handle: export default ComponentName
+        if (ts.isIdentifier(node.expression)) {
+          const name = node.expression.text;
+          // Find the original declaration
+          const decl = declarations.find(d => d.entityName === name);
+          if (decl) {
+            decl.exportType = 'default';
+          }
+        }
+      }
+      
+      ts.forEachChild(node, visit);
+    }
+    
+    function hasExportModifier(node: ts.Node): boolean {
+      if (!ts.canHaveModifiers(node)) return false;
+      const modifiers = ts.getModifiers(node);
+      return modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword) || false;
+    }
+
+    ts.forEachChild(sourceFile, visit);
+    return declarations;
+  } catch (error) {
+    console.error('Error extracting entity declarations:', error);
+    return [];
+  }
+}
+
+/**
+ * Extract all entity names (functions, classes, components) from a codebase
+ * 
+ * @param rootDir - Root directory to scan
+ * @param includePatterns - Array of glob patterns to include
+ * @param excludePatterns - Array of glob patterns to exclude
+ * @returns Set of entity slugs
+ */
+export async function extractAllEntities(
+  rootDir: string,
+  includePatterns: string[] = ["**/*.tsx", "**/*.jsx", "**/*.js", "**/*.ts"],
+  excludePatterns: string[] = ["node_modules/**", "**/node_modules/**"]
+): Promise<Set<string>> {
+  const entities = new Set<string>();
+  
+  try {
+    const { glob } = await import('glob');
+    const fs = await import('fs-extra');
+    
+    // Find all matching files
+    const files = await glob(includePatterns, {
+      cwd: rootDir,
+      ignore: excludePatterns,
+      absolute: true
+    });
+    
+    // Process each file
+    for (const filePath of files) {
+      try {
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const declarations = extractEntityDeclarations(fileContent, filePath);
+        
+        // Add each entity slug
+        declarations.forEach(decl => {
+          entities.add(decl.entitySlug);
+        });
+      } catch (error) {
+        debug(`Error processing file ${filePath}:`, error);
+      }
+    }
+    
+    debug(`Extracted ${entities.size} entities from ${files.length} files`);
+    return entities;
+  } catch (error) {
+    console.error('Error extracting entities:', error);
+    return entities;
+  }
+}
+
 export function extractComponentMethods(
   fileContent: string,
   componentName: string
@@ -511,15 +667,19 @@ export function extractComponentMethods(
       const end = node.end;
       const code = fileContent.substring(start, end);
 
+      const declarationLineStart = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+      const declarationLineEnd = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+
       methods.push({
         name: methodName,
         description: "",
         params,
         returnType,
         code,
+        declarationLineStart,
+        declarationLineEnd,
       });
 
-      // Mark as processed
       methodNames.add(methodName);
 
       // Debug log for extracted code

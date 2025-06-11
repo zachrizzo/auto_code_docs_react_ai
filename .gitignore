@@ -44,3 +44,7 @@ code-y-0.1.0.tgz
 documentation/
 
 test-docs/
+
+test-output/
+
+test-output-small/

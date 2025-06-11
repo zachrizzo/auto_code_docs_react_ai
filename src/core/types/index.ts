@@ -204,6 +204,16 @@ export interface MethodDefinition {
   code?: string;
 
   /**
+   * Start line number of the method's declaration
+   */
+  declarationLineStart?: number;
+
+  /**
+   * End line number of the method's declaration
+   */
+  declarationLineEnd?: number;
+
+  /**
    * Similarity warnings for the method
    */
   similarityWarnings?: SimilarityWarning[];
@@ -290,6 +300,16 @@ export interface ComponentDefinition {
   slug?: string;
 
   /**
+   * Start line number of the component's declaration
+   */
+  declarationLineStart?: number;
+
+  /**
+   * End line number of the component's declaration
+   */
+  declarationLineEnd?: number;
+
+  /**
    * List of imported components
    */
   imports?: string[];
@@ -303,6 +323,41 @@ export interface ComponentDefinition {
    * Relationships with other components
    */
   relationships?: any[];
+
+  /**
+   * Declaration info for this component
+   */
+  declaration?: EntityDeclaration;
+
+  /**
+   * Entities used by this component
+   */
+  usages?: EntityUsage[];
+}
+
+export interface MethodCallInfo {
+  callingEntitySlug: string; // Slug of the entity (component, class, function) making the call
+  targetEntitySlug: string;  // Slug of the entity (component, class, function) being called
+  targetMethodName?: string; // Optional: Name of the specific method if applicable
+  sourceFile: string;        // File path where the call occurs
+  sourceLine: number;        // Line number of the call
+}
+
+export interface EntityDeclaration {
+  entitySlug: string;        // Unique identifier for the entity
+  entityName: string;        // Original name of the entity
+  entityType: 'component' | 'class' | 'function' | 'method';
+  declarationFile: string;   // File where this entity is declared
+  declarationLine: number;   // Line number where declared
+  exportType?: 'default' | 'named' | 'none'; // How it's exported
+}
+
+export interface EntityUsage {
+  entitySlug: string;        // Entity being used
+  usedInFile: string;        // File where it's used
+  usedByEntity: string;      // Entity that's using it
+  usageType: 'import' | 'call' | 'render' | 'extends' | 'implements';
+  usageLine: number;         // Line where it's used
 }
 
 /**

@@ -483,7 +483,7 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
     // Preload component codes for faster comparison
     similarPairs.forEach(pair => {
       // Helper function to fetch code
-      const fetchComponentCode = async (component: ComponentData) => {
+      const preloadComponentCode = async (component: ComponentData) => {
         if (component.code) return;
 
         try {
@@ -497,8 +497,8 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
 
       // Fetch codes in parallel
       Promise.all([
-        fetchComponentCode(pair.component1),
-        fetchComponentCode(pair.component2)
+        preloadComponentCode(pair.component1),
+        preloadComponentCode(pair.component2)
       ]);
     });
   }, [components, threshold])
@@ -512,7 +512,7 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
     method2?: string
   }) => {
     // Fetch code for components if not already available
-    const fetchComponentCode = async (component: ComponentData, methodName?: string) => {
+    const loadComponentCode = async (component: ComponentData, methodName?: string) => {
       try {
         // If it's a method-level comparison, try to get the specific method code
         if (methodName) {
@@ -545,8 +545,8 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
 
     // Set up the comparison
     Promise.all([
-      fetchComponentCode(item.component1, item.isMethodLevel ? item.method1 : undefined),
-      fetchComponentCode(item.component2, item.isMethodLevel ? item.method2 : undefined)
+      loadComponentCode(item.component1, item.isMethodLevel ? item.method1 : undefined),
+      loadComponentCode(item.component2, item.isMethodLevel ? item.method2 : undefined)
     ]).then(([code1, code2]) => {
       // Perform direct code comparison to catch identical components
       // This is a client-side fallback to ensure identical components show as 100% similar
