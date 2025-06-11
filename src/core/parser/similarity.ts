@@ -18,6 +18,7 @@ interface SearchResult {
     componentName?: string;
     methodName?: string;
     filePath?: string;
+    slug?: string;
   };
 }
 
@@ -43,6 +44,7 @@ class VectorServiceAdapter {
       componentName: string;
       methodName: string;
       filePath: string;
+      slug?: string;
     }
   }): Promise<void> {
     // Create a MethodDefinition object from the document
@@ -142,7 +144,8 @@ export async function processComponentListSimilarities(
             metadata: {
               componentName: component.name,
               methodName: method.name,
-              filePath: component.filePath
+              filePath: component.filePath,
+              slug: component.slug
             }
           });
           
@@ -178,12 +181,16 @@ export async function processComponentListSimilarities(
             similarTo: result.metadata?.componentName || 'Unknown Component',
             reason: `Similar implementation to ${result.metadata?.methodName || 'Unknown Method'}`,
             filePath: result.metadata?.filePath || '',
-            code: result.text
+            code: result.text,
+            slug: result.metadata?.slug
           }));
           
           if (similarMethods.length > 0) {
             // IMPORTANT: Modify the original object in the list
-            method.similarityWarnings = similarMethods;
+            method.similarityWarnings = similarMethods.map(m => ({
+              ...m,
+              code: m.code || ''
+            }));
             warningCount += similarMethods.length;
             debug(
               `Found ${similarMethods.length} warnings for ${component.name}.${method.name}`

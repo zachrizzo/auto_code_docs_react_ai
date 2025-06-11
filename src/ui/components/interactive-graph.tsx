@@ -1,5 +1,5 @@
 "use client"
-import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -61,13 +61,17 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   }, [selectedNodeId])
   const [filteredTypes, setFilteredTypes] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
-  const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular'>('force')
+  const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular' | 'grouped'>('force')
   const [showLabels, setShowLabels] = useState(true)
   const [showConnectionsOnly, setShowConnectionsOnly] = useState(false)
   const [nodeSpacing, setNodeSpacing] = useState(150)
   const [isAutoLayouting, setIsAutoLayouting] = useState(false)
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [draggedGroup, setDraggedGroup] = useState<string | null>(null)
+  const [groupDragOffset, setGroupDragOffset] = useState({ x: 0, y: 0 })
+  const [groupingMode, setGroupingMode] = useState<'none' | 'file' | 'parent'>('none')
+  const [showGroupContainers, setShowGroupContainers] = useState(true)
   const animationRef = useRef<number>()
   const nodesRef = useRef<Node[]>(nodes)
   const edgesRef = useRef<Edge[]>(edges)
@@ -77,6 +81,83 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const DAMPING = 0.85
   const CENTER_FORCE = layoutMode === 'force' ? 0.005 : 0.001
 
+  // Create groups based on grouping mode
+  const nodeGroups = useMemo(() => {
+    if (groupingMode === 'none') return new Map<string, Node[]>()
+    
+    const groups = new Map<string, Node[]>()
+    
+    if (groupingMode === 'file') {
+      // Group by file path
+      nodes.forEach(node => {
+        let groupKey = 'Unknown'
+        
+        if (node.filePath && node.filePath.trim() !== '') {
+          let filePath = node.filePath
+          
+          // Remove common prefixes to get to the meaningful file path
+          const prefixesToRemove = [
+            '/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/',
+            'src/',
+            './src/',
+            './'
+          ]
+          
+          for (const prefix of prefixesToRemove) {
+            if (filePath.startsWith(prefix)) {
+              filePath = filePath.substring(prefix.length)
+              break
+            }
+          }
+          
+          // Extract the file name from the path
+          const lastSlashIndex = filePath.lastIndexOf('/')
+          let fileName = lastSlashIndex >= 0 ? filePath.substring(lastSlashIndex + 1) : filePath
+          
+          // Remove file extension for cleaner grouping
+          fileName = fileName.replace(/\.(tsx?|jsx?|js|ts)$/, '')
+          
+          // Handle default fallback paths specially
+          if (filePath.startsWith('components/') && !filePath.includes('/', 'components/'.length)) {
+            // This is a default fallback path like "components/MyComponent"
+            groupKey = fileName
+          } else {
+            // Use the file name as the group key
+            groupKey = fileName
+          }
+        } else {
+          // No file path available, group by component type
+          groupKey = `Unknown (${node.type})`
+        }
+        
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, [])
+        }
+        groups.get(groupKey)!.push(node)
+      })
+    } else if (groupingMode === 'parent') {
+      // Group by parent component (nodes that contain other nodes)
+      const parentMap = new Map<string, string>() // child -> parent
+      
+      edges.forEach(edge => {
+        if (edge.type === 'contains') {
+          parentMap.set(edge.target, edge.source)
+        }
+      })
+      
+      // Group nodes by their parent
+      nodes.forEach(node => {
+        const parent = parentMap.get(node.id) || 'root'
+        if (!groups.has(parent)) {
+          groups.set(parent, [])
+        }
+        groups.get(parent)!.push(node)
+      })
+    }
+    
+    return groups
+  }, [nodes, edges, groupingMode])
+
   // Update refs when props change and apply layout
   useEffect(() => {
     let layoutNodes = [...nodes]
@@ -85,11 +166,13 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       layoutNodes = applyHierarchicalLayout(layoutNodes, edges)
     } else if (layoutMode === 'circular') {
       layoutNodes = applyCircularLayout(layoutNodes)
+    } else if (layoutMode === 'grouped' && groupingMode !== 'none') {
+      layoutNodes = applyGroupedLayout(layoutNodes, nodeGroups)
     }
     
     nodesRef.current = layoutNodes
     edgesRef.current = edges
-  }, [nodes, edges, layoutMode])
+  }, [nodes, edges, layoutMode, nodeGroups, groupingMode])
 
   const getNodeGradient = (type: string) => {
     const gradients = {
@@ -226,6 +309,151 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
 
     const currentNodes = nodesRef.current
     const currentEdges = edgesRef.current
+    const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
+
+    // Draw group containers first (behind everything else)
+    if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+      groupBoxes.forEach((box, groupKey) => {
+        ctx.save()
+        
+        const isDraggedGroup = draggedGroup === groupKey
+        const isHoveredGroup = hoveredNode === `group-${groupKey}`
+        
+        // Enhanced group container style with better visibility
+        const baseAlpha = isDraggedGroup ? 0.15 : isHoveredGroup ? 0.12 : 0.08
+        const borderAlpha = isDraggedGroup ? 0.6 : isHoveredGroup ? 0.5 : 0.4
+        
+        // Gradient background
+        const gradient = ctx.createLinearGradient(box.x, box.y, box.x + box.width, box.y + box.height)
+        gradient.addColorStop(0, `rgba(59, 130, 246, ${baseAlpha})`)
+        gradient.addColorStop(1, `rgba(147, 51, 234, ${baseAlpha * 0.7})`)
+        
+        ctx.fillStyle = gradient
+        ctx.strokeStyle = `rgba(59, 130, 246, ${borderAlpha})`
+        ctx.lineWidth = isDraggedGroup ? 3 : 2
+        ctx.setLineDash(isDraggedGroup ? [12, 6] : [8, 4])
+        
+        // Enhanced shadow for depth
+        if (isDraggedGroup || isHoveredGroup) {
+          ctx.shadowBlur = 20
+          ctx.shadowColor = 'rgba(59, 130, 246, 0.3)'
+          ctx.shadowOffsetX = 0
+          ctx.shadowOffsetY = 4
+        }
+        
+        // Draw rounded rectangle for group with larger radius
+        const radius = 24
+        ctx.beginPath()
+        ctx.moveTo(box.x + radius, box.y)
+        ctx.lineTo(box.x + box.width - radius, box.y)
+        ctx.quadraticCurveTo(box.x + box.width, box.y, box.x + box.width, box.y + radius)
+        ctx.lineTo(box.x + box.width, box.y + box.height - radius)
+        ctx.quadraticCurveTo(box.x + box.width, box.y + box.height, box.x + box.width - radius, box.y + box.height)
+        ctx.lineTo(box.x + radius, box.y + box.height)
+        ctx.quadraticCurveTo(box.x, box.y + box.height, box.x, box.y + box.height - radius)
+        ctx.lineTo(box.x, box.y + radius)
+        ctx.quadraticCurveTo(box.x, box.y, box.x + radius, box.y)
+        ctx.closePath()
+        
+        ctx.fill()
+        ctx.stroke()
+        
+        // Reset shadow
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
+        
+        // Enhanced group label with better styling
+        ctx.setLineDash([])
+        ctx.font = '14px Inter, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
+        
+        // Format group label
+        let label = groupKey
+        if (groupingMode === 'file') {
+          if (groupKey.startsWith('Unknown (')) {
+            label = groupKey
+          } else {
+            label = `📁 ${groupKey}.tsx`
+          }
+        } else if (groupingMode === 'parent') {
+          const parentNode = currentNodes.find(n => n.id === groupKey)
+          label = parentNode ? `🏗️ ${parentNode.name}` : (groupKey === 'root' ? '🌐 Root Components' : groupKey)
+        }
+        
+        // Enhanced label background with gradient
+        const labelPadding = 10
+        const textMetrics = ctx.measureText(label)
+        const labelWidth = textMetrics.width + labelPadding * 2
+        const labelHeight = 28
+        const labelX = box.x + 15
+        const labelY = box.y - 18
+        
+        // Label gradient background
+        const labelGradient = ctx.createLinearGradient(labelX, labelY, labelX + labelWidth, labelY + labelHeight)
+        labelGradient.addColorStop(0, 'rgba(59, 130, 246, 0.95)')
+        labelGradient.addColorStop(1, 'rgba(147, 51, 234, 0.95)')
+        
+        ctx.fillStyle = labelGradient
+        ctx.beginPath()
+        ctx.moveTo(labelX + 8, labelY)
+        ctx.lineTo(labelX + labelWidth - 8, labelY)
+        ctx.quadraticCurveTo(labelX + labelWidth, labelY, labelX + labelWidth, labelY + 8)
+        ctx.lineTo(labelX + labelWidth, labelY + labelHeight - 8)
+        ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight, labelX + labelWidth - 8, labelY + labelHeight)
+        ctx.lineTo(labelX + 8, labelY + labelHeight)
+        ctx.quadraticCurveTo(labelX, labelY + labelHeight, labelX, labelY + labelHeight - 8)
+        ctx.lineTo(labelX, labelY + 8)
+        ctx.quadraticCurveTo(labelX, labelY, labelX + 8, labelY)
+        ctx.closePath()
+        ctx.fill()
+        
+        // Label border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+        ctx.lineWidth = 1
+        ctx.stroke()
+        
+        // Label text with shadow
+        ctx.shadowBlur = 2
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 1
+        
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 12px Inter, sans-serif'
+        ctx.fillText(label, labelX + labelPadding, labelY + 8)
+        
+        // Drag handle indicator when group is hovered or dragged
+        if (isHoveredGroup || isDraggedGroup) {
+          ctx.shadowBlur = 0
+          ctx.shadowOffsetX = 0
+          ctx.shadowOffsetY = 0
+          
+          const handleSize = 6
+          const handleSpacing = 3
+          const handleX = box.x + box.width - 20
+          const handleY = box.y + 10
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+          for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 2; j++) {
+              ctx.beginPath()
+              ctx.arc(
+                handleX + j * (handleSize + handleSpacing),
+                handleY + i * (handleSize + handleSpacing),
+                2,
+                0,
+                2 * Math.PI
+              )
+              ctx.fill()
+            }
+          }
+        }
+        
+        ctx.restore()
+      })
+    }
 
     // Filter edges for drawing
     const drawableEdges = currentEdges.filter(edge => !filteredTypes.has(edge.type))
@@ -556,7 +784,137 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     })
 
     ctx.restore()
-  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels])
+  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers])
+
+  // Minimap component with proper viewport tracking
+  const MinimapComponent = ({ nodes, edges, scale, offset, canvasRef, selectedNode }: {
+    nodes: Node[]
+    edges: Edge[]
+    scale: number
+    offset: { x: number, y: number }
+    canvasRef: React.RefObject<HTMLCanvasElement>
+    selectedNode: string | null
+  }) => {
+    const minimapCanvasRef = useRef<HTMLCanvasElement>(null)
+    
+    useEffect(() => {
+      const canvas = minimapCanvasRef.current
+      if (!canvas || nodes.length === 0) return
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      ctx.clearRect(0, 0, 128, 96)
+      
+      // Calculate world bounds
+      const padding = 50
+      const minX = Math.min(...nodes.map(n => n.x)) - padding
+      const maxX = Math.max(...nodes.map(n => n.x)) + padding
+      const minY = Math.min(...nodes.map(n => n.y)) - padding
+      const maxY = Math.max(...nodes.map(n => n.y)) + padding
+      
+      const worldWidth = maxX - minX
+      const worldHeight = maxY - minY
+      const scaleX = 128 / worldWidth
+      const scaleY = 96 / worldHeight
+      const minimapScale = Math.min(scaleX, scaleY)
+      
+      const offsetX = (128 - worldWidth * minimapScale) / 2
+      const offsetY = (96 - worldHeight * minimapScale) / 2
+      
+      // Draw edges
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.3)'
+      ctx.lineWidth = 1
+      edges.forEach(edge => {
+        const sourceNode = nodes.find(n => n.id === edge.source)
+        const targetNode = nodes.find(n => n.id === edge.target)
+        
+        if (sourceNode && targetNode) {
+          const x1 = offsetX + (sourceNode.x - minX) * minimapScale
+          const y1 = offsetY + (sourceNode.y - minY) * minimapScale
+          const x2 = offsetX + (targetNode.x - minX) * minimapScale
+          const y2 = offsetY + (targetNode.y - minY) * minimapScale
+          
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+        }
+      })
+      
+      // Draw nodes
+      nodes.forEach(node => {
+        const x = offsetX + (node.x - minX) * minimapScale
+        const y = offsetY + (node.y - minY) * minimapScale
+        const radius = Math.max(1, 2)
+        
+        ctx.fillStyle = node.id === selectedNode ? '#3b82f6' : '#64748b'
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, 2 * Math.PI)
+        ctx.fill()
+      })
+    }, [nodes, edges, selectedNode])
+
+    // Calculate viewport indicator position and size
+    const calculateViewport = () => {
+      if (!canvasRef.current || nodes.length === 0) return null
+
+      const canvas = canvasRef.current
+      const padding = 50
+      const minX = Math.min(...nodes.map(n => n.x)) - padding
+      const maxX = Math.max(...nodes.map(n => n.x)) + padding
+      const minY = Math.min(...nodes.map(n => n.y)) - padding
+      const maxY = Math.max(...nodes.map(n => n.y)) + padding
+      
+      const worldWidth = maxX - minX
+      const worldHeight = maxY - minY
+      
+      // Current viewport in world coordinates
+      const viewportLeft = (-offset.x) / scale
+      const viewportTop = (-offset.y) / scale
+      const viewportWidth = canvas.width / scale
+      const viewportHeight = canvas.height / scale
+      
+      // Convert to minimap coordinates (0-100%)
+      const left = Math.max(0, Math.min(100, ((viewportLeft - minX) / worldWidth) * 100))
+      const top = Math.max(0, Math.min(100, ((viewportTop - minY) / worldHeight) * 100))
+      const width = Math.min(100 - left, (viewportWidth / worldWidth) * 100)
+      const height = Math.min(100 - top, (viewportHeight / worldHeight) * 100)
+      
+      return { left, top, width, height }
+    }
+
+    const viewport = calculateViewport()
+    
+    return (
+      <div className="absolute top-4 right-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-slate-200 dark:border-slate-600 rounded-lg p-2 shadow-lg">
+        <div className="w-32 h-24 relative bg-slate-50 dark:bg-slate-900 rounded overflow-hidden">
+          <canvas
+            ref={minimapCanvasRef}
+            width={128}
+            height={96}
+            className="w-full h-full"
+            style={{ display: 'block' }}
+          />
+          {/* Viewport indicator */}
+          {viewport && (
+            <div 
+              className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none"
+              style={{
+                left: `${viewport.left}%`,
+                top: `${viewport.top}%`,
+                width: `${viewport.width}%`,
+                height: `${viewport.height}%`,
+              }}
+            />
+          )}
+        </div>
+        <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 text-center">
+          Navigation
+        </div>
+      </div>
+    )
+  }
 
   // Helper function for rounded rectangles
   const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) => {
@@ -648,6 +1006,325 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       }
     })
   }
+  
+  // Advanced force-directed layout with group constraints and proper spacing
+  const applyAdvancedForceLayout = (nodes: Node[], groups: Map<string, Node[]>) => {
+    const layoutNodes = [...nodes]
+    const groupBoxes = new Map<string, { x: number, y: number, width: number, height: number, centerX: number, centerY: number, fixed?: boolean }>()
+    
+    // Calculate optimal group sizing and positioning
+    const groupKeys = Array.from(groups.keys())
+    const numGroups = groupKeys.length
+    
+    if (numGroups === 0) return layoutNodes
+    
+    // Calculate average node size for spacing calculations
+    const avgNodeRadius = nodes.length > 0 ? nodes.reduce((sum, node) => sum + node.radius, 0) / nodes.length : 20
+    const minNodeSpacing = Math.max(avgNodeRadius * 3, 80) // Minimum distance between node centers
+    
+    // Dynamic grid sizing based on group count and sizes
+    const gridSize = Math.max(2, Math.ceil(Math.sqrt(numGroups * 1.2))) // Slightly larger grid for better spacing
+    
+    // Calculate required spacing based on largest groups
+    const maxNodesInAnyGroup = Math.max(...Array.from(groups.values()).map(nodes => nodes.length))
+    const estimatedGroupSize = calculateOptimalGroupSize(maxNodesInAnyGroup, minNodeSpacing)
+    const groupSpacing = Math.max(estimatedGroupSize + 100, nodeSpacing * 4)
+    
+    const startX = 300
+    const startY = 300
+    
+    groupKeys.forEach((groupKey, groupIndex) => {
+      const groupNodes = groups.get(groupKey) || []
+      const numNodesInGroup = groupNodes.length
+      
+      // Calculate group position in grid
+      const gridRow = Math.floor(groupIndex / gridSize)
+      const gridCol = groupIndex % gridSize
+      const groupCenterX = startX + gridCol * groupSpacing
+      const groupCenterY = startY + gridRow * groupSpacing
+      
+      // Calculate optimal group dimensions for this specific group
+      const optimalSize = calculateOptimalGroupSize(numNodesInGroup, minNodeSpacing)
+      const groupPadding = Math.max(50, avgNodeRadius * 2) // Generous padding
+      
+      // Layout nodes within the group using enhanced algorithm
+      const nodePositions = calculateOptimalNodePositions(
+        numNodesInGroup, 
+        groupCenterX, 
+        groupCenterY, 
+        optimalSize, 
+        minNodeSpacing
+      )
+      
+      groupNodes.forEach((node, nodeIndex) => {
+        const layoutNode = layoutNodes.find(n => n.id === node.id)
+        if (layoutNode && nodePositions[nodeIndex]) {
+          layoutNode.x = nodePositions[nodeIndex].x
+          layoutNode.y = nodePositions[nodeIndex].y
+        }
+      })
+      
+      // Apply overlap resolution within the group
+      resolveInternalNodeOverlaps(groupNodes, layoutNodes, minNodeSpacing)
+      
+      // Calculate actual bounding box based on final node positions
+      const groupNodePositions = groupNodes.map(node => {
+        const layoutNode = layoutNodes.find(n => n.id === node.id)
+        return layoutNode ? { x: layoutNode.x, y: layoutNode.y, radius: layoutNode.radius } : { x: groupCenterX, y: groupCenterY, radius: avgNodeRadius }
+      })
+      
+      if (groupNodePositions.length > 0) {
+        const minX = Math.min(...groupNodePositions.map(p => p.x - p.radius)) - groupPadding
+        const maxX = Math.max(...groupNodePositions.map(p => p.x + p.radius)) + groupPadding
+        const minY = Math.min(...groupNodePositions.map(p => p.y - p.radius)) - groupPadding
+        const maxY = Math.max(...groupNodePositions.map(p => p.y + p.radius)) + groupPadding
+        
+        const width = Math.max(optimalSize, maxX - minX)
+        const height = Math.max(optimalSize, maxY - minY)
+        
+        groupBoxes.set(groupKey, {
+          x: groupCenterX - width / 2,
+          y: groupCenterY - height / 2,
+          width,
+          height,
+          centerX: groupCenterX,
+          centerY: groupCenterY
+        })
+      }
+    })
+    
+    // Apply group collision detection and adjustment
+    const adjustedGroups = resolveGroupCollisions(groupBoxes)
+    
+    // Store group boxes for drawing
+    ;(layoutNodes as any).groupBoxes = adjustedGroups
+    
+    return layoutNodes
+  }
+
+  // Calculate optimal group size based on number of nodes and spacing requirements
+  const calculateOptimalGroupSize = (numNodes: number, minSpacing: number): number => {
+    if (numNodes <= 1) return Math.max(120, minSpacing * 2)
+    
+    // Calculate area needed for nodes with proper spacing
+    const nodeArea = numNodes * Math.PI * Math.pow(minSpacing / 2, 2)
+    const baseRadius = Math.sqrt(nodeArea / Math.PI)
+    
+    // Add extra space for better distribution and visual appeal
+    const scaleFactor = Math.max(1.5, 1 + Math.log(numNodes) * 0.2)
+    return Math.max(180, baseRadius * 2 * scaleFactor)
+  }
+
+  // Calculate optimal positions for nodes within a group
+  const calculateOptimalNodePositions = (
+    numNodes: number, 
+    centerX: number, 
+    centerY: number, 
+    groupSize: number, 
+    minSpacing: number
+  ): Array<{ x: number, y: number }> => {
+    const positions: Array<{ x: number, y: number }> = []
+    
+    if (numNodes === 1) {
+      positions.push({ x: centerX, y: centerY })
+      return positions
+    }
+    
+    if (numNodes === 2) {
+      const spacing = minSpacing * 0.8
+      positions.push({ x: centerX - spacing / 2, y: centerY })
+      positions.push({ x: centerX + spacing / 2, y: centerY })
+      return positions
+    }
+    
+    if (numNodes <= 6) {
+      // Circular arrangement for small groups
+      const radius = Math.min(groupSize / 3, minSpacing * 0.7)
+      for (let i = 0; i < numNodes; i++) {
+        const angle = (2 * Math.PI * i) / numNodes
+        positions.push({
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle)
+        })
+      }
+      return positions
+    }
+    
+    // For larger groups, use a hybrid approach: rings + spiral
+    const innerRingSize = 6
+    const outerNodes = numNodes - innerRingSize
+    
+    // Inner ring
+    const innerRadius = minSpacing * 0.6
+    for (let i = 0; i < innerRingSize; i++) {
+      const angle = (2 * Math.PI * i) / innerRingSize
+      positions.push({
+        x: centerX + innerRadius * Math.cos(angle),
+        y: centerY + innerRadius * Math.sin(angle)
+      })
+    }
+    
+    // Outer spiral for remaining nodes
+    const maxRadius = groupSize / 2.5
+    const spiralTightness = 0.5
+    const angleStep = (2 * Math.PI) / 6 // Base angle step
+    
+    for (let i = 0; i < outerNodes; i++) {
+      const spiralProgress = i / outerNodes
+      const radius = innerRadius + (maxRadius - innerRadius) * Math.sqrt(spiralProgress)
+      const angle = angleStep * i + spiralProgress * Math.PI * spiralTightness
+      
+      positions.push({
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      })
+    }
+    
+    return positions
+  }
+
+  // Resolve overlaps between nodes within a group
+  const resolveInternalNodeOverlaps = (
+    groupNodes: Node[], 
+    layoutNodes: Node[], 
+    minSpacing: number
+  ) => {
+    const maxIterations = 5
+    const groupLayoutNodes = groupNodes.map(node => layoutNodes.find(n => n.id === node.id)).filter(Boolean) as Node[]
+    
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let hasOverlaps = false
+      
+      for (let i = 0; i < groupLayoutNodes.length; i++) {
+        for (let j = i + 1; j < groupLayoutNodes.length; j++) {
+          const nodeA = groupLayoutNodes[i]
+          const nodeB = groupLayoutNodes[j]
+          
+          const dx = nodeB.x - nodeA.x
+          const dy = nodeB.y - nodeA.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          const requiredDistance = minSpacing
+          
+          if (distance < requiredDistance && distance > 0) {
+            hasOverlaps = true
+            
+            const overlap = requiredDistance - distance
+            const separationForce = overlap * 0.5
+            const normalX = dx / distance
+            const normalY = dy / distance
+            
+            nodeA.x -= normalX * separationForce
+            nodeA.y -= normalY * separationForce
+            nodeB.x += normalX * separationForce
+            nodeB.y += normalY * separationForce
+          } else if (distance === 0) {
+            // Handle exact overlap
+            const randomAngle = Math.random() * 2 * Math.PI
+            const pushDistance = minSpacing / 2
+            nodeA.x += Math.cos(randomAngle) * pushDistance
+            nodeA.y += Math.sin(randomAngle) * pushDistance
+            nodeB.x -= Math.cos(randomAngle) * pushDistance
+            nodeB.y -= Math.sin(randomAngle) * pushDistance
+            hasOverlaps = true
+          }
+        }
+      }
+      
+      if (!hasOverlaps) break
+    }
+  }
+
+  // Resolve collisions between group boxes with enhanced algorithm
+  const resolveGroupCollisions = (groupBoxes: Map<string, any>) => {
+    const boxes = Array.from(groupBoxes.entries())
+    const maxIterations = 15
+    
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let hasCollisions = false
+      
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const [, boxA] = boxes[i]
+          const [, boxB] = boxes[j]
+          
+          // Dynamic padding based on box sizes
+          const avgSize = (boxA.width + boxA.height + boxB.width + boxB.height) / 4
+          const padding = Math.max(60, avgSize * 0.15)
+          
+          if (boxA.x < boxB.x + boxB.width + padding &&
+              boxA.x + boxA.width + padding > boxB.x &&
+              boxA.y < boxB.y + boxB.height + padding &&
+              boxA.y + boxA.height + padding > boxB.y) {
+            
+            hasCollisions = true
+            
+            // Calculate push direction and force
+            const centerAX = boxA.x + boxA.width / 2
+            const centerAY = boxA.y + boxA.height / 2
+            const centerBX = boxB.x + boxB.width / 2
+            const centerBY = boxB.y + boxB.height / 2
+            
+            const dx = centerBX - centerAX
+            const dy = centerBY - centerAY
+            const distance = Math.sqrt(dx * dx + dy * dy)
+            
+            if (distance > 0) {
+              // Calculate required separation distance
+              const requiredDistanceX = (boxA.width + boxB.width) / 2 + padding
+              const requiredDistanceY = (boxA.height + boxB.height) / 2 + padding
+              const requiredDistance = Math.sqrt(requiredDistanceX * requiredDistanceX + requiredDistanceY * requiredDistanceY)
+              
+              if (distance < requiredDistance) {
+                const overlap = requiredDistance - distance
+                const pushDistance = Math.max(40, overlap * 0.6)
+                const normalX = dx / distance
+                const normalY = dy / distance
+                
+                // Apply stronger separation force
+                boxA.x -= normalX * pushDistance / 2
+                boxA.y -= normalY * pushDistance / 2
+                boxA.centerX = boxA.x + boxA.width / 2
+                boxA.centerY = boxA.y + boxA.height / 2
+                
+                boxB.x += normalX * pushDistance / 2
+                boxB.y += normalY * pushDistance / 2
+                boxB.centerX = boxB.x + boxB.width / 2
+                boxB.centerY = boxB.y + boxB.height / 2
+              }
+            } else {
+              // Handle exact center overlap
+              const randomAngle = Math.random() * 2 * Math.PI
+              const pushDistance = Math.max(100, avgSize * 0.5)
+              
+              boxA.x -= Math.cos(randomAngle) * pushDistance / 2
+              boxA.y -= Math.sin(randomAngle) * pushDistance / 2
+              boxA.centerX = boxA.x + boxA.width / 2
+              boxA.centerY = boxA.y + boxA.height / 2
+              
+              boxB.x += Math.cos(randomAngle) * pushDistance / 2
+              boxB.y += Math.sin(randomAngle) * pushDistance / 2
+              boxB.centerX = boxB.x + boxB.width / 2
+              boxB.centerY = boxB.y + boxB.height / 2
+            }
+          }
+        }
+      }
+      
+      if (!hasCollisions) break
+    }
+    
+    // Update the map with adjusted positions
+    const adjustedMap = new Map()
+    boxes.forEach(([key, box]) => {
+      adjustedMap.set(key, box)
+    })
+    
+    return adjustedMap
+  }
+
+  const applyGroupedLayout = (nodes: Node[], groups: Map<string, Node[]>) => {
+    return applyAdvancedForceLayout(nodes, groups)
+  }
 
   // Check if two nodes overlap
   const nodesOverlap = (node1: Node, node2: Node, minDistance: number) => {
@@ -668,8 +1345,6 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       const radius = minDistance + (attempt * 20)
       const testX = centerX + Math.cos(angle) * radius
       const testY = centerY + Math.sin(angle) * radius
-      
-      const testNode = { ...node, x: testX, y: testY }
       
       // Check if this position overlaps with any other node
       let overlaps = false
@@ -740,7 +1415,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       })
       
       // Fix overlaps within each level
-      levels.forEach((nodesInLevel, level) => {
+      levels.forEach((nodesInLevel) => {
         nodesInLevel.sort((a, b) => a.y - b.y)
         
         for (let i = 0; i < nodesInLevel.length; i++) {
@@ -772,6 +1447,16 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           }
         }
       }
+      
+    } else if (layoutMode === 'grouped' && groupingMode !== 'none') {
+      const layoutNodes = applyGroupedLayout(currentNodes, nodeGroups)
+      layoutNodes.forEach((layoutNode, index) => {
+        currentNodes[index].x = layoutNode.x
+        currentNodes[index].y = layoutNode.y
+        currentNodes[index].fx = layoutNode.fx
+        currentNodes[index].fy = layoutNode.fy
+      })
+      ;(currentNodes as any).groupBoxes = (layoutNodes as any).groupBoxes
       
     } else {
       // Force layout - use intelligent grid placement with overlap resolution
@@ -844,7 +1529,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     setTimeout(() => {
       setIsAutoLayouting(false)
     }, 1000)
-  }, [layoutMode, nodeSpacing])
+  }, [layoutMode, nodeSpacing, nodeGroups, groupingMode])
 
   const animate = useCallback(() => {
     if (layoutMode === 'force') {
@@ -863,6 +1548,92 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     }
   }, [animate])
 
+  const resetView = useCallback(() => {
+    setScale(1)
+    setOffset({ x: 0, y: 0 })
+  }, [])
+
+  const fitToView = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || nodesRef.current.length === 0) return
+
+    const nodes = nodesRef.current
+    const padding = 50
+
+    // Calculate bounding box of all nodes
+    const minX = Math.min(...nodes.map(n => n.x)) - padding
+    const maxX = Math.max(...nodes.map(n => n.x)) + padding
+    const minY = Math.min(...nodes.map(n => n.y)) - padding
+    const maxY = Math.max(...nodes.map(n => n.y)) + padding
+
+    const contentWidth = maxX - minX
+    const contentHeight = maxY - minY
+
+    // Calculate scale to fit content
+    const scaleX = canvas.width / contentWidth
+    const scaleY = canvas.height / contentHeight
+    const newScale = Math.min(scaleX, scaleY, 2) // Cap at 2x zoom
+
+    // Calculate offset to center content
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    const newOffsetX = canvas.width / 2 - centerX * newScale
+    const newOffsetY = canvas.height / 2 - centerY * newScale
+
+    setScale(newScale)
+    setOffset({ x: newOffsetX, y: newOffsetY })
+  }, [])
+
+  const zoomToNode = useCallback((nodeId: string) => {
+    const node = nodesRef.current.find(n => n.id === nodeId)
+    const canvas = canvasRef.current
+    if (!node || !canvas) return
+
+    const targetScale = 1.5
+    const newOffsetX = canvas.width / 2 - node.x * targetScale
+    const newOffsetY = canvas.height / 2 - node.y * targetScale
+
+    setScale(targetScale)
+    setOffset({ x: newOffsetX, y: newOffsetY })
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== document.body) return // Only work when not typing in inputs
+      
+      switch (e.key) {
+        case 'r':
+        case 'R':
+          e.preventDefault()
+          resetView()
+          break
+        case 'f':
+        case 'F':
+          e.preventDefault()
+          fitToView()
+          break
+        case '=':
+        case '+':
+          e.preventDefault()
+          setScale(prev => Math.min(5, prev * 1.2))
+          break
+        case '-':
+        case '_':
+          e.preventDefault()
+          setScale(prev => Math.max(0.2, prev / 1.2))
+          break
+        case ' ':
+          e.preventDefault()
+          autoLayout()
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [resetView, fitToView, autoLayout])
+
   const handleMouseDown = (e: React.MouseEvent) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -870,6 +1641,32 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     const rect = canvas.getBoundingClientRect()
     const x = (e.clientX - rect.left - offset.x) / scale
     const y = (e.clientY - rect.top - offset.y) / scale
+
+    // Check if clicking on a group box first (higher priority)
+    const currentNodes = nodesRef.current
+    const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
+    
+    if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+      let clickedGroup: string | null = null
+      
+      groupBoxes.forEach((box, groupKey) => {
+        if (x >= box.x && x <= box.x + box.width && 
+            y >= box.y && y <= box.y + box.height) {
+          clickedGroup = groupKey
+        }
+      })
+      
+      if (clickedGroup) {
+        // Start group dragging
+        const groupBox = groupBoxes.get(clickedGroup)!
+        setDraggedGroup(clickedGroup)
+        setGroupDragOffset({
+          x: x - groupBox.x,
+          y: y - groupBox.y
+        })
+        return // Don't check for nodes if we're dragging a group
+      }
+    }
 
     // Check if clicking on a node (only from visible nodes)
     const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
@@ -917,7 +1714,40 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     const x = (e.clientX - rect.left - offset.x) / scale
     const y = (e.clientY - rect.top - offset.y) / scale
 
-    if (draggedNode) {
+    if (draggedGroup) {
+      // Dragging a group
+      const currentNodes = nodesRef.current
+      const groupBoxes = (currentNodes as any).groupBoxes as Map<string, any> | undefined
+      
+      if (groupBoxes && groupBoxes.has(draggedGroup)) {
+        const groupBox = groupBoxes.get(draggedGroup)!
+        const newX = x - groupDragOffset.x
+        const newY = y - groupDragOffset.y
+        
+        // Calculate the displacement
+        const deltaX = newX - groupBox.x
+        const deltaY = newY - groupBox.y
+        
+        // Update group box position
+        groupBox.x = newX
+        groupBox.y = newY
+        groupBox.centerX = newX + groupBox.width / 2
+        groupBox.centerY = newY + groupBox.height / 2
+        
+        // Move all nodes in this group
+        const groupNodes = nodeGroups.get(draggedGroup) || []
+        groupNodes.forEach(node => {
+          const layoutNode = currentNodes.find(n => n.id === node.id)
+          if (layoutNode) {
+            layoutNode.x += deltaX
+            layoutNode.y += deltaY
+            layoutNode.fx = layoutNode.x
+            layoutNode.fy = layoutNode.y
+          }
+        })
+      }
+      canvas.style.cursor = 'grabbing'
+    } else if (draggedNode) {
       // Dragging a node
       const node = nodesRef.current.find(n => n.id === draggedNode)
       if (node) {
@@ -935,32 +1765,80 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       })
       canvas.style.cursor = 'grabbing'
     } else {
-      // Check for hovered node (only from visible nodes)
-      const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
-      const visibleNodes = showConnectionsOnly && selectedNode 
-        ? nodesRef.current.filter(node => 
-            node.id === selectedNode ||
-            currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
-          )
-        : nodesRef.current.filter(node => 
-            !searchTerm || 
-            node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            node.type.toLowerCase().includes(searchTerm.toLowerCase())
-          )
+      // Check for hovered elements
+      let hoveredElement: string | null = null
       
-      const hoveredNode = visibleNodes.find(node => {
-        const dx = x - node.x
-        const dy = y - node.y
-        return Math.sqrt(dx * dx + dy * dy) <= node.radius
-      })
+      // Check for hovered group first
+      const currentNodes = nodesRef.current
+      const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
+      
+      if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+        groupBoxes.forEach((box, groupKey) => {
+          if (x >= box.x && x <= box.x + box.width && 
+              y >= box.y && y <= box.y + box.height) {
+            hoveredElement = `group-${groupKey}`
+          }
+        })
+      }
+      
+      // If not hovering over a group, check for nodes
+      if (!hoveredElement) {
+        const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
+        const visibleNodes = showConnectionsOnly && selectedNode 
+          ? nodesRef.current.filter(node => 
+              node.id === selectedNode ||
+              currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
+            )
+          : nodesRef.current.filter(node => 
+              !searchTerm || 
+              node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              node.type.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+        
+        const hoveredNode = visibleNodes.find(node => {
+          const dx = x - node.x
+          const dy = y - node.y
+          return Math.sqrt(dx * dx + dy * dy) <= node.radius
+        })
 
-      setHoveredNode(hoveredNode?.id || null)
-      canvas.style.cursor = hoveredNode ? 'pointer' : 'grab'
+        if (hoveredNode) {
+          hoveredElement = hoveredNode.id
+        }
+      }
+
+      setHoveredNode(hoveredElement)
+      
+      // Set cursor based on what's hovered
+      if (hoveredElement?.startsWith('group-')) {
+        canvas.style.cursor = 'move'
+      } else if (hoveredElement) {
+        canvas.style.cursor = 'pointer'
+      } else {
+        canvas.style.cursor = 'grab'
+      }
     }
   }
 
   const handleMouseUp = () => {
-    if (draggedNode) {
+    if (draggedGroup) {
+      // Release the dragged group
+      const currentNodes = nodesRef.current
+      const groupNodes = nodeGroups.get(draggedGroup) || []
+      
+      // Keep group nodes fixed for a bit, then release for physics
+      setTimeout(() => {
+        groupNodes.forEach(node => {
+          const layoutNode = currentNodes.find(n => n.id === node.id)
+          if (layoutNode) {
+            layoutNode.fx = null
+            layoutNode.fy = null
+          }
+        })
+      }, 1000)
+      
+      setDraggedGroup(null)
+      setGroupDragOffset({ x: 0, y: 0 })
+    } else if (draggedNode) {
       // Release the dragged node but keep it fixed in place
       const node = nodesRef.current.find(n => n.id === draggedNode)
       if (node) {
@@ -978,14 +1856,34 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
-    setScale(prev => Math.max(0.1, Math.min(3, prev * zoomFactor)))
+    e.stopPropagation()
+    
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+    
+    // Calculate zoom factor with more granular control
+    const zoomIntensity = 0.1
+    const zoomFactor = e.deltaY > 0 ? (1 - zoomIntensity) : (1 + zoomIntensity)
+    const newScale = Math.max(0.2, Math.min(5, scale * zoomFactor))
+    
+    if (newScale !== scale) {
+      // Calculate the point in world coordinates before zoom
+      const worldX = (mouseX - offset.x) / scale
+      const worldY = (mouseY - offset.y) / scale
+      
+      // Calculate new offset to keep the mouse point stationary
+      const newOffsetX = mouseX - worldX * newScale
+      const newOffsetY = mouseY - worldY * newScale
+      
+      setScale(newScale)
+      setOffset({ x: newOffsetX, y: newOffsetY })
+    }
   }
 
-  const resetView = () => {
-    setScale(1)
-    setOffset({ x: 0, y: 0 })
-  }
 
   const toggleFilter = (type: string) => {
     setFilteredTypes(prev => {
@@ -1009,9 +1907,30 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       canvas.height = container.clientHeight
     }
 
+    // Prevent page scrolling when interacting with the graph
+    const preventScroll = (e: WheelEvent) => {
+      if (canvas && canvas.contains(e.target as Node)) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+
+    const preventTouch = (e: TouchEvent) => {
+      if (canvas && canvas.contains(e.target as Node)) {
+        e.preventDefault()
+      }
+    }
+
     resizeCanvas()
     window.addEventListener('resize', resizeCanvas)
-    return () => window.removeEventListener('resize', resizeCanvas)
+    document.addEventListener('wheel', preventScroll, { passive: false })
+    document.addEventListener('touchmove', preventTouch, { passive: false })
+    
+    return () => {
+      window.removeEventListener('resize', resizeCanvas)
+      document.removeEventListener('wheel', preventScroll)
+      document.removeEventListener('touchmove', preventTouch)
+    }
   }, [])
 
   const relationshipTypes = ['uses', 'inherits', 'contains']
@@ -1043,6 +1962,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                   <SelectItem value="force">Force-Directed</SelectItem>
                   <SelectItem value="hierarchical">Hierarchical</SelectItem>
                   <SelectItem value="circular">Circular</SelectItem>
+                  <SelectItem value="grouped">Grouped</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1070,6 +1990,30 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                 />
                 Show Connections Only
               </label>
+              {layoutMode === 'grouped' && (
+                <>
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Group by:</div>
+                  <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="file">File</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={showGroupContainers}
+                      onChange={(e) => setShowGroupContainers(e.target.checked)}
+                      className="rounded"
+                    />
+                    Show Containers
+                  </label>
+                </>
+              )}
             </div>
             
             {/* Spacing & Layout Controls */}
@@ -1106,8 +2050,9 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setScale(prev => Math.min(3, prev * 1.2))}
+                    onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
                     className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    title="Zoom In (+)"
                   >
                     <ZoomIn className="h-4 w-4" />
                   </Button>
@@ -1117,16 +2062,30 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setScale(prev => Math.max(0.1, prev * 0.8))}
+                    onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
                     className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    title="Zoom Out (-)"
                   >
                     <ZoomOut className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
+                    onClick={fitToView}
+                    className="h-8 px-3 hover:bg-green-100 dark:hover:bg-green-900/30"
+                    title="Fit to View (F)"
+                  >
+                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    Fit
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
                     onClick={resetView}
                     className="h-8 px-3 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    title="Reset View (R)"
                   >
                     <RotateCcw className="h-4 w-4 mr-1" />
                     Reset
@@ -1167,17 +2126,24 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       {/* Enhanced Graph Container */}
       <div
         ref={containerRef}
-        className="relative w-full h-[600px] rounded-xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900"
+        className="relative w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700"
+        style={{ 
+          background: 'linear-gradient(135deg, rgb(248 250 252) 0%, rgb(255 255 255) 50%, rgb(248 250 252) 100%)',
+          // Dark mode gradient will be handled by CSS
+        }}
       >
-        {/* Decorative Grid Background */}
-        <div className="absolute inset-0 opacity-30">
-          <svg width="100%" height="100%" className="text-slate-300 dark:text-slate-700">
+        {/* Decorative Grid Background - properly contained with rounded corners */}
+        <div className="absolute inset-0 opacity-30 rounded-xl overflow-hidden">
+          <svg width="100%" height="100%" className="text-slate-300 dark:text-slate-700 rounded-xl">
             <defs>
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
               </pattern>
+              <clipPath id="roundedContainer">
+                <rect width="100%" height="100%" rx="12" ry="12" />
+              </clipPath>
             </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
+            <rect width="100%" height="100%" fill="url(#grid)" clipPath="url(#roundedContainer)" />
           </svg>
         </div>
         
@@ -1189,7 +2155,20 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
           className="w-full h-full relative z-10 cursor-grab active:cursor-grabbing"
+          style={{ touchAction: 'none' }} // Prevent touch scrolling
         />
+        
+        {/* Minimap */}
+        {showMinimap && nodesRef.current.length > 0 && (
+          <MinimapComponent 
+            nodes={nodesRef.current}
+            edges={edgesRef.current}
+            scale={scale}
+            offset={offset}
+            canvasRef={canvasRef}
+            selectedNode={selectedNode}
+          />
+        )}
         
         {/* Enhanced Node Info Tooltip */}
         {hoveredNode && (
@@ -1211,15 +2190,44 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           </div>
         )}
         
-        {/* Graph Instructions */}
-        <div className="absolute bottom-6 right-6 bg-slate-900/80 dark:bg-slate-100/80 text-white dark:text-slate-900 rounded-lg p-3 text-sm backdrop-blur-sm">
-          <div className="font-medium mb-1">Graph Controls:</div>
-          <div className="space-y-1 text-xs opacity-90">
-            <div>• Drag canvas to pan around</div>
-            <div>• Drag nodes to reposition</div>
-            <div>• Scroll to zoom in/out</div>
-            <div>• Click nodes to select</div>
-            <div>• Hover for details</div>
+        {/* Enhanced Graph Instructions */}
+        <div className="absolute bottom-6 right-6 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-sm backdrop-blur-sm shadow-lg max-w-xs">
+          <div className="font-semibold mb-2 text-slate-900 dark:text-slate-100">Navigation Controls</div>
+          <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+            <div className="flex justify-between">
+              <span>Pan canvas</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Drag</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Zoom</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Scroll</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Move nodes</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Drag node</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Move groups</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Drag group</span>
+            </div>
+            <hr className="my-2 border-slate-200 dark:border-slate-700" />
+            <div className="font-medium text-slate-800 dark:text-slate-200">Keyboard Shortcuts</div>
+            <div className="flex justify-between">
+              <span>Reset view</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">R</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Fit to view</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">F</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Zoom in/out</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">+/-</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Auto layout</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Space</span>
+            </div>
           </div>
         </div>
       </div>

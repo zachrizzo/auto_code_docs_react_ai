@@ -112,5 +112,173 @@
     "description": "A React component that renders a addIcon element.",
     "props": {},
     "lastUpdated": "2025-05-22T21:48:54.579Z"
+  },
+  "diffLines:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/types/diff.d.ts": {
+    "componentHash": "f57566e338bea809203eb043f6b799c2",
+    "description": "The `diffLines` component visually highlights the differences between two text strings, providing a clear side-by-side comparison for developers.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:02.404Z"
+  },
+  "diffWords:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/types/diff.d.ts": {
+    "componentHash": "b40646057a2f19abb81057dee52abf1a",
+    "description": "Here are a few options for a concise, one-sentence description of the `diffWords` component, suitable for a developer explaining its function:\n\n**Option 1 (Most General):**\n\n\"The `diffWords` component is responsible for comparing and highlighting the differences between two input strings.\"\n\n**Option 2 (Slightly More Specific):**\n\n\"This component analyzes two strings and visually represents the words that differ between them.\"\n\n**Option 3 (If it has a visual element):**\n\n\"The `diffWords` component displays a visual representation of the words that are different between two provided text inputs.\"\n\n---\n\nTo give you the *best* possible description, I'd need to know more about what the component *actually does* within the `diff.d.ts` file. But these options provide a solid starting point.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:05.494Z"
+  },
+  "diffChars:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/types/diff.d.ts": {
+    "componentHash": "eb851b2195f9de3a77fb3e502dbeac6b",
+    "description": "Okay, here's a concise, one-sentence description of the `diffChars` component, written from a developer's perspective, based on the provided information:\n\n“The `diffChars` component visually highlights the differences between two strings, providing a character-by-character comparison for debugging or display.” \n\n---\n\nWould you like me to generate a description for a different component, or perhaps refine this one based on specific details you can provide (e.g., what kind of differences it highlights, its visual style, etc.)?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:07.560Z"
+  },
+  "ThemeProvider:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/theme-provider.tsx": {
+    "componentHash": "6907679e9874743cd2e1031465e9090f",
+    "description": "Here are a few concise one-sentence descriptions for the `ThemeProvider` component, suitable for a developer explaining its function:\n\n**Option 1 (Most Concise):**\n\n\"The `ThemeProvider` component provides a consistent theme context to all its descendant components, enabling dynamic styling based on the defined theme.\"\n\n**Option 2 (Slightly more detailed):**\n\n\"This `ThemeProvider` component manages and distributes a global theme object, allowing child components to access and utilize theme-related styling properties.\"\n\n**Option 3 (Focus on React Context):**\n\n\"The `ThemeProvider` utilizes React Context to centrally manage the application's theme, simplifying styling and theming across the component tree.\"\n\nI’ve tried to capture the core functionality clearly and accurately.  Let me know if you'd like me to adjust the wording based on a specific emphasis.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:10.644Z"
+  },
+  "SimilarityList:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "2041be50a3a4b3f13090944b1e5a8bba",
+    "description": "Here are a few concise, one-sentence descriptions of the `SimilarityList` component from a developer’s perspective, considering the provided information:\n\n**Option 1 (Most General):**\n\n\"The `SimilarityList` component renders a list of items ranked by similarity, likely based on user input or data analysis.\"\n\n**Option 2 (Slightly more specific, assuming ranking):**\n\n\"This `SimilarityList` component displays a ranked list of items, presenting the most similar results to the user.\"\n\n**Option 3 (If it's displaying similarity scores):**\n\n\"The `SimilarityList` component visualizes a list of items, showcasing their similarity scores to facilitate comparison.\"\n\n**To help me refine the description further, could you tell me:**\n\n*   What kind of data is the component displaying? (e.g., text snippets, images, products?)\n*   How are items ranked for similarity? (e.g., based on cosine similarity, exact matches, etc.)",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:14.239Z"
+  },
+  "generateSyntheticSimilarityData:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "31ed18ece5b3fce43dc89d3e6691c54f",
+    "description": "This `generateSyntheticSimilarityData` component creates sample data simulating the similarity scores between documents, allowing for testing and demonstration of the similarity list functionality.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:14.845Z"
+  },
+  "fetchComponents:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "2e02f2d8dc9b3d72c44d89f750774743",
+    "description": "Okay, here's a concise, one-sentence description of the `fetchComponents` React component, written from a developer's perspective, based on the provided information:\n\n\"The `fetchComponents` component is responsible for retrieving and loading a list of components from a data source.\" \n\n---\n\nWould you like me to refine this description further, perhaps adding a detail based on a specific functionality or use case (if you can provide more context about what the component *does* with the fetched components)?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:16.599Z"
+  },
+  "processSimilarityWarnings:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "afd102cc84b91d263813e6595a552487",
+    "description": "Okay, here's a concise, one-sentence description of the `processSimilarityWarnings` component, written from a developer's perspective, based on the provided information:\n\n“The `processSimilarityWarnings` component displays a list of similarity warnings derived from processing text content.” \n\nWould you like me to refine this description further, or perhaps generate one based on different prop details (if you provide them)?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:18.002Z"
+  },
+  "fetchComponentCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "b2b27e2af15c1ad15e70eeecc6a300be",
+    "description": "Okay, here's a concise, one-sentence description of the `fetchComponentCode` component, written from a developer's perspective, based on the provided information:\n\n\"This component fetches the code for a React component, likely for documentation or analysis, from the specified file path.\" \n\n---\n\nWould you like me to refine this description further, or perhaps provide a slightly different version?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:21.799Z"
+  },
+  "handleCompare:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
+    "componentHash": "afa29e10fca8a0a48cef59c269688dea",
+    "description": "Okay, here's a concise one-sentence description of the `handleCompare` component, written from a developer's perspective, based on the information you provided:\n\n“The `handleCompare` component facilitates the comparison of items within the similarity list, likely triggering a visual or functional action related to highlighting or detailing similarities.” \n\n**Note:** Since you didn't provide the specific props, I've made a general assumption about its function based on the name and file location (similarity-list).  If you provide the props, I can refine the description further.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:20.430Z"
+  },
+  "SimilarComponentsSection:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similar-components-section.tsx": {
+    "componentHash": "07a67fec3e0645bb398045f6fc8c329b",
+    "description": "Okay, here's a concise one-sentence description of the `SimilarComponentsSection` React component, written from a developer's perspective, based on the provided information:\n\n“This component displays a section highlighting visually similar React components, likely for exploration or comparison purposes.” \n\n---\n\n**Note:**  I've created this description assuming the component's core function is to present related components.  If the component has a more specific purpose (e.g., suggesting similar components based on props), the description could be adjusted accordingly.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:23.643Z"
+  },
+  "getMockCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similar-components-section.tsx": {
+    "componentHash": "bec3ed498e410945158e23cbc260aa3b",
+    "description": "Here are a few options for a concise, one-sentence description of the `getMockCode` component, from a developer's perspective, considering the provided information:\n\n**Option 1 (Most Comprehensive):**\n\n\"This `getMockCode` component generates a placeholder code snippet for demonstration purposes within the similar components section.\"\n\n**Option 2 (More Concise):**\n\n\"The `getMockCode` component provides a mock code sample to illustrate similar code structures in the UI.\"\n\n**Option 3 (Very Brief):**\n\n\"This component renders a placeholder code snippet for demonstration.\"\n\n---\n\nTo help me tailor the description even further, could you tell me:\n\n*   **What kind of code is being mocked?** (e.g., JavaScript, React, HTML)\n*   **What is the purpose of this component within the larger application?** (e.g., showing example code, highlighting key features)",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:26.780Z"
+  },
+  "handleCompare:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similar-components-section.tsx": {
+    "componentHash": "890ed5690ca2320b4ad7b94dc2db5543",
+    "description": "Okay, here are a few concise, one-sentence descriptions of the `handleCompare` component, suitable for a developer explaining its function, based on the provided information:\n\n**Option 1 (Most General):**\n\n\"The `handleCompare` component facilitates the comparison of similar components within the application.\"\n\n**Option 2 (Slightly More Specific):**\n\n\"This component is responsible for enabling the user to visually compare different component implementations within the application's similar components section.\"\n\n**Option 3 (Shortest):**\n\n\"The `handleCompare` component provides a mechanism for comparing related components.\"\n\n---\n\nTo help me refine the description even further, could you tell me:\n\n*   **What does the component *do* specifically when a comparison is triggered?** (e.g., highlights differences, displays a side-by-side view, etc.)",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:29.729Z"
+  },
+  "Sidebar:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/sidebar.tsx": {
+    "componentHash": "a92845bfb7e466d4cd04bd529c027a31",
+    "description": "Okay, here's a concise, one-sentence description of the `Sidebar` React component, written from a developer's perspective:\n\n\"The `Sidebar` component renders a persistent navigation menu for the application, allowing users to browse and access different sections.\"",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:30.682Z"
+  },
+  "SidebarWrapper:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/sidebar-wrapper.tsx": {
+    "componentHash": "6ee07479963932c432354e69a2d076c0",
+    "description": "Okay, here's a concise, one-sentence description of the `SidebarWrapper` component, from a developer's perspective, based on the provided information:\n\n“The `SidebarWrapper` component encapsulates and manages the presentation of the sidebar content within the application.” \n\n---\n\nWould you like me to generate a description based on different props or a specific focus for the description?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:32.009Z"
+  },
+  "Search:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/search.tsx": {
+    "componentHash": "a83a4127e49a022fbece10f328678afb",
+    "description": "Here are a few concise, one-sentence descriptions of the `Search` React component, from a developer's perspective, based on the information provided:\n\n**Option 1 (Most General):**\n\n\"The `Search` component facilitates user input for querying data within the application.\"\n\n**Option 2 (Slightly more specific):**\n\n\"This `Search` component provides a search bar for users to input search terms and initiate data retrieval.\"\n\n**Option 3 (Focusing on the file path):**\n\n\"Located in `/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/search.tsx`, the `Search` component handles user-entered search queries.\" \n\n---\n\nTo help me tailor the description even further, could you tell me:\n\n*   **What kind of data is the search intended to find?** (e.g., documents, products, users)\n*   **What is the overall purpose of this component within the application?**",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:35.559Z"
+  },
+  "ModeToggle:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/mode-toggle.tsx": {
+    "componentHash": "184c9465a5192d5d7b9cd4f33f9ef9c1",
+    "description": "The `ModeToggle` component dynamically switches between light and dark mode themes based on user interaction, allowing for a customizable visual experience within the application.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:36.116Z"
+  },
+  "toggleTheme:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/mode-toggle.tsx": {
+    "componentHash": "2539acb31e3a11c92fa85be65d024a9c",
+    "description": "Here's a concise, one-sentence description from a developer's perspective for the `toggleTheme` component:\n\n\"The `toggleTheme` component allows users to dynamically switch between a light and dark color scheme for the application.\"",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:36.961Z"
+  },
+  "Header:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/header.tsx": {
+    "componentHash": "a50868323ea8e8327f98d2ddec297b9c",
+    "description": "Okay, here's a concise, one-sentence description of the `Header` React component, written from a developer's perspective:\n\n\"The `Header` component renders a persistent navigation bar at the top of the application, providing key links and branding elements.\" \n\n**Note:** Since you didn't provide the props, I've focused on the general function of a header component. If you provide the props, I can refine the description further.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:38.527Z"
+  },
+  "ComponentStats:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/component-stats.tsx": {
+    "componentHash": "e95b1fb77d7737db64e7384eebea4af2",
+    "description": "Please provide the props for the `ComponentStats` component. I need to know what data the component receives to generate an accurate, developer-focused description.  For example, tell me what props it takes (e.g., `data`, `label`, `value`, etc.) and what they represent.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:39.612Z"
+  },
+  "fetchComponents:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/component-stats.tsx": {
+    "componentHash": "7b3a05557773c89d6f79dd53d70453f8",
+    "description": "Okay, here's a concise one-sentence description of the `fetchComponents` React component, written from a developer’s perspective, based on the provided information:\n\n\"The `fetchComponents` component retrieves component data (likely for stats or analysis) from an external source via an API call.\" \n\n**Note:** I've made assumptions about the component's purpose based on the filename \"component-stats.tsx\" and the typical use of `fetchComponents` in React projects.  If you can provide more details about what the component *does* with the data, I can refine the description further.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:41.690Z"
+  },
+  "ComponentClient:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/component-client.tsx": {
+    "componentHash": "6c534bc08ec4847228773aa391a88863",
+    "description": "Please provide the props for the `ComponentClient` component. I need the prop definitions to generate an accurate, developer-focused one-sentence description.  For example, tell me what props the component accepts (e.g., `name: string`, `count: number`, etc.).",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:42.711Z"
+  },
+  "fetchComponent:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/component-client.tsx": {
+    "componentHash": "b2b9170a99fd57670fce18494d4b2601",
+    "description": "Please provide the content of the `fetchComponent` component (likely the code itself) so I can generate a concise, one-sentence description from a developer's perspective. I need to see the code to understand its primary function.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:43.554Z"
+  },
+  "generateDescription:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/component-client.tsx": {
+    "componentHash": "407d2ae0b62439970f2e07c70340fd91",
+    "description": "Please provide the content of the `generateDescription` component. I need the code within the component to write a concise, one-sentence description from a developer's perspective.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:44.208Z"
+  },
+  "ComparisonModal:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
+    "componentHash": "574e04de1a412cb9140e3471054be079",
+    "description": "Here are a few concise, one-sentence descriptions for the `ComparisonModal` component, from a developer's perspective, based on the provided information.  I've offered a few options with slightly different nuances:\n\n**Option 1 (Most Direct):**\n\n\"This `ComparisonModal` component displays a side-by-side comparison of two items, allowing users to visually highlight differences.\"\n\n**Option 2 (Slightly more detailed):**\n\n\"The `ComparisonModal` component facilitates a direct comparison between two selected items, presenting them in a modal window for detailed review.\"\n\n**Option 3 (Focus on interaction):**\n\n\"This `ComparisonModal` component enables users to easily compare two elements by providing a visual comparison interface within a modal dialog.\"\n\nTo help me refine the description further, could you provide a brief description of what the component *does* (e.g., what types of items it compares, what kind of differences are highlighted)?",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:47.456Z"
+  },
+  "extractMethodCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
+    "componentHash": "61c0e0288003c9b95280af9eb065b876",
+    "description": "Please provide the code for the `extractMethodCode` component from `/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx` so I can generate the concise, one-sentence description from a developer's perspective.  I need to see the code to understand its function.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:48.792Z"
+  },
+  "normalizeForComparison:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
+    "componentHash": "c04f2df56d0f011840978f3dc0a7b41c",
+    "description": "This `normalizeForComparison` component prepares data for visual comparison by standardizing formats and potentially highlighting key differences between items.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:49.278Z"
+  },
+  "normalize:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
+    "componentHash": "171fd5167ef64a0e7026ba7b28cddfda",
+    "description": "Okay, here's a concise, one-sentence description of the `normalize` component, written from a developer's perspective, based on the information provided:\n\n\"The `normalize` component likely handles and standardizes data input or output, potentially for formatting or consistency within the comparison modal.\" \n\n**Note:**  Because I don't have the actual code content, this description is based solely on the component name and file path. If you provide the code, I can create a more precise and accurate description.",
+    "props": {},
+    "lastUpdated": "2025-06-11T13:43:51.063Z"
   }
 }

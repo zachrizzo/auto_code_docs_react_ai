@@ -3,6 +3,17 @@ import { parseComponents, parseAllCodeItems } from "./core/parser/";
 import fs from "fs-extra";
 import path from "path";
 
+/**
+ * Generate a unique slug for a component based on its file path and name
+ * to avoid collisions when multiple components have the same name
+ */
+function generateUniqueSlug(componentName: string, filePath: string): string {
+  // For generateDocUI, we need to extract root directory from the file path
+  // This is a simplified version since we don't have rootDir readily available
+  const relativePath = filePath.replace(/^.*[\/\\](src[\/\\].*?)$/, '$1') || filePath;
+  return `${relativePath.replace(/[\/\\]/g, '_').replace(/\.(tsx?|jsx?)$/, '')}_${componentName}`.toLowerCase().replace(/\s+/g, "-");
+}
+
 export { generateDocumentation, parseComponents, parseAllCodeItems, AiDescriptionGenerator };
 
 // Generate the documentation UI
@@ -34,7 +45,7 @@ export async function generateDocUI(components: any[], options: any = {}) {
     description: comp.description || "",
     filePath: comp.filePath || "",
     methodCount: comp.methods ? comp.methods.length : 0,
-    slug: comp.name.toLowerCase().replace(/\s+/g, "-"),
+    slug: comp.slug || generateUniqueSlug(comp.name, comp.filePath || ""),
   }));
 
   await fs.writeJson(
@@ -47,7 +58,7 @@ export async function generateDocUI(components: any[], options: any = {}) {
   for (const component of components) {
     const componentData = {
       ...component,
-      slug: component.name.toLowerCase().replace(/\s+/g, "-"),
+      slug: component.slug || generateUniqueSlug(component.name, component.filePath || ""),
     };
 
     await fs.writeJson(

@@ -5,7 +5,8 @@
 
 import * as ts from "typescript";
 import { debug } from "./file-utils";
-import { MethodDefinition, ParamDefinition, EntityDeclaration } from "../types";
+import { MethodDefinition, ParamDefinition } from "../types";
+import { EntityDeclaration } from "../types/index";
 
 /**
  * Extract the source code for a specific component from a file using AST

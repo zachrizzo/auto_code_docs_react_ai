@@ -7,10 +7,11 @@ import * as reactDocgen from "react-docgen-typescript";
 import * as path from "path";
 import * as fs from "fs-extra";
 import * as ts from "typescript";
-import { ComponentDefinition, PropDefinition, EntityDeclaration } from "../types";
+import { ComponentDefinition, PropDefinition } from "../types";
+import { EntityDeclaration } from "../types/index";
 import { debug, extractImportedComponentPaths, shouldIncludeFile } from "./file-utils";
 import { extractComponentMethods, extractComponentSourceCode, extractEntityDeclarations } from "./ast-utils";
-import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages, extractPropDrilling, detectCircularDependencies } from "./relationship-extractor";
+import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages, extractPropDrilling, detectCircularDependencies, PropDrillingInfo } from "./relationship-extractor";
 import { extractCodeBlocks, detectDuplicates, DuplicateCodeMatch } from "./duplicate-detector";
 
 /**
@@ -70,8 +71,9 @@ export function parseComponentFile(
       // The full fileContent will be used for componentDef.sourceCode
       // const sourceCode = extractComponentSourceCode(fileContent, componentName); // This line is no longer needed for componentDef.sourceCode
 
-      // Generate slug for the component
-      const slug = componentName.toLowerCase().replace(/\s+/g, "-");
+      // Generate slug for the component using file path to avoid duplicates
+      const relativePath = path.relative(rootDir, filePath);
+      const slug = `${relativePath.replace(/[\/\\]/g, '_').replace(/\.(tsx?|jsx?)$/, '')}_${componentName}`.toLowerCase().replace(/\s+/g, "-");
       
       // Extract entity usages instead of individual relationship types
       const usages = extractEntityUsages(fileContent, filePath, slug, availableEntities);
@@ -280,8 +282,6 @@ export async function collectComponentsRecursively(
           }
           
           // Check against include/exclude patterns
-          const relativePath = path.relative(rootDir, importPath);
-          
           const included = includePatterns.some((pattern) => {
             const matches = shouldIncludeFile(importPath, rootDir, includePatterns, excludePatterns);
             debug(`  Include pattern ${pattern}: ${matches ? "✓" : "✗"}`);

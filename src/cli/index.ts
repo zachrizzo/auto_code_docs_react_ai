@@ -13,6 +13,15 @@ import { glob } from "glob";
 import * as ts from "typescript";
 import ignore from "ignore"; // NEW: for .gitignore parsing
 
+/**
+ * Generate a unique slug for a component based on its file path and name
+ * to avoid collisions when multiple components have the same name
+ */
+function generateUniqueSlug(componentName: string, filePath: string, rootDir: string): string {
+  const relativePath = path.relative(rootDir, filePath);
+  return `${relativePath.replace(/[\/\\]/g, '_').replace(/\.(tsx?|jsx?)$/, '')}_${componentName}`.toLowerCase().replace(/\s+/g, "-");
+}
+
 // Simple utility to extract methods from code for similarity analysis
 function extractMethodsFromCode(code: string, componentName: string): Array<any> {
   const methods: Array<any> = [];
@@ -94,7 +103,7 @@ function extractMethodsFromCode(code: string, componentName: string): Array<any>
 }
 
 // Enhanced utility to extract all code items including nested functions and classes
-function extractAllCodeItems(fileContent: string, filePath: string): Array<{ 
+function extractAllCodeItems(fileContent: string, filePath: string, rootDir: string): Array<{ 
   name: string; 
   kind: 'function' | 'class' | 'method' | 'component'; 
   code: string;
@@ -127,7 +136,7 @@ function extractAllCodeItems(fileContent: string, filePath: string): Array<{
       if (ts.isFunctionDeclaration(node) && node.name) {
         const name = node.name.text;
         const code = fileContent.substring(node.pos, node.end).trim();
-        const slug = name.toLowerCase().replace(/\s+/g, "-");
+        const slug = generateUniqueSlug(name, filePath, rootDir);
         
         // Check if this is a React component (starts with capital letter and returns JSX)
         const isComponent = /^[A-Z]/.test(name) && code.includes('return') && (code.includes('<') || code.includes('React.'));
@@ -153,7 +162,7 @@ function extractAllCodeItems(fileContent: string, filePath: string): Array<{
       else if (ts.isClassDeclaration(node) && node.name) {
         const name = node.name.text;
         const code = fileContent.substring(node.pos, node.end).trim();
-        const slug = name.toLowerCase().replace(/\s+/g, "-");
+        const slug = generateUniqueSlug(name, filePath, rootDir);
         
         const item: any = { 
           name, 
@@ -199,7 +208,7 @@ function extractAllCodeItems(fileContent: string, filePath: string): Array<{
           ) {
             const name = declaration.name.text;
             const code = fileContent.substring(node.pos, node.end).trim();
-            const slug = name.toLowerCase().replace(/\s+/g, "-");
+            const slug = generateUniqueSlug(name, filePath, rootDir);
             
             // Check if this is a React component
             const isComponent = /^[A-Z]/.test(name) && code.includes('return') && (code.includes('<') || code.includes('React.'));
@@ -295,7 +304,7 @@ async function parseAllCodeItems(rootDir: string): Promise<any[]> {
   for (const filePath of files) {
     try {
       const content = await fs.readFile(filePath, "utf-8");
-      const items = extractAllCodeItems(content, filePath);
+      const items = extractAllCodeItems(content, filePath, rootDir);
       if (items.length > 0) {
         console.log(`Extracted ${items.length} code items from ${path.relative(rootDir, filePath)}`);
         allItems.push(...items);
@@ -436,7 +445,7 @@ program
       
       // Also generate a [slug].json file for each code item in the docs-data directory
       for (const item of codeItems) {
-        const slug = item.slug || item.name.toLowerCase().replace(/\s+/g, "-");
+        const slug = item.slug || generateUniqueSlug(item.name, item.filePath, rootDir);
         item.slug = slug; // Ensure slug is set
         
         // Add empty relationships array if not present
@@ -1220,7 +1229,7 @@ program
       // Create a more detailed component index with relationship data
       const componentIndex = allComponents.map(comp => ({
         name: comp.name,
-        slug: comp.slug || comp.name.toLowerCase().replace(/\s+/g, "-"),
+        slug: comp.slug || generateUniqueSlug(comp.name, comp.filePath, rootDir),
         type: comp.type || 'component',
         filePath: comp.filePath
       }));
@@ -1230,7 +1239,7 @@ program
       
       // Save individual component files with full data including relationships
       for (const component of allComponents) {
-        const slug = component.slug || component.name.toLowerCase().replace(/\s+/g, "-");
+        const slug = component.slug || generateUniqueSlug(component.name, component.filePath, rootDir);
         component.slug = slug; // Ensure slug is set
         
         // Add empty relationships array if not present

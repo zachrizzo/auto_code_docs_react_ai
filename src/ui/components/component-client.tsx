@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeBlock } from "@/components/code-block";
 import { Badge } from "@/components/ui/badge";
 import { CodeRelationships } from "@/components/code-relationships";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PropDefinition {
   name: string;
@@ -18,12 +19,12 @@ interface PropDefinition {
 
 interface ComponentData {
   name: string;
-  type: string;
+  type?: string;
   filePath: string;
-  route: string;
+  route?: string;
   code: string;
   description?: string;
-  lastUpdated: string;
+  lastUpdated?: string;
   props?: PropDefinition[];
   methods?: {
     name: string;
@@ -35,10 +36,11 @@ interface ComponentData {
     }[];
     returnType?: string;
   }[];
-  similarComponents: {
+  similarComponents?: {
     name: string;
     similarity: number;
     reason: string;
+    slug?: string;
   }[];
 }
 
@@ -70,7 +72,16 @@ export default function ComponentClient({ slug }: { slug: string }) {
         const res = await fetch(`/docs-data/${slug}.json`)
         if (res.ok) {
           const data = await res.json()
-          setComponentData(data)
+          // Ensure all required fields exist with defaults
+          setComponentData({
+            ...data,
+            similarComponents: data.similarComponents || [],
+            lastUpdated: data.lastUpdated || new Date().toLocaleDateString(),
+            type: data.type || "Component",
+            route: data.route || `/components/${slug}`,
+            props: data.props || [],
+            methods: data.methods || []
+          })
           if (data.description) {
             setDescription(data.description)
           }
@@ -80,7 +91,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
             name: slug,
             type: "React Component",
             filePath: `src/components/${slug}.tsx`,
-            route: `/components/${slug.toLowerCase()}`,
+            route: `/components/${slug}`,
             code: `import React from 'react';\n\nexport function ${slug}({ title, children }) {\n  return (\n    <div className=\"component\">\n      <h2>{title}</h2>\n      <div>{children}</div>\n    </div>\n  );\n}`,
             lastUpdated: "2 days ago",
             similarComponents: [
@@ -100,6 +111,18 @@ export default function ComponentClient({ slug }: { slug: string }) {
         setLoading(false)
       } catch (error) {
         console.error('Error loading component data:', error)
+        // Set fallback data on error
+        setComponentData({
+          name: slug,
+          type: "Component",
+          filePath: `src/components/${slug}.tsx`,
+          route: `/components/${slug}`,
+          code: `// Error loading component data for ${slug}`,
+          lastUpdated: new Date().toLocaleDateString(),
+          similarComponents: [],
+          props: [],
+          methods: []
+        })
         setLoading(false)
       }
     }
@@ -173,14 +196,14 @@ export default function ComponentClient({ slug }: { slug: string }) {
       <div className="flex flex-col gap-4 mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-4xl font-bold tracking-tight">{componentData.name}</h1>
-          <Badge className="bg-violet-500 hover:bg-violet-600">{componentData.type}</Badge>
+          <Badge className="bg-violet-500 hover:bg-violet-600">{componentData.type || "Component"}</Badge>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <FileCode className="h-4 w-4" />
           <span className="font-mono text-sm">{componentData.filePath}</span>
         </div>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-muted-foreground">Last updated {componentData.lastUpdated}</p>
+          <p className="text-muted-foreground">Last updated {componentData.lastUpdated || "recently"}</p>
           <Button onClick={generateDescription} disabled={isGenerating} className="gap-2">
             {isGenerating ? (
               "Generating..."
@@ -194,17 +217,19 @@ export default function ComponentClient({ slug }: { slug: string }) {
         </div>
       </div>
       {description && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm mb-10 border border-slate-100 dark:border-slate-800">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-medium text-violet-600 dark:text-violet-400">AI Description</h3>
+        <Card className="mb-10">
+          <CardHeader>
+            <CardTitle className="text-violet-600 dark:text-violet-400">AI Description</CardTitle>
             {modelUsed && (
-              <span className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md text-slate-600 dark:text-slate-400">
+              <CardDescription>
                 Generated with {modelUsed}
-              </span>
+              </CardDescription>
             )}
-          </div>
-          <p className="text-lg">{description}</p>
-        </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg">{description}</p>
+          </CardContent>
+        </Card>
       )}
       
       {generationError && !description && (
@@ -235,153 +260,121 @@ export default function ComponentClient({ slug }: { slug: string }) {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="code">
-          <CodeBlock code={componentData.code || `// Code not available for ${componentData.name}`} language="tsx" />
+          <Card>
+            <CodeBlock code={componentData.code || `// Code not available for ${componentData.name}`} language="tsx" />
+          </Card>
         </TabsContent>
         <TabsContent value="usage">
-          <CodeBlock
-            code={`import { ${componentData.name} } from '${componentData.filePath.replace(/\.tsx?$/, '')}';\n\n// Usage example here`}
-            language="tsx"
-          />
+          <Card>
+            <CodeBlock
+              code={`import { ${componentData.name} } from '${componentData.filePath.replace(/\.tsx?$/, '')}';\n\n// Usage example here`}
+              language="tsx"
+            />
+          </Card>
         </TabsContent>
         <TabsContent value="props">
-          <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-800/50">
-                <tr>
-                  <th className="text-left p-4 font-medium">Name</th>
-                  <th className="text-left p-4 font-medium">Type</th>
-                  <th className="text-left p-4 font-medium">Default</th>
-                  <th className="text-left p-4 font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {componentData.props && componentData.props.length > 0 ? (
-                  componentData.props.map((prop, index) => (
-                    <tr key={index} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">{prop.name}</td>
-                      <td className="p-4 text-muted-foreground">{prop.type || 'any'}</td>
-                      <td className="p-4 text-muted-foreground">{prop.defaultValue || '-'}</td>
-                      <td className="p-4">{prop.description || '-'}</td>
+          <Card>
+            <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-800/50">
+                  <tr>
+                    <th className="p-3 text-left font-medium">Prop</th>
+                    <th className="p-3 text-left font-medium">Type</th>
+                    <th className="p-3 text-left font-medium">Required</th>
+                    <th className="p-3 text-left font-medium">Default</th>
+                    <th className="p-3 text-left font-medium">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {componentData.props && componentData.props.length > 0 ? componentData.props.map((prop) => (
+                    <tr key={prop.name} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="p-3 font-mono text-sm">{prop.name}</td>
+                      <td className="p-3 font-mono text-sm text-violet-500">{prop.type}</td>
+                      <td className="p-3">{prop.required ? 'Yes' : 'No'}</td>
+                      <td className="p-3 font-mono text-sm">{prop.defaultValue || 'N/A'}</td>
+                      <td className="p-3">{prop.description || 'N/A'}</td>
                     </tr>
-                  ))
-                ) : (
-                  // Extract props from the component code as a fallback
-                  <>
-                    <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">children</td>
-                      <td className="p-4 text-muted-foreground">ReactNode</td>
-                      <td className="p-4 text-muted-foreground">-</td>
-                      <td className="p-4">The content to render</td>
+                  )) : (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-muted-foreground">
+                        No props defined for this component
+                      </td>
                     </tr>
-                    <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">variant</td>
-                      <td className="p-4 text-muted-foreground">string</td>
-                      <td className="p-4 text-muted-foreground">'primary'</td>
-                      <td className="p-4">The visual style variant of the button</td>
-                    </tr>
-                    <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">size</td>
-                      <td className="p-4 text-muted-foreground">string</td>
-                      <td className="p-4 text-muted-foreground">'medium'</td>
-                      <td className="p-4">The size of the button</td>
-                    </tr>
-                    <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">onClick</td>
-                      <td className="p-4 text-muted-foreground">function</td>
-                      <td className="p-4 text-muted-foreground">-</td>
-                      <td className="p-4">Function called when the button is clicked</td>
-                    </tr>
-                    <tr className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-medium">disabled</td>
-                      <td className="p-4 text-muted-foreground">boolean</td>
-                      <td className="p-4 text-muted-foreground">false</td>
-                      <td className="p-4">Whether the button is disabled</td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
         <TabsContent value="methods">
-          <div className="space-y-6">
-            {!componentData.methods || componentData.methods.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No methods found for this component.</p>
-              </div>
-            ) : (
-              componentData.methods.map((method, index) => {
-                const isSelected = selectedMethod === method.name;
-                return (
-                  <div 
-                    key={`method-${method.name}-${index}`} 
-                    id={method.name}
-                    className={`p-6 rounded-xl border ${isSelected ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-bold">{method.name}</h3>
-                        <Badge className="bg-amber-500 hover:bg-amber-600">Method</Badge>
-                      </div>
-                    </div>
-                    
-                    {method.description && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
-                        <p>{method.description}</p>
-                      </div>
-                    )}
-                    
-                    {method.params && method.params.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Parameters</h4>
-                        <div className="overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800">
-                          <table className="w-full">
-                            <thead className="bg-slate-50 dark:bg-slate-800/50">
-                              <tr>
-                                <th className="text-left p-2 font-medium">Name</th>
-                                <th className="text-left p-2 font-medium">Type</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {method.params.map((param, paramIndex) => (
-                                <tr key={paramIndex} className="border-t border-slate-100 dark:border-slate-800">
-                                  <td className="p-2 font-medium">{param.name}</td>
-                                  <td className="p-2 text-muted-foreground">{param.type || 'any'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {method.returnType && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Return Type</h4>
-                        <p className="font-mono text-sm">{method.returnType}</p>
-                      </div>
-                    )}
-                    
-                    {method.code && (
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Code</h4>
-                        <CodeBlock code={method.code} language="tsx" />
-                      </div>
-                    )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <Card>
+                {componentData.methods && componentData.methods.length > 0 ? (
+                  <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {componentData.methods.map((method) => (
+                      <li
+                        key={method.name}
+                        className={`p-3 cursor-pointer ${selectedMethod === method.name ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        onClick={() => setSelectedMethod(method.name)}
+                      >
+                        <a href={`#${method.name}`} className="font-medium">{method.name}</a>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{method.description}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-6 text-center text-muted-foreground">
+                    No methods defined for this component
                   </div>
-                );
-              })
-            )}
+                )}
+              </Card>
+            </div>
+            <div className="md:col-span-2">
+              {selectedMethod && componentData.methods?.find(m => m.name === selectedMethod) ? (
+                <Card>
+                  <CodeBlock
+                    code={componentData.methods.find(m => m.name === selectedMethod)?.code || ''}
+                    language="typescript"
+                  />
+                </Card>
+              ) : (
+                <Card className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">Select a method to view its details</p>
+                </Card>
+              )}
+            </div>
           </div>
         </TabsContent>
-        
         <TabsContent value="relationships">
-          <div className="space-y-8">
-            <CodeRelationships entityId={slug.toLowerCase()} />
-          </div>
+          <Card>
+            <CodeRelationships entityId={slug} />
+          </Card>
         </TabsContent>
       </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>Similar Components</CardTitle>
+          <CardDescription>Based on an analysis of the codebase, here are some components with similar functionality or implementation.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {componentData.similarComponents?.map((comp) => (
+              <a href={`/components/${comp.slug || comp.name.toLowerCase()}`} key={comp.name} className="block p-4 rounded-lg border bg-card text-card-foreground shadow-sm hover:bg-muted/50 transition-colors">
+                <div className="flex justify-between items-start">
+                  <h4 className="font-semibold">{comp.name}</h4>
+                  <div className="text-sm font-semibold text-violet-500">{comp.similarity}%</div>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{comp.reason}</p>
+              </a>
+            )) || (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                No similar components found
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

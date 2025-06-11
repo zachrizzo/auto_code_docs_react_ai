@@ -146,8 +146,6 @@ export async function parseComponents(
   return allParsedComponents;
 }
 
-
-
 /**
  * Build a map of all entity declarations in the codebase
  * @param rootDir - Root directory to scan
@@ -215,6 +213,7 @@ export async function parseAllCodeItems(rootDir: string): Promise<CodeItem[]> {
       const items = extractAllTopLevelCodeItems(content).map(item => ({
         ...item,
         filePath,
+        type: item.kind, // Map kind to type for compatibility
       }));
       allItems.push(...items);
     } catch (err) {

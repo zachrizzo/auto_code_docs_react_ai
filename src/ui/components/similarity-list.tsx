@@ -652,10 +652,10 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
               <p className="mb-6 text-lg">{item.reason}</p>
               <div className="flex gap-3 flex-wrap">
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/docs/${item.component1.slug || item.pair[0].toLowerCase()}`}>View {item.pair[0]}</Link>
+                  <Link href={`/components/${item.component1.slug || item.pair[0].toLowerCase()}`}>View {item.pair[0]}</Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/docs/${item.component2.slug || item.pair[1].toLowerCase()}`}>View {item.pair[1]}</Link>
+                  <Link href={`/components/${item.component2.slug || item.pair[1].toLowerCase()}`}>View {item.pair[1]}</Link>
                 </Button>
                 <Button
                   size="sm"

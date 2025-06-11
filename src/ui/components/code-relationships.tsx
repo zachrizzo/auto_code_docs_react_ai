@@ -8,10 +8,11 @@ import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { ScrollArea } from "./ui/scroll-area"
-import { Code, Component, ActivityIcon as Function, FileCode, X, ExternalLink } from "lucide-react"
+import { Code, Component, ActivityIcon as Function, FileCode, X, ExternalLink, Server, Zap, Info } from "lucide-react"
 import { ArrowRightIcon } from "@radix-ui/react-icons"
 import { InteractiveGraph } from "./interactive-graph"
 import { CodeBlock } from "./code-block"
+import { McpServerControl } from "./mcp-server-control"
 
 // Define types locally
 export interface CodeEntity {
@@ -43,7 +44,6 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   const [nodeCodeData, setNodeCodeData] = useState<any>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedNodeData, setSelectedNodeData] = useState<any>(null)
-
 
   // Fetch component data
   useEffect(() => {
@@ -157,7 +157,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               id: comp.slug,
               name: comp.name,
               type: entityType,
-              filePath: data.filePath || `src/components/${comp.name}`,
+              filePath: data.filePath || data.route || `src/components/${comp.name}`,
               methods: data.methods || [],
               props: data.props || []
             }
@@ -351,6 +351,23 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         console.log('Components loaded:', componentsData.length)
         console.log('Relationships found:', uniqueRelationships.length)
         
+        // Debug file paths
+        const filePathStats = componentsData.reduce((acc, comp) => {
+          if (comp.filePath) {
+            if (comp.filePath.startsWith('src/components/')) {
+              acc.defaultPaths++
+            } else {
+              acc.realPaths++
+            }
+          } else {
+            acc.noPaths++
+          }
+          return acc
+        }, { defaultPaths: 0, realPaths: 0, noPaths: 0 })
+        
+        console.log('File path statistics:', filePathStats)
+        console.log('Sample file paths:', componentsData.slice(0, 5).map(c => ({ name: c.name, filePath: c.filePath })))
+        
         setComponents(componentsData)
         setRelationships(uniqueRelationships)
         setLoading(false)
@@ -449,7 +466,8 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
           y: Math.random() * 400 + 100,
           radius: Math.max(20, Math.min(40, 20 + connections * 3)),
           color: '',
-          connections
+          connections,
+          filePath: comp.filePath
         }
       })
 
@@ -554,7 +572,9 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
+      <McpServerControl />
+
       {/* Statistics Panel */}
       {filteredRelationships.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -637,7 +657,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             )}
           </div>
         ) : graphView === "graph" ? (
-          <div className="h-[600px]">
+          <div className="h-[calc(100vh-450px)] min-h-[600px] max-h-[800px]">
             <InteractiveGraph
               nodes={graphNodes}
               edges={graphEdges}
@@ -657,36 +677,40 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               return (
                 <div
                   key={index}
-                  className="flex items-center gap-3 p-4 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className="flex items-center gap-4 p-4 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {getEntityIcon(sourceEntity.type)}
-                    <div>
-                      <div className="font-medium">{sourceEntity.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{sourceEntity.filePath}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-base">{sourceEntity.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono truncate" title={sourceEntity.filePath}>
+                        {sourceEntity.filePath?.split('/').slice(-2).join('/') || sourceEntity.filePath}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-center mx-4">
-                    <Badge className={`${getRelationshipColor(rel.type)}`}>
+                  <div className="flex flex-col items-center mx-2 flex-shrink-0">
+                    <Badge className={`${getRelationshipColor(rel.type)} text-xs`}>
                       {getRelationshipLabel(rel.type)}
                       {rel.weight && rel.weight > 1 && (
-                        <span className="ml-1 text-xs">×{rel.weight}</span>
+                        <span className="ml-1">×{rel.weight}</span>
                       )}
                     </Badge>
                     {rel.context && (
-                      <div className="text-xs text-muted-foreground mt-1 max-w-20 text-center">
+                      <div className="text-xs text-muted-foreground mt-1 max-w-16 text-center truncate" title={rel.context}>
                         {rel.context}
                       </div>
                     )}
-                    <ArrowRightIcon className="h-6 w-6 text-muted-foreground my-1" />
+                    <ArrowRightIcon className="h-5 w-5 text-muted-foreground my-1" />
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {getEntityIcon(targetEntity.type)}
-                    <div>
-                      <div className="font-medium">{targetEntity.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{targetEntity.filePath}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-base">{targetEntity.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono truncate" title={targetEntity.filePath}>
+                        {targetEntity.filePath?.split('/').slice(-2).join('/') || targetEntity.filePath}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -783,7 +807,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                 asChild
                 className="w-full border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20"
               >
-                <a href={`/${selectedNodeId}`} target="_blank" rel="noopener noreferrer">
+                <a href={`/components/${selectedNodeId}`} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   View Details Page
                 </a>
@@ -826,7 +850,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             <div className="flex items-center gap-2">
               {nodeCodeData?.filePath && (
                 <Button variant="outline" size="sm" asChild>
-                  <a href={`/${selectedNodeForCode}`} target="_blank" rel="noopener noreferrer">
+                  <a href={`/components/${selectedNodeForCode}`} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Details
                   </a>

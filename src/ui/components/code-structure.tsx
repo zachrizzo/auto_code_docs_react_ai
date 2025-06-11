@@ -185,7 +185,7 @@ export function CodeStructure() {
 
                 {item.componentSlug ? (
                   <Link
-                    href={`/docs/${item.componentSlug}`}
+                    href={`/components/${item.componentSlug}`}
                     className="text-sm hover:underline text-violet-500"
                     onClick={e => {
                       e.stopPropagation()

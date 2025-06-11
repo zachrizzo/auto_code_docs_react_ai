@@ -165,6 +165,7 @@ export class AiDescriptionGenerator {
       }
 
       const componentHash = this.calculateComponentHash(component);
+      component.slug = componentHash;
       const cacheKey = `${component.name}:${component.filePath}`;
       const cachedComponent = this.cache[cacheKey];
 
@@ -285,10 +286,20 @@ export class AiDescriptionGenerator {
 
       // Recursively process child components
       if (component.childComponents && component.childComponents.length > 0) {
-        component.childComponents =
-          await this.enhanceComponentsWithDescriptions(
-            component.childComponents
-          );
+        const childComponentDefinitions = await this.enhanceComponentsWithDescriptions(
+          (component.childComponents as unknown) as ComponentDefinition[]
+        );
+
+        const childDescriptions = childComponentDefinitions
+          .map(
+            (child) =>
+              `- ${child.name}: ${
+                child.description || "No description available."
+              }`
+          )
+          .join("\n");
+
+        component.description += `\nChild components and their descriptions:\n${childDescriptions}`;
       }
 
       enhancedComponents.push(component);
@@ -329,71 +340,34 @@ export class AiDescriptionGenerator {
             .join(", ")
         : "No props.";
 
-    const prompt = `
-You are a React documentation expert. Write a concise and informative description for a React component named "${
-      component.name || "Unknown"
-    }".
-Here are the props it accepts: ${propList}
-File path: ${component.filePath || "Unknown"}
+    let prompt = `
+      Generate a concise, one-sentence description for the following React component.
+      The description should be from the perspective of a developer explaining the component's primary function.
 
-Provide a 1-2 sentence description explaining what this component does, based on its name and props. Be specific and professional.
-Don't include phrases like "Based on the name and props" or "It seems that". Just provide direct information.
-`;
+      Component Name: ${component.name || "Unknown"}
+      File Path: ${component.filePath || "Unknown"}
+      Props: ${propList}
+    `;
 
-    if (this.useOllama) {
-      try {
-        const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
-          model: this.ollamaModel,
-          prompt: prompt,
-          temperature: this.temperature,
-          max_tokens: this.maxTokens,
-          stream: false,
-        });
+    // First, enhance child components to get their descriptions
+    if (component.childComponents && component.childComponents.length > 0) {
+      const childComponentDefinitions = await this.enhanceComponentsWithDescriptions(
+        (component.childComponents as unknown) as ComponentDefinition[]
+      );
 
-        if (response.data && response.data.response) {
-          return (
-            response.data.response.trim() ||
-            `A React component that renders a ${component.name} element.`
-          );
-        } else {
-          console.error(
-            "Unexpected response format from Ollama:",
-            response.data
-          );
-          return `A React component that renders a ${component.name} element.`;
-        }
-      } catch (error) {
-        console.error(
-          `Error generating description with Ollama for component ${component.name}:`,
-          error
-        );
-        return `A React component that renders a ${component.name} element.`;
-      }
-    } else {
-      try {
-        if (!this.openai) {
-          throw new Error("OpenAI client not initialized");
-        }
+      const childDescriptions = childComponentDefinitions
+        .map(
+          (child) =>
+            `- ${child.name}: ${
+              child.description || "No description available."
+            }`
+        )
+        .join("\n");
 
-        const completion = await this.openai.chat.completions.create({
-          messages: [{ role: "user", content: prompt }],
-          model: this.model,
-          temperature: this.temperature,
-          max_tokens: this.maxTokens,
-        });
-
-        return (
-          completion.choices[0]?.message?.content?.trim() ||
-          `A React component that renders a ${component.name} element.`
-        );
-      } catch (error) {
-        console.error(
-          `Error generating description for component ${component.name}:`,
-          error
-        );
-        return `A React component that renders a ${component.name} element.`;
-      }
+      prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
     }
+
+    return this.generateDescription(prompt);
   }
 
   /**
@@ -419,47 +393,67 @@ Don't include phrases like "Based on the name and props" or "It seems that". Jus
       ? `It has a default value of \`${prop.defaultValue}\`.`
       : "";
 
-    const prompt = `
-You are a React documentation expert. Write a concise and informative description for a React prop named "${
-      prop.name || "Unknown"
-    }" for the component "${component.name || "Unknown"}".
-Type: ${prop.type || "unknown"}
-Required: ${isRequired}
-${defaultValue}
-File path: ${component.filePath || "Unknown"}
+    let prompt = `
+      Generate a concise, one-sentence description for the prop "${prop.name}" of the React component "${component.name}".
+      The description should explain what the prop does and its data type.
 
-Provide a 1-2 sentence description explaining what this prop does and how it affects the component. Be specific and professional.
-Don't include phrases like "Based on the name" or "It seems that". Just provide direct information.
-`;
+      Component Name: ${component.name || "Unknown"}
+      File Path: ${component.filePath || "Unknown"}
+      Type: ${prop.type || "unknown"}
+      Required: ${isRequired}
+      ${defaultValue}
+    `;
 
+    // First, enhance child components to get their descriptions
+    if (component.childComponents && component.childComponents.length > 0) {
+      const childComponentDefinitions = await this.enhanceComponentsWithDescriptions(
+        (component.childComponents as unknown) as ComponentDefinition[]
+      );
+
+      const childDescriptions = childComponentDefinitions
+        .map(
+          (child) =>
+            `- ${child.name}: ${
+              child.description || "No description available."
+            }`
+        )
+        .join("\n");
+
+      prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
+    }
+
+    return this.generateDescription(prompt);
+  }
+
+  private async generateDescription(prompt: string): Promise<string> {
     if (this.useOllama) {
       try {
         const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
           model: this.ollamaModel,
           prompt: prompt,
           temperature: this.temperature,
-          max_tokens: 100,
+          max_tokens: this.maxTokens,
           stream: false,
         });
 
         if (response.data && response.data.response) {
           return (
             response.data.response.trim() ||
-            `Controls the ${prop.name} of the ${component.name} component.`
+            `A React component that renders a ${prompt.split(" ")[2]} element.`
           );
         } else {
           console.error(
             "Unexpected response format from Ollama:",
             response.data
           );
-          return `Controls the ${prop.name} of the ${component.name} component.`;
+          return `A React component that renders a ${prompt.split(" ")[2]} element.`;
         }
       } catch (error) {
         console.error(
-          `Error generating description with Ollama for prop ${prop.name}:`,
+          `Error generating description with Ollama for component ${prompt.split(" ")[2]}:`,
           error
         );
-        return `Controls the ${prop.name} of the ${component.name} component.`;
+        return `A React component that renders a ${prompt.split(" ")[2]} element.`;
       }
     } else {
       try {
@@ -471,19 +465,19 @@ Don't include phrases like "Based on the name" or "It seems that". Just provide 
           messages: [{ role: "user", content: prompt }],
           model: this.model,
           temperature: this.temperature,
-          max_tokens: 100,
+          max_tokens: this.maxTokens,
         });
 
         return (
           completion.choices[0]?.message?.content?.trim() ||
-          `Controls the ${prop.name} of the ${component.name} component.`
+          `A React component that renders a ${prompt.split(" ")[2]} element.`
         );
       } catch (error) {
         console.error(
-          `Error generating description for prop ${prop.name}:`,
+          `Error generating description for component ${prompt.split(" ")[2]}:`,
           error
         );
-        return `Controls the ${prop.name} of the ${component.name} component.`;
+        return `A React component that renders a ${prompt.split(" ")[2]} element.`;
       }
     }
   }
@@ -501,8 +495,30 @@ export async function generateDocumentation(
   components: any[],
   options: GenerateDocumentationOptions = {}
 ) {
-  console.log("Generating documentation...");
-  return components;
+  const outputDir = options.output || "docs-data";
+  fs.ensureDirSync(outputDir);
+
+  const componentIndex = components.map((component) => ({
+    name: component.name,
+    slug: component.slug,
+    filePath: component.filePath,
+  }));
+
+  fs.writeJSONSync(path.join(outputDir, "component-index.json"), componentIndex, {
+    spaces: 2,
+  });
+
+  for (const component of components) {
+    if (component.slug) {
+      fs.writeJSONSync(
+        path.join(outputDir, `${component.slug}.json`),
+        component,
+        { spaces: 2 }
+      );
+    }
+  }
+
+  console.log(`Generated documentation for ${components.length} components`);
 }
 
 export default generateDocumentation;

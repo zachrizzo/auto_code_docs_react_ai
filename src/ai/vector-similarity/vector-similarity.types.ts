@@ -12,6 +12,7 @@ export interface VectorEntry {
   filePath: string;
   code: string;
   description?: string; // Optional description for the component or method
+  slug?: string; // URL-friendly slug for the component
 }
 
 /**

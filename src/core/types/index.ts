@@ -172,6 +172,11 @@ export interface SimilarityWarning {
    * Code of the similar method
    */
   code?: string;
+
+  /**
+   * URL-friendly slug for the similar component
+   */
+  slug?: string;
 }
 
 /**

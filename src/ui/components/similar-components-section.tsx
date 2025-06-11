@@ -13,6 +13,7 @@ type SimilarComponent = {
   reason: string
   isMethodLevel?: boolean
   methodName?: string
+  slug?: string
 }
 
 interface SimilarComponentsSectionProps {
@@ -76,7 +77,7 @@ export function ${componentName}({ title, children }) {
                 </div>
                 <div className="flex gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/components/${component.name}`}>View Component</Link>
+                    <Link href={`/components/${component.slug || component.name.toLowerCase()}`}>View Component</Link>
                   </Button>
                   <Button size="sm" className="gap-2" onClick={() => handleCompare(component)}>
                     <GitCompare className="h-4 w-4" />
