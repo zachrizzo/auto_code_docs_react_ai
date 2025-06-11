@@ -357,6 +357,117 @@ export function extractInheritance(fileContent: string): { extends: string[], im
 }
 
 /**
+ * Extract prop drilling patterns (when props are passed through multiple components)
+ */
+export function extractPropDrilling(
+  fileContent: string,
+  filePath: string,
+  currentEntitySlug: string
+): PropDrillingInfo[] {
+  const propDrilling: PropDrillingInfo[] = [];
+  
+  try {
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      fileContent,
+      ts.ScriptTarget.Latest,
+      true
+    );
+
+    function visit(node: ts.Node) {
+      // Look for prop destructuring patterns
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        if (ts.isObjectBindingPattern(node.name)) {
+          // const { prop1, prop2 } = props
+          const destructuredProps = node.name.elements
+            .filter(ts.isBindingElement)
+            .map(el => el.name.getText(sourceFile))
+            .filter(name => name !== 'children');
+          
+          if (destructuredProps.length > 3) { // Threshold for too many props
+            propDrilling.push({
+              entitySlug: currentEntitySlug,
+              filePath,
+              propsCount: destructuredProps.length,
+              propNames: destructuredProps,
+              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+              severity: destructuredProps.length > 6 ? 'high' : 'medium'
+            });
+          }
+        }
+      }
+      
+      ts.forEachChild(node, visit);
+    }
+
+    ts.forEachChild(sourceFile, visit);
+    return propDrilling;
+  } catch (error) {
+    console.error('Error extracting prop drilling:', error);
+    return [];
+  }
+}
+
+/**
+ * Extract circular dependency patterns
+ */
+export function detectCircularDependencies(
+  entities: { slug: string; imports: string[]; filePath: string }[]
+): CircularDependency[] {
+  const dependencies = new Map<string, Set<string>>();
+  const circularDeps: CircularDependency[] = [];
+  
+  // Build dependency graph
+  entities.forEach(entity => {
+    dependencies.set(entity.slug, new Set(entity.imports.map(imp => 
+      imp.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '')
+    )));
+  });
+  
+  // Detect cycles using DFS
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+  
+  function hasCycle(entitySlug: string, path: string[]): boolean {
+    visited.add(entitySlug);
+    recursionStack.add(entitySlug);
+    
+    const deps = dependencies.get(entitySlug) || new Set();
+    
+    for (const dep of deps) {
+      if (!visited.has(dep)) {
+        if (hasCycle(dep, [...path, dep])) {
+          return true;
+        }
+      } else if (recursionStack.has(dep)) {
+        // Found cycle
+        const cycleStart = path.indexOf(dep);
+        const cycle = path.slice(cycleStart);
+        
+        circularDeps.push({
+          cycle: [...cycle, dep],
+          severity: cycle.length > 3 ? 'high' : 'medium',
+          description: `Circular dependency detected: ${cycle.join(' → ')} → ${dep}`
+        });
+        
+        return true;
+      }
+    }
+    
+    recursionStack.delete(entitySlug);
+    return false;
+  }
+  
+  entities.forEach(entity => {
+    if (!visited.has(entity.slug)) {
+      hasCycle(entity.slug, [entity.slug]);
+    }
+  });
+  
+  return circularDeps;
+}
+
+/**
  * Extract all entity usages from a file
  * 
  * @param fileContent - The content of the file
@@ -491,6 +602,29 @@ export function extractEntityUsages(
 import { MethodCallInfo, EntityUsage } from '../types';
 import { Relationship, CallRelationship, RelationshipType } from '../../ui/types/code-entities';
 
+export interface PropDrillingInfo {
+  entitySlug: string;
+  filePath: string;
+  propsCount: number;
+  propNames: string[];
+  line: number;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface CircularDependency {
+  cycle: string[];
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export interface DeepNestingInfo {
+  entitySlug: string;
+  filePath: string;
+  maxDepth: number;
+  line: number;
+  severity: 'low' | 'medium' | 'high';
+}
+
 export function generateRelationships(
   componentSlug: string,
   imports: string[],
@@ -500,20 +634,16 @@ export function generateRelationships(
   availableEntities?: Set<string>
 ): Relationship[] {
   const relationships: Relationship[] = [];
-  const seenRelationships = new Set<string>(); // Prevent duplicates
+  const seenRelationships = new Set<string>();
   
-  // Helper function to convert name to slug
   function toSlug(name: string): string {
     return name.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '').replace(/\s+/g, "-");
   }
   
-  // Helper function to check if target exists and add relationship
-  function addRelationship(source: string, target: string, type: RelationshipType, extra?: Partial<CallRelationship>) {
+  function addRelationship(source: string, target: string, type: RelationshipType, weight = 1, context?: string, extra?: Partial<CallRelationship>) {
     const targetSlug = toSlug(target);
     
-    // Skip self-references and validate target exists
-    if (source === targetSlug || 
-        (availableEntities && !availableEntities.has(targetSlug))) {
+    if (source === targetSlug || (availableEntities && !availableEntities.has(targetSlug))) {
       return;
     }
     
@@ -521,11 +651,13 @@ export function generateRelationships(
     if (!seenRelationships.has(relationshipKey)) {
       seenRelationships.add(relationshipKey);
       
-      if (type === "calls" && extra) {
+      if (type === "uses" && extra) {
         const callRelationship: CallRelationship = {
           source,
           target: targetSlug,
-          type: "calls",
+          type: "uses",
+          weight,
+          context,
           sourceFile: extra.sourceFile!,
           sourceLine: extra.sourceLine!,
           targetFunction: extra.targetFunction,
@@ -535,35 +667,40 @@ export function generateRelationships(
         relationships.push({
           source,
           target: targetSlug,
-          type
+          type,
+          weight,
+          context
         });
       }
     }
   }
   
-  // Add import relationships
-  imports.forEach(importName => {
-    addRelationship(componentSlug, importName, "imports");
-  });
-  
-  // Add render relationships (from JSX references)
-  references.forEach(refName => {
-    // Only add if not already imported (to distinguish imports from renders)
-    const refSlug = toSlug(refName);
-    const importSlugs = imports.map(imp => toSlug(imp));
+  // Combine imports and references into "depends-on" relationships
+  const allDependencies = new Set([...imports, ...references]);
+  allDependencies.forEach(depName => {
+    const isImported = imports.includes(depName);
+    const isRendered = references.includes(depName);
     
-    if (!importSlugs.includes(refSlug)) {
-      addRelationship(componentSlug, refName, "renders");
+    let weight = 1;
+    let context = '';
+    
+    if (isImported && isRendered) {
+      weight = 3;
+      context = 'imports and renders';
+    } else if (isImported) {
+      weight = 2;
+      context = 'imports only';
+    } else if (isRendered) {
+      weight = 2;
+      context = 'renders only';
     }
+    
+    addRelationship(componentSlug, depName, "uses", weight, context);
   });
   
   // Add inheritance relationships
   inheritance.extends.forEach(extendedClass => {
-    addRelationship(componentSlug, extendedClass, "extends");
-  });
-  
-  inheritance.implements.forEach(implementedInterface => {
-    addRelationship(componentSlug, implementedInterface, "implements");
+    addRelationship(componentSlug, extendedClass, "inherits", 2, 'class inheritance');
   });
   
   // Add method call relationships
@@ -572,7 +709,9 @@ export function generateRelationships(
       addRelationship(
         callInfo.callingEntitySlug,
         callInfo.targetEntitySlug,
-        "calls",
+        "uses",
+        2,
+        `calls ${callInfo.targetMethodName || 'method'}`,
         {
           sourceFile: callInfo.sourceFile,
           sourceLine: callInfo.sourceLine,

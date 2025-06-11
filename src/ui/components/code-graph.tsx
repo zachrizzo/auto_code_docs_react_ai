@@ -9,6 +9,7 @@ import { ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "./ui/button"
 import { CodeEntityDetails } from "./code-entity-details"
 import { MinusIcon, PlusIcon } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Define types locally
 export interface CodeEntity {
@@ -41,6 +42,7 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
   const [selectedEntity, setSelectedEntity] = useState<CodeEntity | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
   const [components, setComponents] = useState<CodeEntity[]>([])
@@ -286,9 +288,9 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
 
   // Calculate node positions in a circle layout
   const positions = useMemo(() => {
-    const radius = 200
+    const radius = 250 // Increased radius for better spacing
     const centerX = 400
-    const centerY = 300
+    const centerY = 350
 
     return filteredEntities.map((entity, index) => {
       const angle = (index / filteredEntities.length) * 2 * Math.PI
@@ -308,6 +310,17 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
     setDetailsOpen(true)
   }
 
+  const handleEdgeHover = (rel: Relationship, e: React.MouseEvent) => {
+    const svgRect = svgRef.current?.getBoundingClientRect()
+    if (!svgRect) return
+
+    setTooltip({
+      content: rel.type.charAt(0).toUpperCase() + rel.type.slice(1),
+      x: e.clientX - svgRect.left,
+      y: e.clientY - svgRect.top - 10,
+    })
+  }
+
   const getNodeColor = (type: CodeEntity["type"]) => {
     switch (type) {
       case "component":
@@ -318,25 +331,31 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
         return "#10b981" // emerald-500
       case "method":
         return "#f59e0b" // amber-500
+      case "renders":
+        return "#10b981" // emerald-500
+      case "uses":
+        return "#8b5cf6" // violet-500
       default:
         return "#8b5cf6" // violet-500 as default
     }
   }
 
-  const getEdgeColor = (type: Relationship["type"]) => {
+  const getEdgeStyle = (type: Relationship["type"]) => {
     switch (type) {
       case "imports":
-        return "#3b82f6" // blue-500
+        return { stroke: "#3b82f6", strokeDasharray: "5,5" } // blue-500, dashed
       case "extends":
-        return "#8b5cf6" // violet-500
+        return { stroke: "#8b5cf6", strokeDasharray: "none" } // violet-500, solid
       case "implements":
-        return "#6366f1" // indigo-500
+        return { stroke: "#6366f1", strokeDasharray: "10,5" } // indigo-500, long-dash
       case "calls":
-        return "#f59e0b" // amber-500
+        return { stroke: "#f59e0b", strokeDasharray: "2,2" } // amber-500, dotted
       case "renders":
-        return "#10b981" // emerald-500
+        return { stroke: "#10b981", strokeDasharray: "none" } // emerald-500, solid
       case "uses":
-        return "#8b5cf6" // violet-500
+        return { stroke: "#8b5cf6", strokeDasharray: "5,5" } // violet-500, dashed
+      default:
+        return { stroke: "#94a3b8", strokeDasharray: "2,2" } // slate-400, dotted
     }
   }
 
@@ -476,19 +495,24 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
           >
             {/* Define arrow markers once */}
             <defs>
-              {filteredRelationships.map((rel, index) => (
-                <marker
-                  key={`marker-${rel.source}-${rel.target}-${rel.type}-${index}`}
-                  id={`arrowhead-${rel.source}-${rel.target}-${rel.type}-${index}`}
-                  markerWidth="10"
-                  markerHeight="7"
-                  refX="0"
-                  refY="3.5"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 3.5, 0 7" fill={getEdgeColor(rel.type)} />
-                </marker>
-              ))}
+              <marker id="arrow-imports" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5" fill="#3b82f6" opacity="0.8" />
+              </marker>
+              <marker id="arrow-extends" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b5cf6" />
+              </marker>
+              <marker id="arrow-implements" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5" stroke="#6366f1" fill="none" strokeWidth="2" />
+              </marker>
+              <marker id="arrow-calls" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="4" markerHeight="4" orient="auto">
+                <circle cx="5" cy="0" r="2" fill="#f59e0b" />
+              </marker>
+              <marker id="arrow-renders" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,0L10,0L5,5z" transform="rotate(90 5 0)" fill="#10b981"/>
+              </marker>
+              <marker id="arrow-uses" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5" fill="#8b5cf6" opacity="0.6" />
+              </marker>
             </defs>
 
             {/* Draw edges */}
@@ -504,35 +528,39 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
               const angle = Math.atan2(dy, dx)
 
               // Calculate the position for the arrow (slightly before the target)
-              const nodeRadius = 30
+              const nodeRadius = 35 // Increase radius to avoid overlap with node stroke
               const arrowX = targetPos.x - nodeRadius * Math.cos(angle)
               const arrowY = targetPos.y - nodeRadius * Math.sin(angle)
 
               // Calculate the label position (midpoint of the edge)
               const labelX = (sourcePos.x + targetPos.x) / 2
-              const labelY = (sourcePos.y + targetPos.y) / 2 - 10
+              const labelY = (sourcePos.y + targetPos.y) / 2 - 15
 
-              const markerId = `arrowhead-${rel.source}-${rel.target}-${rel.type}-${index}`
+              const edgeStyle = getEdgeStyle(rel.type)
 
               return (
-                <g key={`edge-${rel.source}-${rel.target}-${rel.type}-${index}`}>
+                <g key={`edge-${rel.source}-${rel.target}-${rel.type}-${index}`} className="edge-group">
                   <line
                     x1={sourcePos.x}
                     y1={sourcePos.y}
                     x2={arrowX}
                     y2={arrowY}
-                    stroke={getEdgeColor(rel.type)}
-                    strokeWidth="2"
-                    markerEnd={`url(#${markerId})`}
+                    strokeWidth="2.5"
+                    {...edgeStyle}
+                    markerEnd={`url(#arrow-${rel.type})`}
+                    className="transition-all duration-300"
+                    onMouseEnter={(e) => handleEdgeHover(rel, e)}
+                    onMouseLeave={() => setTooltip(null)}
                   />
                   <text
                     x={labelX}
                     y={labelY}
                     textAnchor="middle"
-                    fill={getEdgeColor(rel.type)}
-                    fontSize="12"
-                    fontWeight="500"
-                    className="select-none"
+                    fill={edgeStyle.stroke}
+                    fontSize="13"
+                    fontWeight="600"
+                    className="select-none pointer-events-none"
+                    style={{ textShadow: "0 0 5px white, 0 0 5px white" }}
                   >
                     {rel.type}
                   </text>
@@ -553,28 +581,40 @@ export function CodeGraph({ entityId }: CodeGraphProps) {
                   transform={`translate(${pos.x}, ${pos.y})`}
                   onClick={() => handleNodeClick(entity)}
                   style={{ cursor: "pointer" }}
+                  className="node-group transition-transform duration-300 ease-in-out hover:scale-110"
                 >
-                  <circle r="30" fill="white" stroke={nodeColor} strokeWidth="3" className="dark:fill-slate-800" />
+                  <circle r="32" fill={nodeColor} opacity="0.2" />
+                  <circle r="28" fill="white" stroke={nodeColor} strokeWidth="3" className="dark:fill-slate-800" />
                   <text
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill={nodeColor}
-                    fontSize="12"
+                    fontSize="14"
                     fontWeight="bold"
                     className="select-none"
                   >
                     {entity.name.substring(0, 2)}
                   </text>
-                  <text y="50" textAnchor="middle" fill="currentColor" fontSize="12" className="select-none">
+                  <text y="48" textAnchor="middle" fill="currentColor" fontSize="14" fontWeight="500" className="select-none dark:fill-slate-300">
                     {entity.name}
                   </text>
                 </g>
               )
             })}
+            
+            {/* Tooltip */}
+            {tooltip && (
+              <g transform={`translate(${tooltip.x}, ${tooltip.y})`}>
+                <rect x="-5" y="-20" width={tooltip.content.length * 8 + 10} height="25" rx="5" fill="rgba(0,0,0,0.7)" />
+                <text x={tooltip.content.length * 4} y="-7" textAnchor="middle" fill="white" fontSize="12">
+                  {tooltip.content}
+                </text>
+              </g>
+            )}
           </svg>
         </div>
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex flex-wrap gap-4">
+        <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-violet-500"></div>
               <span className="text-sm">Component</span>

@@ -333,6 +333,40 @@ export interface ComponentDefinition {
    * Entities used by this component
    */
   usages?: EntityUsage[];
+  
+  /**
+   * Prop drilling analysis for this component
+   */
+  propDrilling?: PropDrillingInfo[];
+  
+  /**
+   * Duplicate code matches involving this component
+   */
+  duplicates?: DuplicateCodeMatch[];
+}
+
+export interface PropDrillingInfo {
+  entitySlug: string;
+  filePath: string;
+  propsCount: number;
+  propNames: string[];
+  line: number;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface DuplicateCodeMatch {
+  sourceEntity: string;
+  targetEntity: string;
+  sourceMethod?: string;
+  targetMethod?: string;
+  similarity: number;
+  reason: string;
+  sourceCode: string;
+  targetCode: string;
+  sourceFile: string;
+  targetFile: string;
+  sourceLine?: number;
+  targetLine?: number;
 }
 
 export interface MethodCallInfo {

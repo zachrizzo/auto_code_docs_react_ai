@@ -20,7 +20,9 @@ export interface CodeEntity {
 export interface Relationship {
   source: string;
   target: string;
-  type: "imports" | "extends" | "implements" | "calls" | "renders" | "uses";
+  type: "uses" | "inherits" | "contains";
+  weight?: number;
+  context?: string;
 }
 
 interface CodeRelationshipsProps {
@@ -44,12 +46,12 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   ]
   
   const sampleRelationships = [
-    { source: 'card', target: 'button', type: 'imports' as const },
-    { source: 'dialog', target: 'button', type: 'imports' as const },
-    { source: 'card', target: 'utils', type: 'calls' as const },
-    { source: 'dialog', target: 'utils', type: 'calls' as const },
-    { source: 'button', target: 'utils', type: 'calls' as const },
-    { source: 'theme', target: 'utils', type: 'extends' as const }
+    { source: 'card', target: 'button', type: 'uses' as const, weight: 3, context: 'imports and renders' },
+    { source: 'dialog', target: 'button', type: 'uses' as const, weight: 2, context: 'imports only' },
+    { source: 'card', target: 'utils', type: 'uses' as const, weight: 2, context: 'calls utility functions' },
+    { source: 'dialog', target: 'utils', type: 'uses' as const, weight: 2, context: 'calls utility functions' },
+    { source: 'button', target: 'utils', type: 'uses' as const, weight: 2, context: 'calls utility functions' },
+    { source: 'theme', target: 'utils', type: 'inherits' as const, weight: 2, context: 'class inheritance' }
   ]
 
   // Fetch component data
@@ -99,7 +101,9 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                   relationshipsData.push({
                     source: comp.slug,
                     target: rel.target,
-                    type: rel.type
+                    type: rel.type,
+                    weight: rel.weight || 1,
+                    context: rel.context
                   })
                 }
               })
@@ -111,13 +115,15 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                 const targetSlug = importItem.toLowerCase().replace(/\s+/g, "-")
                 // Check if this relationship already exists
                 const exists = relationshipsData.some(r => 
-                  r.source === comp.slug && r.target === targetSlug && r.type === "imports"
+                  r.source === comp.slug && r.target === targetSlug && r.type === "uses"
                 )
                 if (!exists) {
                   relationshipsData.push({
                     source: comp.slug,
                     target: targetSlug,
-                    type: "imports"
+                    type: "uses",
+                    weight: 2,
+                    context: "imports"
                   })
                 }
               })
@@ -129,13 +135,15 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                 const targetSlug = refItem.toLowerCase().replace(/\s+/g, "-")
                 // Check if this relationship already exists
                 const exists = relationshipsData.some(r => 
-                  r.source === comp.slug && r.target === targetSlug && r.type === "renders"
+                  r.source === comp.slug && r.target === targetSlug && r.type === "uses"
                 )
                 if (!exists) {
                   relationshipsData.push({
                     source: comp.slug,
                     target: targetSlug,
-                    type: "renders"
+                    type: "uses",
+                    weight: 1,
+                    context: "renders"
                   })
                 }
               })
@@ -150,12 +158,19 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
           )
         )
 
+        // Debug logging
+        console.log('Components loaded:', componentsData.length)
+        console.log('Relationships found:', uniqueRelationships.length)
+        console.log('Sample relationships:', sampleRelationships.length)
+        
         // If we got real data, use it; otherwise use sample data
         if (componentsData.length > 0 && uniqueRelationships.length > 0) {
+          console.log('Using real data')
           setComponents(componentsData)
           setRelationships(uniqueRelationships)
         } else {
           // Use sample data
+          console.log('Using sample data')
           setComponents(sampleComponents)
           setRelationships(sampleRelationships)
         }
@@ -254,35 +269,27 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
   const getRelationshipLabel = (type: Relationship["type"]) => {
     switch (type) {
-      case "imports":
-        return "Imports"
-      case "extends":
-        return "Extends"
-      case "implements":
-        return "Implements"
-      case "calls":
-        return "Calls"
-      case "renders":
-        return "Renders"
       case "uses":
         return "Uses"
+      case "inherits":
+        return "Inherits"
+      case "contains":
+        return "Contains"
+      default:
+        return type
     }
   }
 
   const getRelationshipColor = (type: Relationship["type"]) => {
     switch (type) {
-      case "imports":
-        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
-      case "extends":
-        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800"
-      case "implements":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800"
-      case "calls":
-        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
-      case "renders":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
       case "uses":
-        return "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800"
+        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+      case "inherits":
+        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800"
+      case "contains":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
+      default:
+        return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800"
     }
   }
 
@@ -444,7 +451,17 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                   </div>
 
                   <div className="flex flex-col items-center mx-4">
-                    <Badge className={`${getRelationshipColor(rel.type)}`}>{getRelationshipLabel(rel.type)}</Badge>
+                    <Badge className={`${getRelationshipColor(rel.type)}`}>
+                      {getRelationshipLabel(rel.type)}
+                      {rel.weight && rel.weight > 1 && (
+                        <span className="ml-1 text-xs">×{rel.weight}</span>
+                      )}
+                    </Badge>
+                    {rel.context && (
+                      <div className="text-xs text-muted-foreground mt-1 max-w-20 text-center">
+                        {rel.context}
+                      </div>
+                    )}
                     <ArrowRightIcon className="h-6 w-6 text-muted-foreground my-1" />
                   </div>
 

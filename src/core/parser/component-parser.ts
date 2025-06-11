@@ -10,7 +10,8 @@ import * as ts from "typescript";
 import { ComponentDefinition, PropDefinition, EntityDeclaration } from "../types";
 import { debug, extractImportedComponentPaths, shouldIncludeFile } from "./file-utils";
 import { extractComponentMethods, extractComponentSourceCode, extractEntityDeclarations } from "./ast-utils";
-import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages } from "./relationship-extractor";
+import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages, extractPropDrilling, detectCircularDependencies } from "./relationship-extractor";
+import { extractCodeBlocks, detectDuplicates, DuplicateCodeMatch } from "./duplicate-detector";
 
 /**
  * Parse a single component file to extract component definitions.
@@ -85,6 +86,11 @@ export function parseComponentFile(
       const inheritance = extractInheritance(fileContent);
       const methodCalls = extractMethodCalls(fileContent, filePath, slug, availableEntities);
       
+      // Debug logging
+      debug(`Component ${componentName}: imports=${imports.length}, references=${references.length}, inheritance=${inheritance.extends.length + inheritance.implements.length}, methodCalls=${methodCalls.length}`);
+      debug(`Imports: ${imports.join(', ')}`);
+      debug(`References: ${references.join(', ')}`);
+      
       const relationships = generateRelationships(
         slug,
         imports,
@@ -126,6 +132,9 @@ export function parseComponentFile(
       }
       ts.forEachChild(sourceFile, findComponentNode);
 
+      // Extract additional analysis data
+      const propDrilling = extractPropDrilling(fileContent, filePath, slug);
+      
       // Create component definition
       const componentDef: ComponentDefinition = {
         name: componentName,
@@ -146,7 +155,8 @@ export function parseComponentFile(
         declarationLineStart,
         declarationLineEnd,
         declaration: thisDeclaration,
-        usages
+        usages,
+        propDrilling
       };
 
       debug(`Added component: ${componentName} with ${methods.length} methods`);
