@@ -1,6 +1,5 @@
 import * as React from "react"
 import { CodeRelationships } from "@/components/code-relationships"
-import { CodeGraph } from "@/components/code-graph"
 
 export default function RelationshipsPage() {
   return (
@@ -11,7 +10,6 @@ export default function RelationshipsPage() {
       </div>
 
       <div className="space-y-12">
-        <CodeGraph />
         <CodeRelationships />
       </div>
     </div>

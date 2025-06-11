@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeBlock } from "@/components/code-block";
 import { Badge } from "@/components/ui/badge";
 import { CodeRelationships } from "@/components/code-relationships";
-import { CodeGraph } from "@/components/code-graph";
 
 interface PropDefinition {
   name: string;
@@ -380,7 +379,6 @@ export default function ComponentClient({ slug }: { slug: string }) {
         <TabsContent value="relationships">
           <div className="space-y-8">
             <CodeRelationships entityId={slug.toLowerCase()} />
-            <CodeGraph entityId={slug.toLowerCase()} />
           </div>
         </TabsContent>
       </Tabs>

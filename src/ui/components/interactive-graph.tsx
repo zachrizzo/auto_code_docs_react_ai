@@ -39,12 +39,13 @@ interface InteractiveGraphProps {
   nodes: Node[]
   edges: Edge[]
   focusNodeId?: string
+  selectedNodeId?: string
   onNodeClick?: (nodeId: string) => void
   onNodeHover?: (nodeId: string | null) => void
   showMinimap?: boolean
 }
 
-export function InteractiveGraph({ nodes, edges, focusNodeId, onNodeClick, onNodeHover, showMinimap = true }: InteractiveGraphProps) {
+export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, onNodeClick, onNodeHover, showMinimap = true }: InteractiveGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -53,6 +54,11 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, onNodeClick, onNod
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [selectedNode, setSelectedNode] = useState<string | null>(focusNodeId || null)
+  
+  // Update selected node when selectedNodeId prop changes
+  useEffect(() => {
+    setSelectedNode(selectedNodeId || null)
+  }, [selectedNodeId])
   const [filteredTypes, setFilteredTypes] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular'>('force')
@@ -891,7 +897,6 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, onNodeClick, onNod
         x: x - clickedNode.x,
         y: y - clickedNode.y
       })
-      setSelectedNode(clickedNode.id)
       onNodeClick?.(clickedNode.id)
       
       // Fix the node position during dragging

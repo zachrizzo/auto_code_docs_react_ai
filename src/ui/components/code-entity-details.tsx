@@ -6,8 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Badge } from "./ui/badge"
 import { CodeBlock } from "./code-block"
 import { Component, Code, ActivityIcon as Function, FileCode, ChevronDown, ChevronRight } from "lucide-react"
-// Extending the CodeEntity interface to include slug property
-interface ExtendedCodeEntity extends Omit<import('./code-graph').CodeEntity, 'type'> {
+
+interface ExtendedCodeEntity {
+  name: string;
+  filePath: string;
+  code: string;
   type: "component" | "class" | "function" | "method" | string;
   slug?: string;
 }
@@ -134,7 +137,7 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-[90vw] w-[90vw] max-h-[85vh] h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             {getEntityIcon()}
@@ -154,12 +157,12 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
             <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="code">
+          <TabsContent value="code" className="h-[calc(85vh-12rem)] overflow-y-auto">
             <CodeBlock code={entity.code || ""} language="tsx" />
           </TabsContent>
           
           {subFunctions.length > 0 && (
-            <TabsContent value="methods" className="space-y-4">
+            <TabsContent value="methods" className="space-y-4 h-[calc(85vh-12rem)] overflow-y-auto">
               {loading ? (
                 <div className="p-4 text-center text-muted-foreground">
                   Loading sub-functions...
@@ -200,13 +203,13 @@ export function CodeEntityDetails({ entity, isOpen, onClose }: CodeEntityDetails
             </TabsContent>
           )}
           
-          <TabsContent value="usage">
+          <TabsContent value="usage" className="h-[calc(85vh-12rem)] overflow-y-auto">
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
               <p className="text-muted-foreground">Usage examples will appear here.</p>
             </div>
           </TabsContent>
           
-          <TabsContent value="dependencies">
+          <TabsContent value="dependencies" className="h-[calc(85vh-12rem)] overflow-y-auto">
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
               <p className="text-muted-foreground">Dependencies will appear here.</p>
             </div>
