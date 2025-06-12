@@ -1,95 +1,105 @@
 # Code-y: AI-Powered React Documentation Generator
 
-Code-y is an AI-powered documentation generator for React applications that provides automated documentation generation with AI chat capabilities, vector search, and component relationship visualization.
+Code-y is a powerful command-line tool that automates the generation of documentation for your React, TypeScript, and JavaScript projects. It leverages AI to create meaningful descriptions, provides vector-based semantic search, and visualizes component relationships to give you a deep understanding of your codebase.
 
 ## 🚀 Features
 
-- **Automated Documentation Generation**: Analyzes React components, TypeScript classes, and functions
-- **AI-Powered Descriptions**: Generates meaningful descriptions using OpenAI or Ollama
-- **Vector Search**: Semantic search across your codebase using embeddings
-- **Interactive Chat**: Ask questions about your code with AI assistance
-- **Component Relationships**: Visualize dependencies and prop flows
-- **Modern UI**: Clean, responsive Next.js interface with dark mode support
-- **CLI Interface**: Simple commands for initialization, generation, and serving
+- **Automated Code Analysis**: Scans your entire project to identify components, functions, classes, and their relationships.
+- **AI-Powered Descriptions**: Uses Ollama to automatically generate insightful descriptions for your code.
+- **Vector Search**: Embeds your code for powerful semantic search capabilities across the entire codebase.
+- **Interactive Documentation UI**: A modern Next.js interface to explore, search, and understand your code.
+- **Component Relationship Graphs**: Visualize dependencies, import/export flows, and component hierarchies.
+- **Highly Configurable**: Use a `codey.config.js` file to tailor the tool to your project's needs.
 
 ## 📦 Installation
 
 ```bash
-npm install -g code-y
-# or
-yarn global add code-y
-# or use directly with npx
-npx code-y
+# Install globally to use the CLI anywhere
+npm install -g @zachrizzo/code-y
+```
+
+Alternatively, you can run it directly in your project without installation:
+
+```bash
+# Use npx for one-time commands
+npx @zachrizzo/code-y <command>
 ```
 
 ## 🚀 Quick Start
 
+Getting started with Code-y is simple.
+
 ### 1. Initialize Configuration
 
-```bash
-npx code-y init
-```
-
-This creates a `codey.config.js` file with default settings.
-
-### 2. Generate and Serve Documentation
+In the root of your project, run the `init` command:
 
 ```bash
-npx code-y serve
+npx @zachrizzo/code-y init
 ```
 
-This command:
-- Scans your React project
-- Generates documentation with AI
-- Starts the documentation UI server
-- Opens your browser automatically
+This will create a `codey.config.js` file in your project. This file contains all the options for customizing how Code-y scans your project and generates documentation.
+
+### 2. Generate Documentation and Start the Server
+
+Once you are happy with your configuration, run the `generate` command:
+
+```bash
+npx @zachrizzo/code-y generate
+```
+
+This single command will:
+1.  Scan your project based on your configuration.
+2.  Analyze all found code files to extract components, functions, and relationships.
+3.  Generate vector embeddings for semantic search.
+4.  Optionally, generate AI-powered descriptions for your code (if enabled).
+5.  Start the documentation UI server.
+6.  Automatically open your browser to the documentation site.
 
 ## 🛠️ CLI Commands
 
-### `code-y init`
-Initialize Code-y configuration in your project.
+Code-y provides a few simple commands to manage your documentation workflow.
 
-### `code-y generate`
-Generate documentation without starting the server.
+### `init`
+
+Initializes Code-y by creating a `codey.config.js` file in the current directory.
 
 ```bash
-npx code-y generate [options]
+npx @zachrizzo/code-y init
+```
+
+### `generate`
+
+This is the main command. It scans your codebase, generates all documentation assets, and starts the development server to view the UI.
+
+```bash
+npx @zachrizzo/code-y generate [options]
 ```
 
 **Options:**
-- `-r, --root <path>` - Root directory of the project (default: current directory)
-- `-c, --component <path>` - Path to root component file (optional)
-- `-o, --output <path>` - Output directory (default: "documentation")
-- `-p, --port <number>` - Port for documentation server (default: 3000)
-- `--generate-descriptions` - Generate AI descriptions for components
-- `--use-ollama` - Use Ollama for local AI processing
-- `--ollama-url <url>` - Ollama server URL (default: http://localhost:11434)
-- `--ollama-model <model>` - Ollama model for chat (default: gemma3:4b)
+- `-r, --root <path>`: The root directory of your project to scan. Overrides `targetDir` in your config.
+- `-p, --port <number>`: The port to run the documentation server on. Overrides `uiPort` in your config.
+- `--generate-descriptions`: A flag to enable the generation of AI descriptions. Overrides `generateDescriptions` in your config.
+- `--ollama-url <url>`: The URL of your Ollama server. Overrides `ollamaBaseUrl` in your config.
+- `--ollama-model <model>`: The Ollama model to use for generating descriptions. Overrides `ollamaModel` in your config.
+- `--ollama-embedding-model <model>`: The Ollama model to use for creating embeddings. Overrides `ollamaEmbeddingModel` in your config.
 
-### `code-y serve`
-Generate documentation and start the UI server.
+### `build`
+
+Generates a static, production-ready build of your documentation UI. This is useful for deploying your documentation to a static hosting service.
 
 ```bash
-npx code-y serve [options]
+npx @zachrizzo/code-y build [options]
 ```
 
 **Options:**
-- `-r, --root <path>` - Root directory to scan
-- `-p, --port <number>` - Port for UI server
-- `--ollama-url <url>` - URL for Ollama API
-- `--ollama-model <model>` - Model for chat
-- `--ollama-embedding-model <model>` - Model for embeddings
+- `-r, --root <path>`: Root directory of the project. (Default: current directory)
+- `-o, --output <path>`: The output directory for the static build. (Default: "documentation")
 
-### `code-y build`
-Build static documentation files.
+You must run the `generate` command at least once before using `build`.
 
-```bash
-npx code-y build [options]
-```
+## ⚙️ Configuration (`codey.config.js`)
 
-## ⚙️ Configuration
-
-After running `code-y init`, customize your `codey.config.js`:
+The `codey.config.js` file provides fine-grained control over the documentation process.
 
 ```javascript
 module.exports = {
@@ -137,105 +147,44 @@ module.exports = {
   showCode: true,
   showMethods: true,
   showSimilarity: true,
-  generateDescriptions: false
+  generateDescriptions: false // Set to true to enable AI descriptions by default
 };
 ```
 
 ## 🤖 AI Integration
 
-### Using Ollama (Recommended for Local Development)
+### Using Ollama (Recommended)
 
-1. [Install Ollama](https://ollama.ai/download)
-2. Pull required models:
-   ```bash
-   ollama pull gemma3:4b
-   ollama pull nomic-embed-text:latest
-   ```
-3. Ensure Ollama is running:
-   ```bash
-   ollama serve
-   ```
+Code-y is optimized for local AI processing with Ollama.
+
+1.  **[Install Ollama](https://ollama.ai/download)** on your machine.
+2.  Pull the necessary models. The defaults are a great starting point:
+    ```bash
+    ollama pull gemma3:4b
+    ollama pull nomic-embed-text:latest
+    ```
+3.  Ensure the Ollama server is running before you use Code-y.
+4.  Update your `codey.config.js` if you use different models or a different server address.
 
 ### Using OpenAI
 
-1. Get an API key from [OpenAI](https://platform.openai.com)
-2. Set in your config or environment:
-   ```javascript
-   // codey.config.js
-   module.exports = {
-     aiProvider: 'openai',
-     openaiApiKey: 'your-api-key-here',
-     // ...
-   };
-   ```
+You can also use OpenAI for description generation.
 
-## 🎨 Features in Detail
+1.  Get an API key from the [OpenAI Platform](https://platform.openai.com).
+2.  Set it in your `codey.config.js` or as an environment variable:
+    ```javascript
+    // codey.config.js
+    module.exports = {
+      aiProvider: 'openai',
+      openaiApiKey: 'your-api-key-here',
+      // ...
+    };
+    ```
+    *Note: The embedding generation still uses Ollama locally for performance and cost-efficiency.*
 
-### Component Analysis
-- Parses React components using `react-docgen-typescript`
-- Extracts props, methods, and relationships
-- Supports TypeScript and JavaScript
-- Handles class components and functional components
+## License
 
-### Vector Search
-- Creates embeddings for all code elements
-- Enables semantic search across your codebase
-- Find similar functions and components
-- Powered by Ollama or OpenAI embeddings
-
-### AI Chat Interface
-- Ask questions about your codebase
-- Get explanations for specific components
-- Understand relationships between code elements
-- Context-aware responses using vector search
-
-### Relationship Visualization
-- Interactive dependency graphs
-- Component hierarchy views
-- Import/export relationships
-- Method call tracking
-
-## 🔧 Programmatic Usage
-
-```javascript
-import { parseComponents, generateDocumentation } from 'code-y';
-
-// Parse components with AI
-const components = await parseComponents({
-  rootDir: './src',
-  useOllama: true,
-  ollamaUrl: 'http://localhost:11434',
-  similarityThreshold: 0.3
-});
-
-// Generate documentation
-const outputPath = await generateDocumentation(components, {
-  outputDir: './docs',
-  theme: 'dark',
-  showCode: true,
-  showMethods: true
-});
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**1. "Module not found" errors**
-- Ensure you've run `npm install` after cloning
-- Try rebuilding: `npm run build`
-
-**2. Ollama connection issues**
-- Check if Ollama is running: `curl http://localhost:11434/api/tags`
-- Verify models are installed: `ollama list`
-
-**3. Port conflicts**
-- Code-y automatically finds free ports
-- Or specify a different port: `npx code-y serve -p 3001`
-
-**4. No components found**
-- Check your include/exclude patterns in config
-- Ensure your React components are properly exported
+This project is licensed under the MIT License.
 
 ## 📁 Project Structure
 

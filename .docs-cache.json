@@ -144,10 +144,10 @@
     "lastUpdated": "2025-06-11T13:43:14.239Z"
   },
   "generateSyntheticSimilarityData:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
-    "componentHash": "31ed18ece5b3fce43dc89d3e6691c54f",
-    "description": "This `generateSyntheticSimilarityData` component creates sample data simulating the similarity scores between documents, allowing for testing and demonstration of the similarity list functionality.",
+    "componentHash": "c3c03a9fb9d9c51162b42aa5ac23fbb3",
+    "description": "```markdown\n## generateSyntheticSimilarityData Component\n\nThe `generateSyntheticSimilarityData` component automatically adds synthetic similarity warnings to a list of React components.  It creates dummy similarity warnings, simulating potential code duplication by comparing each component to others in the `components` array, generating random similarity scores between 70% and 95%, and adding details like `filePath` and example code snippets. This component is typically used during development to proactively identify potential code duplication and improve code maintainability within a project.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:14.845Z"
+    "lastUpdated": "2025-06-12T17:09:17.335Z"
   },
   "fetchComponents:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
     "componentHash": "2e02f2d8dc9b3d72c44d89f750774743",
@@ -162,10 +162,10 @@
     "lastUpdated": "2025-06-11T13:43:18.002Z"
   },
   "fetchComponentCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
-    "componentHash": "b2b27e2af15c1ad15e70eeecc6a300be",
-    "description": "Okay, here's a concise, one-sentence description of the `fetchComponentCode` component, written from a developer's perspective, based on the provided information:\n\n\"This component fetches the code for a React component, likely for documentation or analysis, from the specified file path.\" \n\n---\n\nWould you like me to refine this description further, or perhaps provide a slightly different version?",
+    "componentHash": "2f57127387f312cb8a62fd999dd2e3b3",
+    "description": "```markdown\n## fetchComponentCode Component\n\nThe `fetchComponentCode` component asynchronously retrieves the source code for a given component from a remote data source (`/docs-data/${component.slug}.json`).  It prioritizes fetching method-specific code if a `methodName` is provided, falling back to the full component code or a default error message if the code isn't available. This component is typically used within a documentation system or code explorer to dynamically display the source code of a React component based on its identifier.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:21.799Z"
+    "lastUpdated": "2025-06-12T17:09:19.685Z"
   },
   "handleCompare:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similarity-list.tsx": {
     "componentHash": "afa29e10fca8a0a48cef59c269688dea",
@@ -180,10 +180,10 @@
     "lastUpdated": "2025-06-11T13:43:23.643Z"
   },
   "getMockCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similar-components-section.tsx": {
-    "componentHash": "bec3ed498e410945158e23cbc260aa3b",
-    "description": "Here are a few options for a concise, one-sentence description of the `getMockCode` component, from a developer's perspective, considering the provided information:\n\n**Option 1 (Most Comprehensive):**\n\n\"This `getMockCode` component generates a placeholder code snippet for demonstration purposes within the similar components section.\"\n\n**Option 2 (More Concise):**\n\n\"The `getMockCode` component provides a mock code sample to illustrate similar code structures in the UI.\"\n\n**Option 3 (Very Brief):**\n\n\"This component renders a placeholder code snippet for demonstration.\"\n\n---\n\nTo help me tailor the description even further, could you tell me:\n\n*   **What kind of code is being mocked?** (e.g., JavaScript, React, HTML)\n*   **What is the purpose of this component within the larger application?** (e.g., showing example code, highlighting key features)",
+    "componentHash": "86d380c9825a8a8e8933093f044158f3",
+    "description": "```markdown\n## getMockCode Component\n\nThe `getMockCode` component generates a valid React code snippet for a given component name, returning a string containing a basic React functional component with a title and child content.  This component is primarily used for quickly generating example code snippets within documentation or for demonstration purposes, offering a convenient way to present a functional component structure.  Typically, it's utilized in documentation tools or educational materials to provide a ready-to-use React component template for developers to build upon.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:26.780Z"
+    "lastUpdated": "2025-06-12T17:09:24.172Z"
   },
   "handleCompare:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/similar-components-section.tsx": {
     "componentHash": "890ed5690ca2320b4ad7b94dc2db5543",
@@ -216,10 +216,10 @@
     "lastUpdated": "2025-06-11T13:43:36.116Z"
   },
   "toggleTheme:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/mode-toggle.tsx": {
-    "componentHash": "2539acb31e3a11c92fa85be65d024a9c",
-    "description": "Here's a concise, one-sentence description from a developer's perspective for the `toggleTheme` component:\n\n\"The `toggleTheme` component allows users to dynamically switch between a light and dark color scheme for the application.\"",
+    "componentHash": "aeaa50b49a9b7c41bb3436401859ea00",
+    "description": "```markdown\n## toggleTheme Component\n\nThe `toggleTheme` component provides a simple mechanism to toggle between a light and dark theme for an application. It utilizes a `setTheme` function (assumed to be externally provided) to switch the currently active theme between 'light' and 'dark', offering a convenient way to dynamically adjust the user interface's appearance. This component is typically used in conjunction with a theme management system, allowing users to easily switch between light and dark modes based on preference or environmental conditions.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:36.961Z"
+    "lastUpdated": "2025-06-12T17:09:26.679Z"
   },
   "Header:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/header.tsx": {
     "componentHash": "a50868323ea8e8327f98d2ddec297b9c",
@@ -264,21 +264,183 @@
     "lastUpdated": "2025-06-11T13:43:47.456Z"
   },
   "extractMethodCode:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
-    "componentHash": "61c0e0288003c9b95280af9eb065b876",
-    "description": "Please provide the code for the `extractMethodCode` component from `/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx` so I can generate the concise, one-sentence description from a developer's perspective.  I need to see the code to understand its function.",
+    "componentHash": "9826cd6e02883b78835312b2317a23ef",
+    "description": "```markdown\n## extractMethodCode Component Description\n\nThe `extractMethodCode` component attempts to identify and extract method definitions from a given code string. It primarily focuses on recognizing common JavaScript function and method patterns, including standard function declarations, function expressions, arrow functions, and class methods.  This component is designed to be used when you need to isolate a method from a larger code block for comparison or analysis, and it handles various syntax variations to ensure robust extraction.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:48.792Z"
+    "lastUpdated": "2025-06-12T17:09:33.158Z"
   },
   "normalizeForComparison:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
-    "componentHash": "c04f2df56d0f011840978f3dc0a7b41c",
-    "description": "This `normalizeForComparison` component prepares data for visual comparison by standardizing formats and potentially highlighting key differences between items.",
+    "componentHash": "21f1d1eaf9504b3f4825a7f17c4b0c03",
+    "description": "```markdown\n## normalizeForComparison Component\n\nThe `normalizeForComparison` component is a utility function designed to standardize strings for comparison purposes. It takes a string as input and returns a single-spaced, trimmed version of that string, removing leading/trailing whitespace and collapsing multiple spaces into single spaces. This is particularly useful when comparing strings where whitespace inconsistencies could lead to inaccurate results, such as in code diffs or text similarity calculations.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:49.278Z"
+    "lastUpdated": "2025-06-12T17:09:34.832Z"
   },
   "normalize:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/comparison-modal.tsx": {
-    "componentHash": "171fd5167ef64a0e7026ba7b28cddfda",
-    "description": "Okay, here's a concise, one-sentence description of the `normalize` component, written from a developer's perspective, based on the information provided:\n\n\"The `normalize` component likely handles and standardizes data input or output, potentially for formatting or consistency within the comparison modal.\" \n\n**Note:**  Because I don't have the actual code content, this description is based solely on the component name and file path. If you provide the code, I can create a more precise and accurate description.",
+    "componentHash": "2e88014a0c0c0aa34bb95081d9d1e582",
+    "description": "```markdown\n## normalize Component Description\n\nThe `normalize` component is a utility function that cleans up a given code string by removing all single-line and multi-line comments, splitting the code into individual lines, trimming whitespace, and then joining them back together with a single space.  It's primarily used to prepare code snippets for display or processing by stripping away irrelevant comment content. Typical use cases include formatting code blocks within a comparison modal or any scenario where raw, uncommented code needs to be presented in a consistent format.\n```",
     "props": {},
-    "lastUpdated": "2025-06-11T13:43:51.063Z"
+    "lastUpdated": "2025-06-12T17:09:36.896Z"
+  },
+  "visit:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-debug.js": {
+    "componentHash": "86c942240a03fedc9b6399ef6b6ce862",
+    "description": "```markdown\n## Visit Component\n\nThe `visit` component is a utility function designed to recursively traverse a TypeScript Abstract Syntax Tree (AST) node and log information about function and variable declarations. Specifically, it identifies function declarations and variable statements, logging the function name or variable name, and demonstrating how to access node text using `getText()`. This component is primarily used for debugging and understanding the structure of a TypeScript codebase by inspecting its AST representation.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:08:59.159Z"
+  },
+  "getAllEntities:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/mcp-server.js": {
+    "componentHash": "e4575308647824d85ad1069ff537b46d",
+    "description": "```markdown\n## getAllEntities Component Description\n\nThe `getAllEntities` component asynchronously retrieves all entity data from JSON files within the `component-index.json` file. It reads the index file, then dynamically reads and parses corresponding entity files based on the slugs provided, handling potential file read errors by returning `null` for missing files. This component is typically used to fetch a comprehensive list of entities for display or further processing within a larger application.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:00.968Z"
+  },
+  "runCommand:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/build-js.js": {
+    "componentHash": "b77c931abdf5b6b7cd4288ee42f3a920",
+    "description": "```markdown\n## runCommand Component Description\n\nThe `runCommand` component provides a simple way to execute shell commands within a React application. It safely executes a given command using `execSync`, inheriting standard input/output for real-time feedback, and includes error handling to catch and log any execution failures, making it ideal for tasks like running build scripts or interactive commands within a user interface.  This component is typically used when you need to trigger shell commands based on user interaction or other application events.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:02.874Z"
+  },
+  "build:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/build-js.js": {
+    "componentHash": "628967a4966618407969b8a60745af44",
+    "description": "```markdown\n## Build Component\n\nThe `build` component automatically transcompiles TypeScript code into JavaScript, ensuring your project is ready for deployment. It achieves this by first cleaning the `dist` directory, then running the `tsc` command based on the `tsconfig.json` file, followed by copying `package.json` to the `dist` folder and making the CLI executable for seamless execution. This component is typically used during the build process of a React project leveraging TypeScript to generate optimized JavaScript files.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:05.010Z"
+  },
+  "generateUniqueSlug:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/src/index.ts": {
+    "componentHash": "10370f8656dd5b465a2ec5c962917072",
+    "description": "```markdown\n## generateUniqueSlug Component\n\nThe `generateUniqueSlug` component creates a unique, URL-friendly slug from a component's file path and name. It converts the file path into a sanitized string, replacing special characters with underscores, removing file extensions, and then appending the component name, all while converting to lowercase and replacing spaces with hyphens.  This component is typically used within documentation generation workflows to create consistent and predictable slugs for component references.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:06.811Z"
+  },
+  "generateDocUI:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/src/index.ts": {
+    "componentHash": "35a421386ad26a81a1c12d0379e737bf",
+    "description": "## generateDocUI Component Description\n\nThe `generateDocUI` component automatically creates React component documentation by processing an array of component definitions. It generates a `component-index.json` file and individual JSON files for each component, tailored with options such as code display, method inclusion, and similarity highlighting, ultimately outputting documentation data to a specified directory. This component is ideal for quickly generating documentation for a React project, facilitating developers' understanding of component structure and functionality.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:09.316Z"
+  },
+  "cn:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/lib/utils.ts": {
+    "componentHash": "e0d890a77683998bdbb99df520e5d6d6",
+    "description": "```markdown\n## cn Component\n\nThe `cn` component is a utility function designed to seamlessly merge CSS classes using the `clsx` library.  It takes a variable number of class names (as an array of `ClassValue` objects) and returns a single, combined string of classes, making it ideal for dynamic styling in React components.  This component is commonly used to build complex styling configurations by combining utility classes from libraries like Tailwind CSS or styled-components.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:11.126Z"
+  },
+  "CodeStructure:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-structure.tsx": {
+    "componentHash": "0101cbec2539606620828c2b76b579d6",
+    "description": "Okay, here's a concise description of the `CodeStructure` component, formatted for clarity and precision:\n\n**CodeStructure Component Description**\n\nThe `CodeStructure` component dynamically renders a visual tree representation of a project's codebase based on data fetched from a JSON file (`component-index.json`).  It organizes code files and folders into a hierarchical structure, grouping them by their file paths and displaying them as a navigable tree. This component is designed to visually map out a project's codebase, making it easier to understand file organization and relationships, and includes a loading state and a fallback message if no data is available.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:41.232Z"
+  },
+  "fetchComponents:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-structure.tsx": {
+    "componentHash": "edb4f28f05f057693d595e1586ceee6d",
+    "description": "## fetchComponents Component\n\nThe `fetchComponents` component asynchronously fetches a hierarchical structure of all components from a `/docs-data/component-index.json` file.  It groups components by their file paths, constructing a tree-like representation with folders and files, suitable for display in a component explorer or navigation system. This component is designed to provide a dynamic, organized view of your component library based on its file structure.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:45.016Z"
+  },
+  "sortStructure:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-structure.tsx": {
+    "componentHash": "9d4e543401ddf5adf940a9f7cc501571",
+    "description": "```markdown\n## sortStructure Component\n\nThe `sortStructure` component recursively sorts an array of `FileStructure` objects, prioritizing folders and then sorting files alphabetically. It's designed to present a file hierarchy in a consistently ordered manner, ideal for displaying project structures or file listings within a user interface.  This component is commonly used to organize and display files and folders within a codebase or document management system, ensuring predictable ordering for the user.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:46.822Z"
+  },
+  "renderTree:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-structure.tsx": {
+    "componentHash": "0811a436d6a414af80b0722067f01434",
+    "description": "```markdown\n## renderTree Component\n\nThe `renderTree` component recursively renders a hierarchical file structure as an unordered list (`<ul>`). It takes an array of `FileStructure` items and displays each item, including folders and files, with appropriate icons and links to documentation.  This component is typically used to visualize and navigate complex project structures, commonly found in documentation or code exploration tools.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:48.789Z"
+  },
+  "CodeRelationships:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "7b14682bb5640f44b1749570369c64a6",
+    "description": "Okay, here's a concise description of the `CodeRelationships` component, formatted for clarity and focusing on the key aspects, suitable for documentation:\n\n**Component Description: CodeRelationships**\n\nThe `CodeRelationships` component dynamically displays relationships between code entities within a project.  It fetches data based on component slugs and displays these relationships (e.g., imports, dependencies, calls) in a visually structured format within a card.  The component supports filtering relationships by “all”, “dependencies”, or “dependents”. It uses the provided `entityId` to focus on the relationships for a specific code entity, and includes loading states and visual feedback.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:09:54.782Z"
+  },
+  "fetchData:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "159fae8a6f3e7373d3990932ae773b9d",
+    "description": "The `fetchData` component asynchronously retrieves and analyzes component relationships from a JSON data source. It fetches an index of all components, then fetches detailed data for each component, identifying imports, method calls, and similarity warnings – ultimately constructing a list of relationships between components. This data is used to generate a dependency graph or visualization of the application's component ecosystem.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:00.324Z"
+  },
+  "getEntityIcon:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "d998d21384ccacca4f28c43e3e976fad",
+    "description": "```markdown\n## getEntityIcon Component\n\nThe `getEntityIcon` component renders a simple, icon-like representation of a code entity based on its type.  It uses a switch statement to map a `CodeEntity[\"type\"]` value (e.g., \"component\", \"class\") to a corresponding icon component (`Component`, `Code`, `Function`, or `FileCode`), ensuring a consistent visual representation across different code entities.  This component is typically used within a codebase visualization or code explorer to represent various code elements visually, enhancing readability and understanding.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:02.516Z"
+  },
+  "getRelationshipLabel:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "80f91589beffc76071865ff40880b12c",
+    "description": "```markdown\n## getRelationshipLabel Component Description\n\nThe `getRelationshipLabel` component provides a standardized, localized string representation for various relationship types between code elements.  It takes a `type` prop (of type `Relationship[\"type\"]`) and returns a user-friendly label such as \"Imports\", \"Extends\", or \"Calls\", offering a consistent and readable way to display relationship information within a codebase. This component is commonly used in code visualization tools or documentation to clearly represent the connections between different code constructs.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:04.518Z"
+  },
+  "getRelationshipColor:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "c2f6f03a81fdc5673591518db8d17d09",
+    "description": "```markdown\n## getRelationshipColor Component\n\nThe `getRelationshipColor` component dynamically returns a CSS class string based on the `type` of relationship provided. Specifically, it maps relationship types (like \"imports\", \"extends\", etc.) to corresponding color palettes with border styles, ensuring consistent visual representation of relationships within the codebase. This component is typically used within code visualization tools or diagramming libraries to style relationship edges based on their semantic meaning, offering a visually intuitive way to understand code dependencies.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:06.834Z"
+  },
+  "ArrowLeft:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-relationships.tsx": {
+    "componentHash": "c671f279a9222fa6c3cd22c701a1adca",
+    "description": "```markdown\n## ArrowLeft Component\n\nThe `ArrowLeft` component renders a standard left-pointing arrow icon, providing a simple visual cue for navigation or direction.  It's a basic SVG element with customizable stroke color and width, allowing developers to easily integrate it into designs using the `stroke` prop.  Typically, this component is used to indicate a \"previous\" link, a navigation direction, or as a stylistic element within a UI where a left-pointing arrow is relevant.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:08.857Z"
+  },
+  "CodeGraph:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "37468363284ee81ebda3a5658c214a64",
+    "description": "```markdown\n## Code Visualization Component\n\nThis component visualizes the relationships between code components, displaying them in a graph-like structure. It allows filtering by component type (Component, Class, Function, Method) and provides interactive zooming and panning.\n\n### Key Features\n\n*   **Component Graph:** Displays a network of code components with connections representing dependencies.\n*   **Filtering:** Filters the displayed components based on their type.\n*   **Zooming & Panning:** Allows users to zoom in and out of the graph and pan around to explore the entire structure.\n*   **Interactive Nodes:** Clicking on a component reveals its details.\n\n### Component Breakdown\n\n1.  **SVG Canvas:** The core of the visualization is an SVG canvas that renders the component graph.\n2.  **Component Nodes:** Each component is represented as a node in the graph.  Nodes are styled based on their component type.\n3.  **Edges (Connections):** Lines (edges) connect the nodes, indicating dependencies. The color and style of edges are also based on the relationship type (e.g., `imports`, `extends`, `calls`, `uses`).\n4.  **Interactive Details:** Clicking on a component node reveals a panel with the component's details.\n5.  **Filtering:** The component allows the user to select a specific component type to display.\n6.  **Zooming and Panning:** The user can interactively zoom in and out of the graph and pan around using the mousewheel or gestures.\n\n### Technical Details\n\n*   **React Component:** The component is built using React, a JavaScript library for building user interfaces.\n*   **SVG Manipulation:** The SVG canvas is manipulated using JavaScript code to render the graph and handle user interactions.\n*   **Data Structure:** The component data is likely represented as a JavaScript object or array, containing information about each component and its relationships.\n\n### Usage\n\n1.  Install the necessary dependencies in your React project.\n2.  Import the `CodeVisualizationComponent` into your application.\n3.  Pass the component data to the `CodeVisualizationComponent`.\n4.  Render the component in your application.\n\n### Example Data Structure (Illustrative)\n\n```javascript\nconst componentData = [\n  { id: \"comp1\", name: \"MyComponent\", type: \"Component\" },\n  { id: \"comp2\", name: \"MyClass\", type: \"Class\" },\n  { id: \"comp3\", name: \"MyFunction\", type: \"Function\" },\n  { id: \"comp4\", name: \"MyMethod\", type: \"Method\" },\n  // ... more components\n];\n```\n\n### Further Development\n\n*   **Edge Types:** Add more detailed information about edge types (e.g., the direction of the dependency).\n*   **Dynamic Data Loading:**  Implement a mechanism to load component data dynamically, perhaps from a database or API.\n*   **Advanced Filtering:**  Add more sophisticated filtering options, such as filtering by name or other properties.\n*   **Layout Algorithms:** Experiment with different graph layout algorithms to improve the visual clarity of the graph.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:25.672Z"
+  },
+  "fetchData:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "26adb452f46b193aa41050ad5450cb6b",
+    "description": "The `fetchData` component asynchronously retrieves and analyzes component data from a specified API endpoint, constructing a graph of component relationships. It fetches a component index, then iteratively retrieves data for each component, identifying dependencies (imports), method calls, and similarity warnings to establish relationships between components.  The resulting data is presented as an array of relationships, including source, target, and relationship type, which is used for visualization and navigation within the application. This component is ideal for situations where understanding the connections between components within a larger codebase is critical for development and documentation.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:32.715Z"
+  },
+  "handleNodeClick:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "c764a473eb4679ea959db81e7406c64c",
+    "description": "```markdown\n## handleNodeClick Component Description\n\nThe `handleNodeClick` component is a utility function designed to respond to clicks on nodes within a code graph visualization. Upon a node click, it updates the `selectedEntity` and toggles the visibility of detailed node information by opening the `detailsOpen` state.  This component is typically used within a code graph implementation to enable users to interact with and select individual code entities for further examination.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:34.388Z"
+  },
+  "getNodeColor:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "ca30b753b21479eed05f5202c050678a",
+    "description": "```markdown\n## getNodeColor Component\n\nThe `getNodeColor` component provides a simple, deterministic way to assign a color based on the `type` of a `CodeEntity`. Specifically, it maps `CodeEntity` types like \"component\", \"class\", \"function\", and \"method\" to corresponding Material UI color palettes (e.g., violet-500, blue-500, emerald-500, amber-500), ensuring consistent color-coding within a code graph visualization. This component is typically used within a code graph library to visually differentiate node types, improving readability and understanding of the code structure.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:36.816Z"
+  },
+  "getEdgeColor:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "9fd0ab5075d2ab88c6152f685fe9a1d9",
+    "description": "```markdown\n## getEdgeColor Component\n\nThe `getEdgeColor` component is a utility function that returns a specific color based on the `type` of a relationship in a code graph.  It maps relationship types like \"imports,\" \"extends,\" or \"calls\" to corresponding color values (e.g., blue, violet, or amber) – these colors are defined within the component.  This component is typically used within a code graph visualization to visually differentiate relationships between code elements based on their type, enhancing the clarity and understanding of the graph.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:38.991Z"
+  },
+  "zoomIn:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "632d405c6bd33db899c4e009502870c4",
+    "description": "```markdown\n## zoomIn Component Description\n\nThe `zoomIn` component provides a simple way to increase the zoom level of an associated element (likely within a larger UI) by 0.1 on each click. It utilizes a state variable `zoom` to track the current zoom level, ensuring it never exceeds a maximum of 2, offering a smooth and controlled zooming experience. This component is commonly used within visualizations or interactive diagrams where a user needs to progressively increase the level of detail.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:40.774Z"
+  },
+  "zoomOut:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "d8a23929b7be6e5301cb4f056b1c6816",
+    "description": "```markdown\n## zoomOut Component\n\nThe `zoomOut` component is a utility function that dynamically reduces the zoom level of the application. It smoothly decreases the current zoom value from its current position to a maximum of 0.5, providing a subtle and intuitive way to step back from a detailed view. This component is typically used within interactive visualizations or diagrams where a user might want to quickly reduce the magnification for a broader overview.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:42.370Z"
+  },
+  "ArrowLeft:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-graph.tsx": {
+    "componentHash": "95cbb1e03dc1483ca6786ab83ef39104",
+    "description": "```markdown\n## ArrowLeft Component\n\nThe `ArrowLeft` component renders a simple, filled SVG arrow pointing to the left, using a customizable stroke color based on the `stroke` prop.  It's designed for visually indicating navigation or movement in a left direction within a UI, commonly used in interactive elements or diagrams to show a directional path.  Because it has no props, the component's appearance is fully controlled by the `stroke` property, allowing for consistent styling across applications.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:44.407Z"
+  },
+  "CodeEntityDetails:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-entity-details.tsx": {
+    "componentHash": "83ea4f5f53e4438a038cdf66db776b02",
+    "description": "## CodeEntityDetails Component Description\n\nThe `CodeEntityDetails` component displays detailed information about a code entity – such as a component, class, or function – in a modal dialog. It renders an icon representing the entity type, its name, and a type badge, alongside the entity's file path.  The component utilizes a Dialog component to present this information within a modal, and includes tabs for displaying the entity's code, usage examples, and dependencies, providing a comprehensive view of the code artifact.",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:47.452Z"
+  },
+  "getEntityIcon:/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/test-docs-project/components/code-entity-details.tsx": {
+    "componentHash": "da93d20e6c8403969f3b4ee145926d5f",
+    "description": "```markdown\n## getEntityIcon Component Description\n\nThe `getEntityIcon` component renders an icon representing the type of a code entity (component, class, function, or method). It utilizes a switch statement to return a specific icon based on the `entity.type` prop, ensuring consistent visual representation of different code elements.  This component is typically used within code entity details displays to provide a clear visual cue for each entity type.\n```",
+    "props": {},
+    "lastUpdated": "2025-06-12T17:10:51.498Z"
   }
 }

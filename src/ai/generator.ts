@@ -111,7 +111,7 @@ export class AiDescriptionGenerator {
               defaultValue: prop.defaultValue,
             }))
           : [],
-      sourceCode: component.sourceCode || "",
+      sourceCode: this.getSourceCode(component),
     };
 
     return crypto
@@ -332,11 +332,13 @@ export class AiDescriptionGenerator {
   private async generateComponentDescription(
     component: ComponentDefinition
   ): Promise<string> {
-    // Add null check for component itself as well as component.props before trying to map over it
+    // Add null check for component itself
     if (!component) {
       console.warn("Component is undefined in generateComponentDescription");
       return "A React component.";
     }
+
+    const sourceCode = this.getSourceCode(component);
 
     const propList =
       component.props && Array.isArray(component.props)
@@ -367,7 +369,7 @@ export class AiDescriptionGenerator {
       File Path: ${component.filePath || "Unknown"}
       Props: ${propList}
       Component code:
-      ${component.sourceCode || "No source code available."}
+      ${sourceCode || "No source code available."}
 
       Format the response in Markdown.
     `;
@@ -394,6 +396,20 @@ export class AiDescriptionGenerator {
     }
 
     return this.generateDescription(prompt);
+  }
+
+  private getSourceCode(component: ComponentDefinition): string {
+    // This provides a resilient way to access the source code,
+    // accommodating different property names used in different parts of the toolchain.
+    if (component.sourceCode) {
+      return component.sourceCode;
+    }
+    // The type doesn't officially have 'code', so we cast to any to check for it.
+    const code = (component as any).code;
+    if (typeof code === 'string') {
+      return code;
+    }
+    return "";
   }
 
   /**
@@ -474,12 +490,16 @@ export class AiDescriptionGenerator {
     method: any
   ): Promise<string> {
     console.log(`Generating description for method: ${method.name} in ${component.name}`);
+    
+    // Get method code - check both sourceCode and code properties
+    const methodCode = method.sourceCode || method.code || '';
+    
     const prompt = `
       Component: ${component.name}
       Method: ${method.name}
-      Method signature: ${method.name}(${method.params.map((p: any) => `${p.name}: ${p.type}`).join(', ')}): ${method.returnType}
+      Method signature: ${method.name}(${method.params?.map((p: any) => `${p.name}: ${p.type}`).join(', ') || ''}): ${method.returnType || 'void'}
       Method code:
-      ${method.sourceCode}
+      ${methodCode}
 
       What is the purpose of this method? Describe its function, parameters, and return value in a single, concise sentence.
     `;

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Sparkles, FileCode } from "lucide-react";
+import { Sparkles, FileCode, Clock, Tag, GitBranch, Users, Code2, BookOpen, Lightbulb, Copy, Check, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeBlock } from "@/components/code-block";
@@ -29,6 +29,7 @@ interface ComponentData {
   code: string;
   description?: string;
   lastUpdated?: string;
+  exportedFrom?: string[];
   props?: PropDefinition[];
   methods?: {
     name: string;
@@ -55,6 +56,12 @@ export default function ComponentClient({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('code')
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
+  const [copySuccess, setCopySuccess] = useState<string | null>(null)
+  const [codeStats, setCodeStats] = useState<{
+    lines: number
+    complexity: number
+    maintainability: string
+  } | null>(null)
 
   // Check for method fragment in URL
   useEffect(() => {
@@ -68,6 +75,25 @@ export default function ComponentClient({ slug }: { slug: string }) {
     }
   }, []);
 
+  // Calculate code statistics
+  const calculateCodeStats = (code: string) => {
+    const lines = code.split('\n').filter(line => line.trim() !== '').length
+    const complexity = Math.min(Math.max(Math.floor(lines / 10), 1), 10)
+    const maintainability = complexity <= 3 ? 'Excellent' : complexity <= 6 ? 'Good' : complexity <= 8 ? 'Fair' : 'Needs Attention'
+    return { lines, complexity, maintainability }
+  }
+
+  // Copy to clipboard functionality
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopySuccess(type)
+      setTimeout(() => setCopySuccess(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy: ', err)
+    }
+  }
+
   // Fetch component data
   useEffect(() => {
     async function fetchComponent() {
@@ -77,7 +103,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
         if (res.ok) {
           const data = await res.json()
           // Ensure all required fields exist with defaults
-          setComponentData({
+          const componentData = {
             ...data,
             similarComponents: data.similarComponents || [],
             lastUpdated: data.lastUpdated || new Date().toLocaleDateString(),
@@ -85,7 +111,11 @@ export default function ComponentClient({ slug }: { slug: string }) {
             route: data.route || `/components/${slug}`,
             props: data.props || [],
             methods: data.methods || []
-          })
+          }
+          setComponentData(componentData)
+          if (componentData.code) {
+            setCodeStats(calculateCodeStats(componentData.code))
+          }
           if (data.description) {
             setDescription(data.description)
           }
@@ -214,9 +244,25 @@ export default function ComponentClient({ slug }: { slug: string }) {
           <h1 className="text-4xl font-bold tracking-tight">{componentData.name}</h1>
           <Badge className="bg-violet-500 hover:bg-violet-600">{componentData.type || "Component"}</Badge>
         </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <FileCode className="h-4 w-4" />
-          <span className="font-mono text-sm">{componentData.filePath}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <FileCode className="h-4 w-4" />
+            <span className="font-mono text-sm">{componentData.filePath}</span>
+          </div>
+          {componentData.exportedFrom && componentData.exportedFrom.length > 1 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Also exported from:</span>
+              <div className="flex flex-wrap gap-1">
+                {componentData.exportedFrom
+                  .filter((path: string) => path !== componentData.filePath)
+                  .map((exportPath: string, index: number) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {exportPath.split('/').pop()}
+                    </Badge>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between mt-2">
           <p className="text-muted-foreground">Last updated {componentData.lastUpdated || "recently"}</p>

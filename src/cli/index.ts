@@ -12,6 +12,7 @@ import { saveVectorDatabase } from "./save-vector-db";
 import { glob } from "glob";
 import * as ts from "typescript";
 import ignore from "ignore"; // NEW: for .gitignore parsing
+import axios from "axios";
 
 /**
  * Generate a unique slug for a component based on its file path and name
@@ -20,6 +21,101 @@ import ignore from "ignore"; // NEW: for .gitignore parsing
 function generateUniqueSlug(componentName: string, filePath: string, rootDir: string): string {
   const relativePath = path.relative(rootDir, filePath);
   return `${relativePath.replace(/[\/\\]/g, '_').replace(/\.(tsx?|jsx?)$/, '')}_${componentName}`.toLowerCase().replace(/\s+/g, "-");
+}
+
+/**
+ * Generate a content-based hash for deduplication
+ */
+function generateContentHash(name: string, code: string): string {
+  // Simple hash based on function name and normalized code content
+  const normalizedCode = code.replace(/\s+/g, ' ').trim();
+  let hash = 0;
+  const content = `${name}:${normalizedCode}`;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * Determine if a file path is likely a re-export (index file or contains exports)
+ */
+function isReExportFile(filePath: string, code: string): boolean {
+  const fileName = path.basename(filePath, path.extname(filePath));
+  
+  // Check if it's an index file
+  if (fileName === 'index') {
+    return true;
+  }
+  
+  // Check if the code contains export statements without implementation
+  const exportPattern = /export\s+(?:\{[^}]+\}|[*])\s+from\s+['"][^'"]+['"]/g;
+  return exportPattern.test(code);
+}
+
+/**
+ * Find the most likely source file for a function (not a re-export)
+ */
+function findSourceFile(items: Array<any>): any {
+  // Sort by specificity - prefer files that are not index files and have actual implementation
+  return items.sort((a, b) => {
+    const aIsReExport = isReExportFile(a.filePath, a.code);
+    const bIsReExport = isReExportFile(b.filePath, b.code);
+    
+    // Prefer non-re-export files
+    if (aIsReExport && !bIsReExport) return 1;
+    if (!aIsReExport && bIsReExport) return -1;
+    
+    // Prefer files with longer code (more implementation)
+    const aCodeLength = (a.code || '').length;
+    const bCodeLength = (b.code || '').length;
+    if (aCodeLength !== bCodeLength) {
+      return bCodeLength - aCodeLength;
+    }
+    
+    // Prefer files that are deeper in the directory structure (more specific)
+    const aDepth = a.filePath.split(path.sep).length;
+    const bDepth = b.filePath.split(path.sep).length;
+    return bDepth - aDepth;
+  })[0];
+}
+
+/**
+ * Deduplicate code items based on content hash
+ */
+function deduplicateCodeItems(items: Array<any>): Array<any> {
+  const seenHashes = new Map<string, Array<any>>();
+  const uniqueItems: Array<any> = [];
+  
+  // Group items by content hash
+  for (const item of items) {
+    const hash = generateContentHash(item.name, item.code || '');
+    if (!seenHashes.has(hash)) {
+      seenHashes.set(hash, []);
+    }
+    seenHashes.get(hash)!.push(item);
+  }
+  
+  // For each group, select the best representative
+  for (const [hash, duplicates] of seenHashes) {
+    if (duplicates.length === 1) {
+      uniqueItems.push(duplicates[0]);
+    } else {
+      console.log(`Found ${duplicates.length} duplicates for "${duplicates[0].name}"`);
+      const sourceItem = findSourceFile(duplicates);
+      
+      // Update the source item to include references to all file paths where it's found
+      sourceItem.exportedFrom = duplicates.map(d => d.filePath);
+      sourceItem.alternativeSlugs = duplicates.map(d => d.slug).filter(s => s !== sourceItem.slug);
+      
+      uniqueItems.push(sourceItem);
+      console.log(`Selected "${sourceItem.filePath}" as canonical source for "${sourceItem.name}"`);
+    }
+  }
+  
+  return uniqueItems;
 }
 
 // Simple utility to extract methods from code for similarity analysis
@@ -315,7 +411,13 @@ async function parseAllCodeItems(rootDir: string): Promise<any[]> {
   }
   
   console.log(`Total code items extracted: ${allItems.length}`);
-  return allItems;
+  
+  // Apply deduplication to remove duplicate entries from re-exports
+  console.log("Applying deduplication to remove re-export duplicates...");
+  const deduplicatedItems = deduplicateCodeItems(allItems);
+  console.log(`After deduplication: ${deduplicatedItems.length} unique code items`);
+  
+  return deduplicatedItems;
 }
 
 /**
@@ -373,7 +475,10 @@ program
       const ollamaUrl = options.ollamaUrl || config.ollamaBaseUrl || "http://localhost:11434";
       const ollamaModel = options.ollamaModel || config.ollamaModel || "gemma3:4b";
       const ollamaEmbeddingModel = options.ollamaEmbeddingModel || config.ollamaEmbeddingModel || "nomic-embed-text:latest";
-      
+      const generateDescriptions = options.generateDescriptions || config.generateDescriptions || false;
+      const outputDir = path.join(process.cwd(), "documentation");
+      const docsDataDir = path.join(outputDir, "docs-data");
+
       // Set environment variables for the services
       process.env.OLLAMA_URL = ollamaUrl;
       process.env.OLLAMA_MODEL = ollamaModel;
@@ -386,40 +491,121 @@ program
       
       const codeItems = await parseAllCodeItems(rootDir);
       
-      // Generate AI descriptions if configured or passed as a flag
-      const generateDescriptions = options.generateDescriptions || config.generateDescriptions || false;
+      // Save code items to JSON files first
+      await fs.ensureDir(docsDataDir);
+      await fs.writeJson(path.join(docsDataDir, "code-index.json"), codeItems, { spaces: 2 });
+
+      for (const item of codeItems) {
+        const slug = item.slug || generateUniqueSlug(item.name, item.filePath, rootDir);
+        item.slug = slug; // Ensure slug is set
+        if (!item.relationships) item.relationships = [];
+        if (!item.imports) item.imports = [];
+        await fs.writeJson(path.join(docsDataDir, `${slug}.json`), item, { spaces: 2 });
+      }
+      
+      // Generate AI descriptions if enabled, using the same logic as the UI
       if (generateDescriptions) {
         console.log("Generating AI descriptions for code items...");
-        const { AiDescriptionGenerator } = require("../ai/generator");
-        const aiGenerator = new AiDescriptionGenerator({
-          useOllama: true,
-          ollamaUrl,
-          ollamaModel,
-          apiKey: "sk-mock-api-key-for-ollama"
-        });
         
-        // Generate descriptions for each code item
-        for (const item of codeItems) {
-          if (!item.description || item.description.trim() === "") {
-            try {
-              // Create a mock component structure for the AI generator
-              const mockComponent = {
-                name: item.name,
-                filePath: item.filePath,
-                type: item.kind,
-                props: [],
-                methods: item.methods || [],
-                sourceCode: item.code
-              };
-              
-              const enhanced = await aiGenerator.enhanceComponentsWithDescriptions([mockComponent]);
-              if (enhanced && enhanced.length > 0) {
-                item.description = enhanced[0].description;
-                console.log(`Generated description for ${item.name} (${item.code?.length || 0} chars)`);
-              }
-            } catch (error) {
-              console.error(`Error generating description for ${item.name}:`, error);
+        // Function to generate description using Ollama (same as /api/describe endpoint)
+        const generateDescriptionWithOllama = async (componentName: string, code: string, filePath: string) => {
+          const prompt = `
+            You are an expert React developer documenting a component library.
+            Please provide a clear, concise description of the "${componentName}" component below.
+            Focus on:
+            - What the component does
+            - Key features and functionality
+            - Typical use cases
+
+            Keep the description between 2-3 sentences. Be precise and informative.
+
+            Component code:
+            ${code}
+            ${filePath ? `File path: ${filePath}` : ""}
+          `;
+
+          try {
+            console.log(`Sending request to Ollama API for ${componentName}...`);
+            
+            const response = await axios.post(`${ollamaUrl}/api/chat`, {
+              model: ollamaModel,
+              messages: [
+                {
+                  role: "system",
+                  content: "You are an AI assistant specializing in React component documentation.",
+                },
+                {
+                  role: "user",
+                  content: prompt,
+                },
+              ],
+              stream: false,
+            });
+
+            const data = response.data;
+            
+            if (data.message?.content) {
+              return data.message.content;
+            } else {
+              console.warn("Unexpected response format from Ollama:", JSON.stringify(data));
+              return `The ${componentName} component is a UI element that provides functionality based on its props and implementation.`;
             }
+          } catch (error) {
+            if (axios.isAxiosError(error)) {
+              console.error(`Ollama API error: ${error.response?.status} ${error.response?.statusText}`);
+            } else {
+              console.error("Error generating description with Ollama:", error);
+            }
+            return `The ${componentName} component is a UI element that provides functionality based on its props and implementation.`;
+          }
+        };
+        
+        for (const item of codeItems) {
+          const itemPath = path.join(docsDataDir, `${item.slug}.json`);
+          try {
+            const currentItem = await fs.readJson(itemPath);
+
+            if (!currentItem.description || currentItem.description.trim() === "") {
+              console.log(`Generating description for ${currentItem.name}...`);
+              
+              const description = await generateDescriptionWithOllama(
+                currentItem.name,
+                currentItem.code || `function ${currentItem.name}() { /* Code not available */ }`,
+                currentItem.filePath
+              );
+              
+              if (description) {
+                currentItem.description = description;
+                currentItem.lastUpdated = new Date().toISOString();
+                await fs.writeJson(itemPath, currentItem, { spaces: 2 });
+                console.log(`Generated and saved description for ${currentItem.name}`);
+              }
+            }
+            
+            // Also generate descriptions for methods if they exist
+            if (currentItem.methods && Array.isArray(currentItem.methods)) {
+              for (const method of currentItem.methods) {
+                if (method && (!method.description || method.description.trim() === '')) {
+                  console.log(`Generating description for method ${method.name} in ${currentItem.name}...`);
+                  
+                  const methodDescription = await generateDescriptionWithOllama(
+                    `${currentItem.name}.${method.name}`,
+                    method.code || `function ${method.name}() { /* Code not available */ }`,
+                    currentItem.filePath
+                  );
+                  
+                  if (methodDescription) {
+                    method.description = methodDescription;
+                  }
+                }
+              }
+              
+              // Save updated methods
+              await fs.writeJson(itemPath, currentItem, { spaces: 2 });
+              console.log(`Updated descriptions for methods in ${currentItem.name}`);
+            }
+          } catch (error) {
+            console.error(`Error processing descriptions for ${item.name}:`, error);
           }
         }
       }
@@ -434,33 +620,9 @@ program
         }
       }
       console.log("Finished processing methods for similarity analysis.");
-      const outputDir = path.join(process.cwd(), "documentation");
       
       // Save the vector database to a file in the documentation directory
       saveVectorDatabase(similarityService, outputDir);
-      // Save code items as code-index.json
-      await fs.ensureDir(outputDir);
-      const docsDataDir = path.join(outputDir, "docs-data");
-      await fs.ensureDir(docsDataDir);
-      await fs.writeJson(path.join(docsDataDir, "code-index.json"), codeItems, { spaces: 2 });
-      
-      // Also generate a [slug].json file for each code item in the docs-data directory
-      for (const item of codeItems) {
-        const slug = item.slug || generateUniqueSlug(item.name, item.filePath, rootDir);
-        item.slug = slug; // Ensure slug is set
-        
-        // Add empty relationships array if not present
-        if (!item.relationships) {
-          item.relationships = [];
-        }
-        
-        // Add empty imports array if not present
-        if (!item.imports) {
-          item.imports = [];
-        }
-        
-        await fs.writeJson(path.join(docsDataDir, `${slug}.json`), item, { spaces: 2 });
-      }
       
       // Create a more detailed component index for the UI
       const componentIndex = codeItems.map(item => ({
@@ -705,6 +867,15 @@ program.action(async (options: CodeYOptions) => {
         apiKey: apiKey, // Pass potentially overridden API key
       });
 
+      // Ensure all components have sourceCode property for the AI generator
+      for (const component of allComponents) {
+        if (!component.sourceCode && component.code) {
+          component.sourceCode = component.code;
+        }
+        // Methods in components should already have code property from MethodDefinition
+        // No need to duplicate since AI generator checks both sourceCode and code
+      }
+
       allComponents = await aiGenerator.enhanceComponentsWithDescriptions(
         allComponents
       );
@@ -720,7 +891,7 @@ program.action(async (options: CodeYOptions) => {
     fs.writeJsonSync(componentsJsonPath, allComponents, { spaces: 2 });
 
     // Generate the documentation UI
-    const outputDir = path.resolve(rootDir, options.output);
+    const outputDir = path.join(rootDir, options.output);
     const docsDataDir = path.join(outputDir, "docs-data");
 
     await generateDocUI(allComponents, {
@@ -912,8 +1083,7 @@ NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
             console.error("Error starting serve:", serveError);
             console.log(`To view documentation, run:
 1. cd ${outputDocsUiDir}
-2. npm run dev -- -p ${options.port}
-Or: npx serve ${outputDir} -p ${options.port}`);
+2. npm run dev -- -p ${options.port}`);
           }
         }
       } catch (error) {

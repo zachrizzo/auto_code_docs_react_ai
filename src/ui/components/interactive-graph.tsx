@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Slider } from './ui/slider'
-import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle, Focus, Info, Move, Zap } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
@@ -42,13 +42,14 @@ interface InteractiveGraphProps {
   selectedNodeId?: string
   onNodeClick?: (nodeId: string) => void
   onNodeHover?: (nodeId: string | null) => void
+  onGroupClick?: (groupId: string, groupNodes: Node[]) => void
   showMinimap?: boolean
 }
 
-export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, onNodeClick, onNodeHover, showMinimap = true }: InteractiveGraphProps) {
+export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, onNodeClick, onNodeHover, onGroupClick, showMinimap = true }: InteractiveGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
+  const [scale, setScale] = useState(0.25)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -61,7 +62,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   }, [selectedNodeId])
   const [filteredTypes, setFilteredTypes] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
-  const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular' | 'grouped'>('force')
+  const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular' | 'grouped'>('grouped')
   const [showLabels, setShowLabels] = useState(true)
   const [showConnectionsOnly, setShowConnectionsOnly] = useState(false)
   const [nodeSpacing, setNodeSpacing] = useState(250)
@@ -73,6 +74,13 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const [groupingMode, setGroupingMode] = useState<'none' | 'file' | 'parent'>('file')
   const [showGroupContainers, setShowGroupContainers] = useState(true)
   const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('curved')
+  const [focusedGroup, setFocusedGroup] = useState<string | null>(null)
+  const [groupFocusMode, setGroupFocusMode] = useState(false)
+  const [selectedNodeForMenu, setSelectedNodeForMenu] = useState<string | null>(null)
+  const [selectedGroupForMenu, setSelectedGroupForMenu] = useState<string | null>(null)
+  const [menuActionHover, setMenuActionHover] = useState<string | null>(null)
+  const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; node: Node } | null>(null)
+  const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number; group: string; nodes: Node[] } | null>(null)
   const animationRef = useRef<number>()
   const nodesRef = useRef<Node[]>(nodes)
   const edgesRef = useRef<Edge[]>(edges)
@@ -194,62 +202,66 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     })
     
     if (sortedNodes.length <= 3) {
-      // Small groups: horizontal line layout
-      const totalWidth = (sortedNodes.length - 1) * spacing
+      // Small groups: horizontal line layout with better spacing
+      const actualSpacing = spacing * 1.3 // Increase spacing between nodes
+      const totalWidth = (sortedNodes.length - 1) * actualSpacing
       sortedNodes.forEach((_, index) => {
         positions.push({
-          x: -totalWidth / 2 + index * spacing,
+          x: -totalWidth / 2 + index * actualSpacing,
           y: 0
         })
       })
     } else if (sortedNodes.length <= 6) {
-      // Medium groups: 2-level tree structure
+      // Medium groups: 2-level tree structure with improved spacing
       const root = sortedNodes[0]
       const children = sortedNodes.slice(1)
       
-      // Root at top center
-      positions.push({ x: 0, y: -spacing })
+      // Root at top center with more vertical space
+      positions.push({ x: 0, y: -spacing * 1.3 })
       
       // Children arranged in a horizontal line below with more spacing
-      const childWidth = (children.length - 1) * spacing * 1.2
+      const childSpacing = spacing * 1.5 // Increased horizontal spacing
+      const childWidth = (children.length - 1) * childSpacing
       children.forEach((_, index) => {
         positions.push({
-          x: -childWidth / 2 + index * spacing * 1.2,
-          y: spacing * 0.8
+          x: -childWidth / 2 + index * childSpacing,
+          y: spacing * 1.1 // Increased vertical spacing
         })
       })
     } else {
-      // Large groups: 3-level tree structure
+      // Large groups: 3-level tree structure with better spacing
       const root = sortedNodes[0]
       const level2Count = Math.min(3, Math.ceil(sortedNodes.length / 3))
       const level2Nodes = sortedNodes.slice(1, 1 + level2Count)
       const level3Nodes = sortedNodes.slice(1 + level2Count)
       
-      // Root at top center
-      positions.push({ x: 0, y: -spacing * 1.2 })
+      // Root at top center with more space
+      positions.push({ x: 0, y: -spacing * 1.5 })
       
-      // Level 2: spread horizontally
-      const level2Width = (level2Count - 1) * spacing
+      // Level 2: spread horizontally with better spacing
+      const level2Spacing = spacing * 1.4
+      const level2Width = (level2Count - 1) * level2Spacing
       level2Nodes.forEach((_, index) => {
         positions.push({
-          x: level2Count === 1 ? 0 : -level2Width / 2 + index * spacing,
-          y: 0
+          x: level2Count === 1 ? 0 : -level2Width / 2 + index * level2Spacing,
+          y: -spacing * 0.1 // Slightly below root
         })
       })
       
-      // Level 3: arrange under level 2 nodes
+      // Level 3: arrange under level 2 nodes with better spacing
       const nodesPerParent = Math.ceil(level3Nodes.length / level2Count)
+      const childSpacing = spacing * 1.1
       level3Nodes.forEach((_, index) => {
         const parentIndex = Math.floor(index / nodesPerParent)
         const childIndex = index % nodesPerParent
-        const parentX = level2Count === 1 ? 0 : -level2Width / 2 + parentIndex * spacing
+        const parentX = level2Count === 1 ? 0 : -level2Width / 2 + parentIndex * level2Spacing
         
         const siblingCount = Math.min(nodesPerParent, level3Nodes.length - parentIndex * nodesPerParent)
-        const siblingWidth = (siblingCount - 1) * spacing * 0.9
+        const siblingWidth = (siblingCount - 1) * childSpacing
         
         positions.push({
-          x: parentX + (siblingCount === 1 ? 0 : -siblingWidth / 2 + childIndex * spacing * 0.9),
-          y: spacing * 1.5
+          x: parentX + (siblingCount === 1 ? 0 : -siblingWidth / 2 + childIndex * childSpacing),
+          y: spacing * 1.8 // Increased vertical spacing for level 3
         })
       })
     }
@@ -405,27 +417,43 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         
         const isDraggedGroup = draggedGroup === groupKey
         const isHoveredGroup = hoveredNode === `group-${groupKey}`
+        const isFocusedGroup = groupFocusMode && focusedGroup === groupKey
         
         // Enhanced group container style with better visibility
-        const baseAlpha = isDraggedGroup ? 0.15 : isHoveredGroup ? 0.12 : 0.08
-        const borderAlpha = isDraggedGroup ? 0.6 : isHoveredGroup ? 0.5 : 0.4
+        let baseAlpha = isDraggedGroup ? 0.15 : isHoveredGroup ? 0.12 : 0.08
+        let borderAlpha = isDraggedGroup ? 0.6 : isHoveredGroup ? 0.5 : 0.4
+        
+        // Special styling for focused groups
+        if (isFocusedGroup) {
+          baseAlpha = 0.2
+          borderAlpha = 0.8
+        }
         
         // Gradient background
         const gradient = ctx.createLinearGradient(box.x, box.y, box.x + box.width, box.y + box.height)
-        gradient.addColorStop(0, `rgba(59, 130, 246, ${baseAlpha})`)
-        gradient.addColorStop(1, `rgba(147, 51, 234, ${baseAlpha * 0.7})`)
         
-        ctx.fillStyle = gradient
-        ctx.strokeStyle = `rgba(59, 130, 246, ${borderAlpha})`
+        if (isFocusedGroup) {
+          // Amber/orange gradient for focused groups
+          gradient.addColorStop(0, `rgba(245, 158, 11, ${baseAlpha})`)
+          gradient.addColorStop(1, `rgba(217, 119, 6, ${baseAlpha * 0.7})`)
+          ctx.fillStyle = gradient
+          ctx.strokeStyle = `rgba(245, 158, 11, ${borderAlpha})`
+        } else {
+          // Blue/purple gradient for normal groups
+          gradient.addColorStop(0, `rgba(59, 130, 246, ${baseAlpha})`)
+          gradient.addColorStop(1, `rgba(147, 51, 234, ${baseAlpha * 0.7})`)
+          ctx.fillStyle = gradient
+          ctx.strokeStyle = `rgba(59, 130, 246, ${borderAlpha})`
+        }
         ctx.lineWidth = isDraggedGroup ? 3 : 2
         ctx.setLineDash(isDraggedGroup ? [12, 6] : [8, 4])
         
         // Enhanced shadow for depth
-        if (isDraggedGroup || isHoveredGroup) {
-          ctx.shadowBlur = 20
-          ctx.shadowColor = 'rgba(59, 130, 246, 0.3)'
+        if (isDraggedGroup || isHoveredGroup || isFocusedGroup) {
+          ctx.shadowBlur = isFocusedGroup ? 25 : 20
+          ctx.shadowColor = isFocusedGroup ? 'rgba(245, 158, 11, 0.4)' : 'rgba(59, 130, 246, 0.3)'
           ctx.shadowOffsetX = 0
-          ctx.shadowOffsetY = 4
+          ctx.shadowOffsetY = isFocusedGroup ? 6 : 4
         }
         
         // Draw rounded rectangle for group with larger radius
@@ -543,7 +571,31 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     }
 
     // Filter edges for drawing
-    const drawableEdges = currentEdges.filter(edge => !filteredTypes.has(edge.type))
+    let drawableEdges = currentEdges.filter(edge => !filteredTypes.has(edge.type))
+    
+    // Additional filtering for group focus mode
+    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
+      const groupMembers = nodeGroups.get(focusedGroup)!
+      const groupMemberIds = new Set(groupMembers.map(n => n.id))
+      
+      // Find all connected nodes first
+      const connectedNodeIds = new Set<string>()
+      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
+      
+      drawableEdges.forEach(edge => {
+        if (groupMemberIds.has(edge.source)) {
+          connectedNodeIds.add(edge.target)
+        }
+        if (groupMemberIds.has(edge.target)) {
+          connectedNodeIds.add(edge.source)
+        }
+      })
+      
+      // Only show edges that connect visible nodes
+      drawableEdges = drawableEdges.filter(edge => 
+        connectedNodeIds.has(edge.source) && connectedNodeIds.has(edge.target)
+      )
+    }
 
     // Draw edges (filtered)
     drawableEdges.forEach(edge => {
@@ -712,16 +764,39 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     })
 
     // Draw nodes (only visible ones)
-    const visibleNodes = showConnectionsOnly && selectedNode 
-      ? currentNodes.filter(node => 
-          node.id === selectedNode ||
-          drawableEdges.some(edge => edge.source === node.id || edge.target === node.id)
-        )
-      : currentNodes.filter(node => 
-          !searchTerm || 
-          node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          node.type.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+    let visibleNodes: Node[]
+    
+    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
+      // Group focus mode - show group members and their connected nodes
+      const groupMembers = nodeGroups.get(focusedGroup)!
+      const groupMemberIds = new Set(groupMembers.map(n => n.id))
+      
+      // Find all nodes connected to any group member
+      const connectedNodeIds = new Set<string>()
+      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
+      
+      drawableEdges.forEach(edge => {
+        if (groupMemberIds.has(edge.source)) {
+          connectedNodeIds.add(edge.target)
+        }
+        if (groupMemberIds.has(edge.target)) {
+          connectedNodeIds.add(edge.source)
+        }
+      })
+      
+      visibleNodes = currentNodes.filter(node => connectedNodeIds.has(node.id))
+    } else if (showConnectionsOnly && selectedNode) {
+      visibleNodes = currentNodes.filter(node => 
+        node.id === selectedNode ||
+        drawableEdges.some(edge => edge.source === node.id || edge.target === node.id)
+      )
+    } else {
+      visibleNodes = currentNodes.filter(node => 
+        !searchTerm || 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
     
     visibleNodes.forEach(node => {
       const isSelected = selectedNode === node.id
@@ -922,10 +997,89 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         ctx.restore()
       }
       
+      // Draw menu if this node is selected for menu
+      if (selectedNodeForMenu === node.id) {
+        ctx.save()
+        
+        // Menu dimensions
+        const menuHeight = 32
+        const menuWidth = 120
+        const menuY = node.y - nodeSize/2 - menuHeight - 8
+        const menuX = node.x - menuWidth/2
+        
+        // Menu shadow
+        ctx.shadowBlur = 10
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)'
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 2
+        
+        // Menu background
+        ctx.fillStyle = 'rgba(30, 41, 59, 0.95)' // slate-800
+        ctx.beginPath()
+        roundRect(ctx, menuX, menuY, menuWidth, menuHeight, 8)
+        ctx.fill()
+        
+        // Menu border
+        ctx.strokeStyle = 'rgba(71, 85, 105, 0.8)' // slate-600
+        ctx.lineWidth = 1
+        ctx.stroke()
+        
+        // Reset shadow for icons
+        ctx.shadowBlur = 0
+        
+        // Draw menu items
+        const iconSize = 14
+        const itemWidth = menuWidth / 3
+        
+        // Focus button
+        const focusX = menuX + itemWidth * 0.5
+        const focusY = menuY + menuHeight / 2
+        ctx.fillStyle = menuActionHover === 'focus' ? '#60a5fa' : '#93c5fd' // blue-400/300
+        ctx.font = `${iconSize}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('◎', focusX, focusY)
+        
+        // Divider
+        ctx.strokeStyle = 'rgba(71, 85, 105, 0.5)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(menuX + itemWidth, menuY + 6)
+        ctx.lineTo(menuX + itemWidth, menuY + menuHeight - 6)
+        ctx.stroke()
+        
+        // Info button
+        const infoX = menuX + itemWidth * 1.5
+        const infoY = menuY + menuHeight / 2
+        ctx.fillStyle = menuActionHover === 'info' ? '#22d3ee' : '#67e8f9' // cyan-400/300
+        ctx.fillText('ⓘ', infoX, infoY)
+        
+        // Divider
+        ctx.beginPath()
+        ctx.moveTo(menuX + itemWidth * 2, menuY + 6)
+        ctx.lineTo(menuX + itemWidth * 2, menuY + menuHeight - 6)
+        ctx.stroke()
+        
+        // Move button
+        const moveX = menuX + itemWidth * 2.5
+        const moveY = menuY + menuHeight / 2
+        ctx.fillStyle = menuActionHover === 'move' ? '#4ade80' : '#86efac' // green-400/300
+        ctx.fillText('↔', moveX, moveY)
+        
+        // Draw connection line to node
+        ctx.strokeStyle = 'rgba(71, 85, 105, 0.5)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(node.x, menuY + menuHeight)
+        ctx.lineTo(node.x, node.y - nodeSize/2)
+        ctx.stroke()
+        
+        ctx.restore()
+      }
     })
 
     ctx.restore()
-  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers])
+  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers, groupFocusMode, focusedGroup, selectedNodeForMenu, selectedGroupForMenu, menuActionHover])
 
   // Minimap component with proper viewport tracking
   const MinimapComponent = ({ nodes, edges, scale, offset, canvasRef, selectedNode }: {
@@ -1492,6 +1646,69 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     return adjustedMap
   }
 
+  // Function to resolve node overlaps within a group
+  const resolveNodeOverlapsInGroup = (groupNodes: Node[], groupCenterX: number, groupCenterY: number, spacing: number) => {
+    const minDistance = spacing * 0.7 // Minimum distance between node centers
+    const maxIterations = 30
+    
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let hasOverlaps = false
+      
+      for (let i = 0; i < groupNodes.length; i++) {
+        for (let j = i + 1; j < groupNodes.length; j++) {
+          const nodeA = groupNodes[i]
+          const nodeB = groupNodes[j]
+          
+          const dx = nodeB.x - nodeA.x
+          const dy = nodeB.y - nodeA.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          const requiredDistance = Math.max(minDistance, (nodeA.radius + nodeB.radius) * 2.2) // Ensure nodes don't visually overlap
+          
+          if (distance < requiredDistance) {
+            hasOverlaps = true
+            
+            // Calculate separation vector
+            if (distance > 0) {
+              const overlap = requiredDistance - distance
+              const separationX = (dx / distance) * overlap * 0.6
+              const separationY = (dy / distance) * overlap * 0.6
+              
+              // Move nodes apart
+              nodeA.x -= separationX / 2
+              nodeA.y -= separationY / 2
+              nodeB.x += separationX / 2
+              nodeB.y += separationY / 2
+            } else {
+              // Handle exact same position
+              const angle = Math.random() * 2 * Math.PI
+              const separation = requiredDistance / 2
+              
+              nodeA.x = groupCenterX - Math.cos(angle) * separation
+              nodeA.y = groupCenterY - Math.sin(angle) * separation
+              nodeB.x = groupCenterX + Math.cos(angle) * separation
+              nodeB.y = groupCenterY + Math.sin(angle) * separation
+            }
+          }
+        }
+      }
+      
+      if (!hasOverlaps) break
+    }
+    
+    // Apply gentle centering force to keep nodes roughly centered in group
+    const currentCenterX = groupNodes.reduce((sum, node) => sum + node.x, 0) / groupNodes.length
+    const currentCenterY = groupNodes.reduce((sum, node) => sum + node.y, 0) / groupNodes.length
+    
+    const offsetX = groupCenterX - currentCenterX
+    const offsetY = groupCenterY - currentCenterY
+    
+    // Apply a gentle centering adjustment
+    groupNodes.forEach(node => {
+      node.x += offsetX * 0.3
+      node.y += offsetY * 0.3
+    })
+  }
+
   const applyGroupedLayout = (nodes: Node[], groups: Map<string, Node[]>) => {
     const layoutNodes = [...nodes]
     const groupBoxes = new Map()
@@ -1518,7 +1735,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       const groupCenterY = groupPadding + (row + 0.5) * groupHeight
       
       // Get tree layout positions relative to center with better spacing
-      const internalSpacing = nodeSpacing * 0.8 // Increased from 0.5 to 0.8 for more space
+      const internalSpacing = nodeSpacing * 1.2 // Increased from 0.8 to 1.2 for more space
       const treePositions = calculateTreeLayout(groupNodes, internalSpacing)
       
       // Apply absolute positions to nodes within this group
@@ -1531,18 +1748,26 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         }
       })
       
-      // Calculate group container after positioning nodes
-      const groupNodePositions = groupNodes.map(node => {
-        const layoutNode = layoutNodes.find(n => n.id === node.id)
-        return layoutNode ? { x: layoutNode.x, y: layoutNode.y, radius: layoutNode.radius } : null
-      }).filter(Boolean)
+      // Resolve node overlaps within this group
+      const groupLayoutNodes = groupNodes.map(node => 
+        layoutNodes.find(n => n.id === node.id)
+      ).filter(Boolean) as Node[]
+      
+      resolveNodeOverlapsInGroup(groupLayoutNodes, groupCenterX, groupCenterY, internalSpacing)
+      
+      // Calculate group container after positioning and overlap resolution
+      const groupNodePositions = groupLayoutNodes.map(node => ({
+        x: node.x,
+        y: node.y,
+        radius: node.radius
+      }))
       
       if (groupNodePositions.length > 0) {
-        const padding = 100 // Generous padding for group containers
-        const minX = Math.min(...groupNodePositions.map(p => p!.x - p!.radius)) - padding
-        const maxX = Math.max(...groupNodePositions.map(p => p!.x + p!.radius)) + padding
-        const minY = Math.min(...groupNodePositions.map(p => p!.y - p!.radius)) - padding
-        const maxY = Math.max(...groupNodePositions.map(p => p!.y + p!.radius)) + padding
+        const padding = 120 // More generous padding for group containers to accommodate spacing
+        const minX = Math.min(...groupNodePositions.map(p => p.x - p.radius)) - padding
+        const maxX = Math.max(...groupNodePositions.map(p => p.x + p.radius)) + padding
+        const minY = Math.min(...groupNodePositions.map(p => p.y - p.radius)) - padding
+        const maxY = Math.max(...groupNodePositions.map(p => p.y + p.radius)) + padding
         
         groupBoxes.set(groupKey, {
           x: minX,
@@ -1791,6 +2016,45 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     setOffset({ x: 0, y: 0 })
   }, [])
 
+  // Context menu actions
+  const handleNodeAction = (action: string, node: Node) => {
+    switch (action) {
+      case 'focus':
+        setSelectedNode(node.id)
+        setShowConnectionsOnly(true)
+        break
+      case 'details':
+        onNodeClick?.(node.id)
+        break
+      case 'drag':
+        setDraggedNode(node.id)
+        setDragOffset({ x: 0, y: 0 })
+        node.fx = node.x
+        node.fy = node.y
+        break
+    }
+    setSelectedNodeForMenu(null)
+  }
+
+  const handleGroupAction = (action: string, groupId: string, nodes: Node[]) => {
+    switch (action) {
+      case 'isolate':
+        setGroupFocusMode(true)
+        setFocusedGroup(groupId)
+        setSelectedNode(null)
+        break
+      case 'details':
+        if (onGroupClick) {
+          onGroupClick(groupId, nodes)
+        }
+        break
+      case 'expand':
+        // Could implement group expansion logic here
+        break
+    }
+    setSelectedGroupForMenu(null)
+  }
+
   const fitToView = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas || nodesRef.current.length === 0 || canvas.width === 0 || canvas.height === 0) return
@@ -1868,12 +2132,31 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           e.preventDefault()
           autoLayout()
           break
+        case 'Escape':
+          e.preventDefault()
+          setNodeContextMenu(null)
+          setGroupContextMenu(null)
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [resetView, fitToView, autoLayout])
+
+  // Click outside handler for context menus
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-context-menu]') && !target.closest('canvas')) {
+        setNodeContextMenu(null)
+        setGroupContextMenu(null)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const canvas = canvasRef.current
@@ -1883,21 +2166,49 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     const x = (e.clientX - rect.left - offset.x) / scale
     const y = (e.clientY - rect.top - offset.y) / scale
 
+    // Handle right-click for context menus
+    if (e.button === 2) {
+      e.preventDefault()
+      return // Let onContextMenu handle this
+    }
+
     const currentNodes = nodesRef.current
     const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
     
     // First check if clicking on a node (higher priority than groups)
     const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
-    const visibleNodes = showConnectionsOnly && selectedNode 
-      ? nodesRef.current.filter(node => 
-          node.id === selectedNode ||
-          currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
-        )
-      : nodesRef.current.filter(node => 
-          !searchTerm || 
-          node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          node.type.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+    let visibleNodes: Node[]
+    
+    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
+      // Group focus mode - same logic as rendering
+      const groupMembers = nodeGroups.get(focusedGroup)!
+      const groupMemberIds = new Set(groupMembers.map(n => n.id))
+      
+      const connectedNodeIds = new Set<string>()
+      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
+      
+      currentEdges.forEach(edge => {
+        if (groupMemberIds.has(edge.source)) {
+          connectedNodeIds.add(edge.target)
+        }
+        if (groupMemberIds.has(edge.target)) {
+          connectedNodeIds.add(edge.source)
+        }
+      })
+      
+      visibleNodes = nodesRef.current.filter(node => connectedNodeIds.has(node.id))
+    } else if (showConnectionsOnly && selectedNode) {
+      visibleNodes = nodesRef.current.filter(node => 
+        node.id === selectedNode ||
+        currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
+      )
+    } else {
+      visibleNodes = nodesRef.current.filter(node => 
+        !searchTerm || 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
     
     // Increase click area for nodes slightly for better UX
     const clickedNode = visibleNodes.find(node => {
@@ -1907,18 +2218,45 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       return Math.sqrt(dx * dx + dy * dy) <= clickRadius
     })
 
+    // Check if clicking on a menu item first
+    if (selectedNodeForMenu) {
+      const selectedNodeObj = visibleNodes.find(n => n.id === selectedNodeForMenu)
+      if (selectedNodeObj) {
+        const nodeSize = Math.max(90, selectedNodeObj.radius * 3.5)
+        const menuHeight = 32
+        const menuWidth = 120
+        const menuY = selectedNodeObj.y - nodeSize/2 - menuHeight - 8
+        const menuX = selectedNodeObj.x - menuWidth/2
+        const itemWidth = menuWidth / 3
+        
+        // Check if click is on menu
+        if (x >= menuX && x <= menuX + menuWidth && y >= menuY && y <= menuY + menuHeight) {
+          // Determine which button was clicked
+          if (x < menuX + itemWidth) {
+            // Focus button clicked
+            handleNodeAction('focus', selectedNodeObj)
+          } else if (x < menuX + itemWidth * 2) {
+            // Info button clicked
+            handleNodeAction('details', selectedNodeObj)
+          } else {
+            // Move button clicked
+            handleNodeAction('drag', selectedNodeObj)
+          }
+          return
+        }
+      }
+    }
+
     if (clickedNode) {
-      // Node clicked - handle node interaction
-      setDraggedNode(clickedNode.id)
-      setDragOffset({
-        x: x - clickedNode.x,
-        y: y - clickedNode.y
-      })
-      onNodeClick?.(clickedNode.id)
-      
-      // Fix the node position during dragging
-      clickedNode.fx = clickedNode.x
-      clickedNode.fy = clickedNode.y
+      // Node clicked - toggle menu
+      if (selectedNodeForMenu === clickedNode.id) {
+        // Clicking the same node again - close menu
+        setSelectedNodeForMenu(null)
+      } else {
+        // Select this node for menu
+        setSelectedNodeForMenu(clickedNode.id)
+        setSelectedGroupForMenu(null)
+      }
       return // Exit early - node takes priority
     }
     
@@ -1946,11 +2284,26 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
             y: y - groupBox.y
           })
           return
+        } else {
+          // Click on group body - toggle group menu
+          if (nodeGroups.has(clickedGroup)) {
+            if (selectedGroupForMenu === clickedGroup) {
+              // Clicking the same group again - close menu
+              setSelectedGroupForMenu(null)
+            } else {
+              // Select this group for menu
+              setSelectedGroupForMenu(clickedGroup)
+              setSelectedNodeForMenu(null)
+            }
+          }
+          return
         }
       }
     }
     
-    // If no node or group header clicked, start canvas dragging
+    // If no node or group clicked, clear menus and start canvas dragging
+    setSelectedNodeForMenu(null)
+    setSelectedGroupForMenu(null)
     setIsDragging(true)
     setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
   }
@@ -2133,6 +2486,100 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = (e.clientX - rect.left - offset.x) / scale
+    const y = (e.clientY - rect.top - offset.y) / scale
+
+    const currentNodes = nodesRef.current
+    const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
+    
+    // Check if right-clicking on a node
+    const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
+    let visibleNodes: Node[]
+    
+    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
+      const groupMembers = nodeGroups.get(focusedGroup)!
+      const groupMemberIds = new Set(groupMembers.map(n => n.id))
+      
+      const connectedNodeIds = new Set<string>()
+      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
+      
+      currentEdges.forEach(edge => {
+        if (groupMemberIds.has(edge.source)) {
+          connectedNodeIds.add(edge.target)
+        }
+        if (groupMemberIds.has(edge.target)) {
+          connectedNodeIds.add(edge.source)
+        }
+      })
+      
+      visibleNodes = nodesRef.current.filter(node => connectedNodeIds.has(node.id))
+    } else if (showConnectionsOnly && selectedNode) {
+      visibleNodes = nodesRef.current.filter(node => 
+        node.id === selectedNode ||
+        currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
+      )
+    } else {
+      visibleNodes = nodesRef.current.filter(node => 
+        !searchTerm || 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+    
+    // Check for node click
+    const clickedNode = visibleNodes.find(node => {
+      const dx = x - node.x
+      const dy = y - node.y
+      const clickRadius = node.radius + 5
+      return Math.sqrt(dx * dx + dy * dy) <= clickRadius
+    })
+
+    if (clickedNode) {
+      // Show node context menu
+      setNodeContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        node: clickedNode
+      })
+      setGroupContextMenu(null)
+      return
+    }
+
+    // Check for group click
+    if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+      let clickedGroup: string | null = null
+      
+      groupBoxes.forEach((box, groupKey) => {
+        if (x >= box.x && x <= box.x + box.width && 
+            y >= box.y && y <= box.y + box.height) {
+          clickedGroup = groupKey
+        }
+      })
+      
+      if (clickedGroup && nodeGroups.has(clickedGroup)) {
+        // Show group context menu
+        setGroupContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          group: clickedGroup,
+          nodes: nodeGroups.get(clickedGroup)!
+        })
+        setNodeContextMenu(null)
+        return
+      }
+    }
+
+    // Clear any existing context menus if clicking on empty space
+    setNodeContextMenu(null)
+    setGroupContextMenu(null)
+  }
 
   const toggleFilter = (type: string) => {
     setFilteredTypes(prev => {
@@ -2281,6 +2728,24 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
               />
               Connected
             </label>
+            {groupFocusMode && focusedGroup && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-300 dark:border-amber-700">
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                  Focused: {focusedGroup}
+                </span>
+                <button
+                  onClick={() => {
+                    setGroupFocusMode(false)
+                    setFocusedGroup(null)
+                  }}
+                  className="ml-1 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
+                  title="Clear group focus"
+                >
+                  ×
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Line Style Control */}
@@ -2447,6 +2912,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
+          onContextMenu={handleContextMenu}
           className="w-full h-full relative z-10 cursor-grab active:cursor-grabbing"
           style={{ 
             touchAction: 'none',
@@ -2501,8 +2967,12 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
               <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Scroll</span>
             </div>
             <div className="flex justify-between">
-              <span>Move nodes</span>
-              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Drag node</span>
+              <span>Node menu</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Click node</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Group menu</span>
+              <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">Click group</span>
             </div>
             <div className="flex justify-between">
               <span>Move groups</span>
@@ -2528,6 +2998,102 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
             </div>
           </div>
         </div>
+
+        {/* Node Context Menu */}
+        {nodeContextMenu && (
+          <div 
+            data-context-menu
+            className="fixed z-50"
+            style={{
+              left: `${nodeContextMenu.x - 60}px`, 
+              top: `${nodeContextMenu.y - 15}px`, 
+            }}
+          >
+            {/* Connection line to node */}
+            <div 
+              className="absolute w-0.5 h-3 bg-slate-600 dark:bg-slate-500 left-1/2 bottom-0 transform -translate-x-1/2"
+              style={{ transform: 'translateX(-50%) translateY(100%)' }}
+            />
+            
+            {/* Menu container with tail */}
+            <div className="relative">
+              {/* Tail pointing down to node */}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-slate-800 dark:border-t-slate-700"></div>
+              </div>
+              
+              {/* Main menu */}
+              <div className="bg-slate-800/98 dark:bg-slate-700/98 backdrop-blur-sm border border-slate-600 dark:border-slate-500 rounded-lg shadow-2xl flex items-center gap-0.5 p-1 min-w-fit">
+                <button
+                  onClick={() => handleNodeAction('focus', nodeContextMenu.node)}
+                  className="p-1.5 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-md transition-colors"
+                  title="Focus Node"
+                >
+                  <Focus className="h-3 w-3 text-blue-400" />
+                </button>
+                <div className="w-px h-4 bg-slate-600 dark:bg-slate-500"></div>
+                <button
+                  onClick={() => handleNodeAction('details', nodeContextMenu.node)}
+                  className="p-1.5 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-md transition-colors"
+                  title="View Details"
+                >
+                  <Info className="h-3 w-3 text-cyan-400" />
+                </button>
+                <div className="w-px h-4 bg-slate-600 dark:bg-slate-500"></div>
+                <button
+                  onClick={() => handleNodeAction('drag', nodeContextMenu.node)}
+                  className="p-1.5 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-md transition-colors"
+                  title="Start Dragging"
+                >
+                  <Move className="h-3 w-3 text-green-400" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Group Context Menu */}
+        {groupContextMenu && (
+          <div 
+            data-context-menu
+            className="fixed z-50"
+            style={{
+              left: `${groupContextMenu.x - 60}px`, 
+              top: `${groupContextMenu.y + 10}px`, 
+            }}
+          >
+            {/* Menu container with tail pointing up to group */}
+            <div className="relative">
+              {/* Tail pointing up to group */}
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full">
+                <div className="w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-amber-800 dark:border-b-amber-700"></div>
+              </div>
+              
+              {/* Main menu */}
+              <div className="bg-amber-800/98 dark:bg-amber-700/98 backdrop-blur-sm border border-amber-600 dark:border-amber-500 rounded-lg shadow-2xl flex items-center gap-0.5 p-1 min-w-fit">
+                <button
+                  onClick={() => handleGroupAction('isolate', groupContextMenu.group, groupContextMenu.nodes)}
+                  className="p-1.5 hover:bg-amber-700 dark:hover:bg-amber-600 rounded-md transition-colors"
+                  title="Isolate Group"
+                >
+                  <Zap className="h-3 w-3 text-amber-200" />
+                </button>
+                <div className="w-px h-4 bg-amber-600 dark:bg-amber-500"></div>
+                <button
+                  onClick={() => handleGroupAction('details', groupContextMenu.group, groupContextMenu.nodes)}
+                  className="p-1.5 hover:bg-amber-700 dark:hover:bg-amber-600 rounded-md transition-colors"
+                  title="View Details"
+                >
+                  <Info className="h-3 w-3 text-amber-200" />
+                </button>
+                <div className="w-px h-4 bg-amber-600 dark:bg-amber-500"></div>
+                <div className="px-2 text-xs text-amber-200 font-medium flex items-center">
+                  {groupContextMenu.nodes.length}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   )

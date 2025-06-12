@@ -185,9 +185,9 @@ export function CodeArchitecture() {
 
         setArchitecturalLayers(layers)
 
-        // Build dependency graph
-        const nodes: DependencyNode[] = allComponents.map(comp => ({
-          id: comp.slug,
+        // Build dependency graph with unique IDs
+        const nodes: DependencyNode[] = allComponents.map((comp, index) => ({
+          id: `${comp.slug}-${index}`, // Make ID unique by adding index
           name: comp.name,
           type: comp.kind || 'unknown',
           layer: layers.find(l => l.components.includes(comp))?.name || 'Unknown',
@@ -397,8 +397,8 @@ export function CodeArchitecture() {
               <div>
                 <h3 className="font-medium mb-3 text-red-600">High Coupling ({highCouplingComponents.length})</h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {highCouplingComponents.map(node => (
-                    <Card key={node.id} className="p-3">
+                  {highCouplingComponents.map((node, index) => (
+                    <Card key={`high-coupling-${node.id}-${index}`} className="p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{node.name}</div>
@@ -415,8 +415,8 @@ export function CodeArchitecture() {
               <div>
                 <h3 className="font-medium mb-3 text-yellow-600">Isolated Components ({isolatedComponents.length})</h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {isolatedComponents.map(node => (
-                    <Card key={node.id} className="p-3">
+                  {isolatedComponents.map((node, index) => (
+                    <Card key={`isolated-${node.id}-${index}`} className="p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{node.name}</div>
@@ -488,11 +488,11 @@ export function CodeArchitecture() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {layer.components.map(component => {
-                    const node = dependencyNodes.find(n => n.id === component.slug)
+                  {layer.components.map((component, componentIndex) => {
+                    const node = dependencyNodes.find(n => n.id.startsWith(component.slug))
                     
                     return (
-                      <Card key={component.slug} className="p-3 cursor-pointer hover:shadow-md transition-shadow"
+                      <Card key={`${layer.name}-${component.slug}-${componentIndex}`} className="p-3 cursor-pointer hover:shadow-md transition-shadow"
                             onClick={() => setSelectedComponent(component)}>
                         <div className="flex items-center justify-between">
                           <div>
@@ -557,7 +557,7 @@ export function CodeArchitecture() {
                 </h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {errorPatterns.map((pattern, index) => (
-                    <Card key={index} className="p-3 border-red-200 bg-red-50 dark:bg-red-900/10">
+                    <Card key={`error-${pattern.component}-${pattern.type}-${index}`} className="p-3 border-red-200 bg-red-50 dark:bg-red-900/10">
                       <div className="font-medium text-red-800 dark:text-red-200">{pattern.type}</div>
                       <div className="text-sm text-red-600 dark:text-red-300">{pattern.component}</div>
                       <div className="text-xs text-red-500 dark:text-red-400 mt-1">{pattern.description}</div>
@@ -574,7 +574,7 @@ export function CodeArchitecture() {
                 </h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {warningPatterns.map((pattern, index) => (
-                    <Card key={index} className="p-3 border-amber-200 bg-amber-50 dark:bg-amber-900/10">
+                    <Card key={`warning-${pattern.component}-${pattern.type}-${index}`} className="p-3 border-amber-200 bg-amber-50 dark:bg-amber-900/10">
                       <div className="font-medium text-amber-800 dark:text-amber-200">{pattern.type}</div>
                       <div className="text-sm text-amber-600 dark:text-amber-300">{pattern.component}</div>
                       <div className="text-xs text-amber-500 dark:text-amber-400 mt-1">{pattern.description}</div>
@@ -591,7 +591,7 @@ export function CodeArchitecture() {
                 </h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {infoPatterns.map((pattern, index) => (
-                    <Card key={index} className="p-3 border-blue-200 bg-blue-50 dark:bg-blue-900/10">
+                    <Card key={`info-${pattern.component}-${pattern.type}-${index}`} className="p-3 border-blue-200 bg-blue-50 dark:bg-blue-900/10">
                       <div className="font-medium text-blue-800 dark:text-blue-200">{pattern.type}</div>
                       <div className="text-sm text-blue-600 dark:text-blue-300">{pattern.component}</div>
                       <div className="text-xs text-blue-500 dark:text-blue-400 mt-1">{pattern.description}</div>
@@ -636,7 +636,7 @@ export function CodeArchitecture() {
                   <div className="font-medium mb-2">{component}</div>
                   <div className="space-y-2">
                     {flows.map((flow, index) => (
-                      <div key={index} className="flex items-center gap-2 text-sm">
+                      <div key={`flow-${component}-${flow.to}-${index}`} className="flex items-center gap-2 text-sm">
                         <ArrowRight className="h-3 w-3 text-muted-foreground" />
                         <span>{flow.to}</span>
                         <Badge variant="outline" className="text-xs">{flow.type}</Badge>

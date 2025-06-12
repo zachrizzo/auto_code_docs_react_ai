@@ -26,6 +26,8 @@ export interface CodeEntity {
   name: string;
   type: "component" | "class" | "function" | "method" | string;
   filePath?: string;
+  methods?: any[];
+  props?: any[];
 }
 
 export interface Relationship {
@@ -50,6 +52,8 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   const [nodeCodeData, setNodeCodeData] = useState<any>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedNodeData, setSelectedNodeData] = useState<any>(null)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [selectedGroupData, setSelectedGroupData] = useState<any>(null)
   const [focusMode, setFocusMode] = useState(false)
   const [panelPosition, setPanelPosition] = useState({ x: 0, y: 80 })
   const [isDragging, setIsDragging] = useState(false)
@@ -57,337 +61,129 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   const [isMinimized, setIsMinimized] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Fetch component data
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch component index
+        setLoading(true)
+        // Fetch component index first
         const indexRes = await fetch('/docs-data/component-index.json')
+        if (!indexRes.ok) {
+          throw new Error(`Failed to fetch component index: ${indexRes.statusText}`)
+        }
         const indexData = await indexRes.json()
 
-        // Fetch all component data and classify entity types based on file analysis
-        const componentsData = await Promise.all(
-          indexData.map(async (comp: { name: string; slug: string }) => {
-            const res = await fetch(`/docs-data/${comp.slug}.json`)
-            const data = await res.json()
-            
-            // Determine entity type based on comprehensive analysis
-            let entityType = "component" // default
-            
-            // First, analyze the code content for function patterns
-            if (data.code) {
-              const code = data.code.toLowerCase()
-              
-              // Check for function patterns in the code
-              if (code.includes('function ') || 
-                  code.includes('const ') && code.includes(' = ') && (code.includes('=>') || code.includes('function')) ||
-                  code.includes('export const ') && code.includes('=>') ||
-                  code.includes('export function ') ||
-                  code.includes('async ') && code.includes('=>')) {
-                
-                // Further check if it's NOT a React component
-                if (!code.includes('jsx') && 
-                    !code.includes('tsx') && 
-                    !code.includes('react') && 
-                    !code.includes('component') &&
-                    !code.includes('props') &&
-                    !code.includes('return (') &&
-                    !code.includes('<') &&
-                    !data.props?.length) {
-                  entityType = "function"
-                }
-              }
-              
-              // Check for class patterns
-              if (code.includes('class ') && code.includes('extends')) {
-                entityType = "class"
-              }
-            }
-            
-            // Analyze file path for additional context
-            if (data.filePath) {
-              const filePath = data.filePath.toLowerCase()
-              
-              // File path based classification (higher priority for utilities)
-              if (filePath.includes('/lib/') || 
-                  filePath.includes('/utils/') || 
-                  filePath.includes('/helpers/') ||
-                  filePath.includes('/functions/')) {
-                entityType = "function"
-              } else if (filePath.includes('/services/') || 
-                        filePath.includes('/classes/') ||
-                        filePath.includes('/models/')) {
-                entityType = "class"
-              }
-            }
-            
-            // Name-based classification
-            if (data.name) {
-              const name = data.name.toLowerCase()
-              
-              // Function naming patterns
-              if (name.includes('use') && name.length > 3 && name[3] === name[3].toUpperCase()) {
-                // React hook pattern (useState, useEffect, etc.)
-                entityType = "function"
-              } else if (name.match(/^[a-z][a-z0-9]*[A-Z]/) || // camelCase starting with lowercase
-                        name.includes('to') || 
-                        name.includes('get') || 
-                        name.includes('set') || 
-                        name.includes('create') || 
-                        name.includes('update') || 
-                        name.includes('delete') || 
-                        name.includes('fetch') ||
-                        name.includes('handle') ||
-                        name.includes('copy') ||
-                        name.includes('format') ||
-                        name.includes('parse') ||
-                        name.includes('validate')) {
-                entityType = "function"
-              }
-              
-              // Class naming patterns
-              if (name.includes('Service') || 
-                  name.includes('Provider') || 
-                  name.includes('Manager') ||
-                  name.includes('Controller') ||
-                  name.includes('Handler') && !name.includes('handle')) {
-                entityType = "class"
-              }
-            }
-            
-            // Check if it's a method within another component
-            if (data.parent || (data.methods && data.methods.length === 1 && data.props?.length === 0)) {
-              entityType = "method"
-            }
-            
-            // Final check: if it has props but no JSX, it might be a utility with TypeScript interface
-            if (data.props && data.props.length > 0 && data.code && !data.code.includes('<')) {
-              entityType = "function"
-            }
-            
-            return {
-              id: comp.slug,
-              name: comp.name,
-              type: entityType,
-              filePath: data.filePath || data.route || `src/components/${comp.name}`,
-              methods: data.methods || [],
-              props: data.props || []
-            }
-          })
-        )
-
-        // Extract relationships from component data with enhanced relationship detection
-        const relationshipsData: Relationship[] = []
-
-        // Create a lookup map for easier entity finding
-        const entityLookup = new Map()
-        componentsData.forEach(comp => entityLookup.set(comp.name.toLowerCase(), comp.id))
-
-        // For each component, check for relationships directly
-        await Promise.all(
-          indexData.map(async (comp: { name: string; slug: string }) => {
-            const res = await fetch(`/docs-data/${comp.slug}.json`)
-            const data = await res.json()
-            const currentEntity = componentsData.find(c => c.id === comp.slug)
-
-            // 1. Direct relationships from data.relationships
-            if (data.relationships && Array.isArray(data.relationships)) {
-              data.relationships.forEach((rel: any) => {
-                if (rel.source && rel.target && rel.type) {
-                  relationshipsData.push({
-                    source: rel.source,
-                    target: rel.target,
-                    type: rel.type,
-                    weight: rel.weight || 1,
-                    context: rel.context
-                  })
-                } else if (rel.target && rel.type && !rel.source) {
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: rel.target,
-                    type: rel.type,
-                    weight: rel.weight || 1,
-                    context: rel.context
-                  })
-                }
-              })
-            }
-
-            // 2. Create "contains" relationships for methods within components/classes
-            if (data.methods && Array.isArray(data.methods) && data.methods.length > 0) {
-              data.methods.forEach((method: any) => {
-                const methodSlug = `${comp.slug}-${method.name.toLowerCase()}`
-                // Check if a method entity exists
-                const methodEntity = componentsData.find(c => 
-                  c.name.toLowerCase() === method.name.toLowerCase() || 
-                  c.id === methodSlug
-                )
-                
-                if (methodEntity) {
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: methodEntity.id,
-                    type: "contains",
-                    weight: 1,
-                    context: "owns method"
-                  })
-                }
-              })
-            }
-
-            // 3. Detect inheritance relationships from naming patterns and file structure
-            if (currentEntity && currentEntity.type === "class") {
-              // Look for inheritance patterns in the name
-              if (data.name.includes('Service') && data.name !== 'BaseService') {
-                const baseServiceEntity = componentsData.find(c => 
-                  c.name.toLowerCase().includes('baseservice') || 
-                  c.name.toLowerCase().includes('base')
-                )
-                if (baseServiceEntity) {
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: baseServiceEntity.id,
-                    type: "inherits",
-                    weight: 2,
-                    context: "class inheritance"
-                  })
-                }
-              }
-              
-              // Provider pattern inheritance
-              if (data.name.includes('Provider')) {
-                const baseProviderEntity = componentsData.find(c => 
-                  c.name.toLowerCase().includes('provider') && 
-                  c.name.toLowerCase().includes('base')
-                )
-                if (baseProviderEntity && baseProviderEntity.id !== comp.slug) {
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: baseProviderEntity.id,
-                    type: "inherits",
-                    weight: 2,
-                    context: "provider inheritance"
-                  })
-                }
-              }
-            }
-
-            // 4. Import relationships (uses)
-            if (data.imports && Array.isArray(data.imports)) {
-              data.imports.forEach((importItem: string) => {
-                const targetSlug = importItem.toLowerCase().replace(/\s+/g, "-")
-                const targetEntity = componentsData.find(c => 
-                  c.name.toLowerCase() === importItem.toLowerCase() ||
-                  c.id === targetSlug
-                )
-                
-                if (targetEntity && !relationshipsData.some(r => 
-                  r.source === comp.slug && r.target === targetEntity.id && r.type === "uses"
-                )) {
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: targetEntity.id,
-                    type: "uses",
-                    weight: 2,
-                    context: "imports"
-                  })
-                }
-              })
-            }
-
-            // 5. Reference relationships (uses/contains)
-            if (data.references && Array.isArray(data.references)) {
-              data.references.forEach((refItem: string) => {
-                const targetEntity = componentsData.find(c => 
-                  c.name.toLowerCase() === refItem.toLowerCase()
-                )
-                
-                if (targetEntity && !relationshipsData.some(r => 
-                  r.source === comp.slug && r.target === targetEntity.id
-                )) {
-                  // Determine relationship type based on entity types
-                  let relType: "uses" | "contains" = "uses"
-                  if (currentEntity?.type === "component" && targetEntity.type === "component") {
-                    relType = "contains" // Component containing/rendering another component
-                  }
-                  
-                  relationshipsData.push({
-                    source: comp.slug,
-                    target: targetEntity.id,
-                    type: relType,
-                    weight: relType === "contains" ? 2 : 1,
-                    context: relType === "contains" ? "renders component" : "references"
-                  })
-                }
-              })
-            }
-
-            // 6. Analyze method code for function calls (uses relationships)
-            if (data.methods && Array.isArray(data.methods)) {
-              data.methods.forEach((method: any) => {
-                if (method.code) {
-                  // Look for function calls in method code
-                  componentsData.forEach(targetEntity => {
-                    if (targetEntity.type === "function" && 
-                        targetEntity.id !== comp.slug &&
-                        method.code.includes(targetEntity.name)) {
-                      
-                      if (!relationshipsData.some(r => 
-                        r.source === comp.slug && r.target === targetEntity.id && r.type === "uses"
-                      )) {
-                        relationshipsData.push({
-                          source: comp.slug,
-                          target: targetEntity.id,
-                          type: "uses",
-                          weight: 1,
-                          context: "calls function"
-                        })
-                      }
-                    }
-                  })
-                }
-              })
-            }
-          })
-        )
-
-        // Remove duplicate relationships
-        const uniqueRelationships = relationshipsData.filter((rel, index, self) =>
-          index === self.findIndex(r =>
-            r.source === rel.source && r.target === rel.target && r.type === rel.type
-          )
-        )
-
-        // Use only real data from the documentation
-        console.log('Loading real data from documentation')
-        console.log('Components loaded:', componentsData.length)
-        console.log('Relationships found:', uniqueRelationships.length)
-        
-        // Debug file paths
-        const filePathStats = componentsData.reduce((acc, comp) => {
+        // Create basic components from index data
+        const componentsData: CodeEntity[] = indexData.map((comp: { name: string; slug: string; filePath?: string }) => {
+          let entityType = "component"
+          const name = comp.name.toLowerCase()
+          if (name.includes('use') && name.length > 3 && comp.name[3] === comp.name[3].toUpperCase()) entityType = "function"
+          else if (name.match(/^[a-z][a-z0-9]*[A-Z]/) || ['to', 'get', 'set', 'create', 'update', 'delete', 'fetch', 'handle', 'copy', 'format', 'parse', 'validate'].some(p => name.includes(p))) entityType = "function"
+          if (['service', 'provider', 'manager', 'controller', 'handler'].some(p => name.includes(p)) && !name.includes('handle')) entityType = "class"
           if (comp.filePath) {
-            if (comp.filePath.startsWith('src/components/')) {
-              acc.defaultPaths++
-            } else {
-              acc.realPaths++
-            }
-          } else {
-            acc.noPaths++
+            const filePath = comp.filePath.toLowerCase()
+            if (['/lib/', '/utils/', '/helpers/', '/functions/'].some(p => filePath.includes(p))) entityType = "function"
+            else if (['/services/', '/classes/', '/models/'].some(p => filePath.includes(p))) entityType = "class"
           }
-          return acc
-        }, { defaultPaths: 0, realPaths: 0, noPaths: 0 })
-        
-        console.log('File path statistics:', filePathStats)
-        console.log('Sample file paths:', componentsData.slice(0, 5).map(c => ({ name: c.name, filePath: c.filePath })))
+          return { id: comp.slug, name: comp.name, type: entityType, filePath: comp.filePath || `src/components/${comp.name}`, methods: [], props: [] }
+        })
+
+        // Load all component details to get complete relationships
+        const detailedData = await Promise.all(
+          componentsData.map(async (comp) => {
+            try {
+              const res = await fetch(`/docs-data/${comp.id}.json`)
+              if (!res.ok) {
+                console.warn(`Failed to load details for ${comp.id}: ${res.statusText}`)
+                return null
+              }
+              return await res.json()
+            } catch (error) {
+              console.warn(`Failed to load details for ${comp.id}:`, error)
+              return null
+            }
+          })
+        )
+
+        // Helper function to resolve entity names to actual component IDs
+        const resolveEntityId = (entityName: string): string | null => {
+          // First try exact ID match
+          const exactMatch = componentsData.find(c => c.id === entityName)
+          if (exactMatch) return exactMatch.id
+          
+          // Try exact name match
+          const nameMatch = componentsData.find(c => c.name === entityName)
+          if (nameMatch) return nameMatch.id
+          
+          // Try case-insensitive name match
+          const caseInsensitiveMatch = componentsData.find(c => c.name.toLowerCase() === entityName.toLowerCase())
+          if (caseInsensitiveMatch) return caseInsensitiveMatch.id
+          
+          // Try to find a component that ends with the entity name (for cases like "dialog" -> "src_ui_components_ui_dialog_dialog")
+          const slugEndMatch = componentsData.find(c => c.id.toLowerCase().endsWith(`_${entityName.toLowerCase()}`))
+          if (slugEndMatch) return slugEndMatch.id
+          
+          // Try to find a component whose name matches the entity name
+          const nameInSlugMatch = componentsData.find(c => c.id.toLowerCase().includes(`_${entityName.toLowerCase()}_`) || c.id.toLowerCase().endsWith(`_${entityName.toLowerCase()}`))
+          if (nameInSlugMatch) return nameInSlugMatch.id
+          
+          return null
+        }
+
+        // Extract relationships from the loaded component data
+        const relationshipsData: Relationship[] = []
+        detailedData.forEach((data, index) => {
+          if (!data) return
+          const comp = componentsData[index]
+          if (data.relationships && Array.isArray(data.relationships)) {
+            data.relationships.forEach((rel: any) => {
+              let sourceId = rel.source
+              let targetId = rel.target
+              
+              // Resolve source and target to actual component IDs
+              if (sourceId) {
+                const resolvedSource = resolveEntityId(sourceId)
+                sourceId = resolvedSource || sourceId
+              } else {
+                sourceId = comp.id
+              }
+              
+              if (targetId) {
+                const resolvedTarget = resolveEntityId(targetId)
+                targetId = resolvedTarget
+              }
+              
+              // Only add relationship if both source and target exist
+              if (sourceId && targetId && rel.type) {
+                relationshipsData.push({ source: sourceId, target: targetId, type: rel.type, weight: rel.weight || 1, context: rel.context })
+              }
+            })
+          }
+          if (data.imports && Array.isArray(data.imports)) {
+            data.imports.forEach((importItem: string) => {
+              const resolvedTarget = resolveEntityId(importItem)
+              if (resolvedTarget && !relationshipsData.some(r => r.source === comp.id && r.target === resolvedTarget && r.type === "uses")) {
+                relationshipsData.push({ source: comp.id, target: resolvedTarget, type: "uses", weight: 2, context: "imports" })
+              }
+            })
+          }
+        })
+
+        const uniqueRelationships = relationshipsData.filter((rel, index, self) =>
+          index === self.findIndex(r => r.source === rel.source && r.target === rel.target && r.type === rel.type)
+        )
+
+        console.log('Initialized with data from documentation index')
+        console.log('Components loaded:', componentsData.length)
+        console.log('Relationships loaded:', uniqueRelationships.length)
         
         setComponents(componentsData)
         setRelationships(uniqueRelationships)
-        setLoading(false)
+        
       } catch (error) {
         console.error("Error fetching relationship data:", error)
-        // Set empty data if there's an error
         setComponents([])
         setRelationships([])
+      } finally {
         setLoading(false)
       }
     }
@@ -395,11 +191,64 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     fetchData()
   }, [])
 
+  // Function to load full details for a specific component on-demand
+  const loadComponentDetails = async (componentId: string) => {
+    try {
+      const res = await fetch(`/docs-data/${componentId}.json`)
+      const data = await res.json()
+      
+      // Update the component in state with full details
+      setComponents(prev => prev.map(comp => 
+        comp.id === componentId 
+          ? { ...comp, methods: data.methods || [], props: data.props || [] }
+          : comp
+      ))
+      
+      // Extract and add any new relationships from this component
+      const newRelationships: Relationship[] = []
+      
+      if (data.relationships && Array.isArray(data.relationships)) {
+        data.relationships.forEach((rel: any) => {
+          if (rel.source && rel.target && rel.type) {
+            newRelationships.push({
+              source: rel.source,
+              target: rel.target,
+              type: rel.type,
+              weight: rel.weight || 1,
+              context: rel.context
+            })
+          } else if (rel.target && rel.type && !rel.source) {
+            newRelationships.push({
+              source: componentId,
+              target: rel.target,
+              type: rel.type,
+              weight: rel.weight || 1,
+              context: rel.context
+            })
+          }
+        })
+      }
+      
+      // Add new relationships that don't already exist
+      setRelationships(prev => {
+        const existing = new Set(prev.map(r => `${r.source}-${r.target}-${r.type}`))
+        const filtered = newRelationships.filter(rel => 
+          !existing.has(`${rel.source}-${rel.target}-${rel.type}`)
+        )
+        return [...prev, ...filtered]
+      })
+      
+      return data
+    } catch (error) {
+      console.error(`Error loading details for ${componentId}:`, error)
+      return null
+    }
+  }
+
   // Fetch code data for a specific node
   const fetchNodeCodeData = async (nodeId: string) => {
     try {
-      const res = await fetch(`/docs-data/${nodeId}.json`)
-      const data = await res.json()
+      const data = await loadComponentDetails(nodeId)
       setNodeCodeData(data)
     } catch (error) {
       console.error('Error fetching node code data:', error)
@@ -413,9 +262,50 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     // Fetch basic node data for the side panel
     const nodeEntity = components.find(c => c.id === nodeId)
     setSelectedNodeData(nodeEntity)
+    
+    // Load detailed data for this component if not already loaded
+    if (nodeEntity && (!nodeEntity.methods || nodeEntity.methods.length === 0)) {
+      loadComponentDetails(nodeId)
+    }
+    
+    // Clear group selection when selecting a node
+    setSelectedGroupId(null)
+    setSelectedGroupData(null)
     // Reset focus mode when selecting a new node
     setFocusMode(false)
     // Reset panel position when selecting a new node (default to right side)
+    setPanelPosition({ 
+      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
+      y: 80 
+    })
+    // Reset minimize state
+    setIsMinimized(false)
+  }
+
+  // Handle group click to select group and show side panel
+  const handleGroupClick = (groupId: string, groupNodes: any[]) => {
+    setSelectedGroupId(groupId)
+    // Create group data object with summary information
+    const groupData = {
+      id: groupId,
+      name: groupId,
+      nodeCount: groupNodes.length,
+      nodes: groupNodes,
+      types: [...new Set(groupNodes.map(n => n.type))],
+      // Calculate connections to nodes outside this group
+      externalConnections: relationships.filter(rel => {
+        const groupNodeIds = new Set(groupNodes.map(n => n.id))
+        return (groupNodeIds.has(rel.source) && !groupNodeIds.has(rel.target)) ||
+               (groupNodeIds.has(rel.target) && !groupNodeIds.has(rel.source))
+      })
+    }
+    setSelectedGroupData(groupData)
+    // Clear node selection when selecting a group
+    setSelectedNodeId(null)
+    setSelectedNodeData(null)
+    // Reset focus mode when selecting a group
+    setFocusMode(false)
+    // Reset panel position when selecting a group
     setPanelPosition({ 
       x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
       y: 80 
@@ -545,7 +435,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
       involvedEntityIds.add(rel.target)
     })
 
-    // Create nodes
+    // Create nodes - only include components that actually exist
     const nodes = components
       .filter(comp => involvedEntityIds.has(comp.id))
       .map(comp => {
@@ -659,7 +549,9 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         </CardHeader>
         <CardContent className="p-6">
           <div className="text-center py-8">
-            <p className="text-muted-foreground">Loading relationship data...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground text-lg font-medium">Loading components...</p>
+            <p className="text-sm text-slate-500 mt-2">Loading component index and building relationships</p>
           </div>
         </CardContent>
       </Card>
@@ -743,14 +635,28 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
           </div>
         </CardHeader>
       <CardContent className="p-6">
-        {filteredRelationships.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No relationships found in your codebase.</p>
-            {components.length === 0 ? (
-              <p className="text-sm text-slate-500 mt-2">Generate documentation first to analyze your code relationships</p>
-            ) : (
-              <p className="text-sm text-slate-500 mt-2">Your components don't have detectable relationships yet. Try adding imports or method calls.</p>
-            )}
+        {components.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-slate-400 mb-4">
+              <Component className="h-16 w-16 mx-auto" />
+            </div>
+            <p className="text-muted-foreground text-lg font-medium">No components found</p>
+            <p className="text-sm text-slate-500 mt-2">Generate documentation first to analyze your code relationships</p>
+          </div>
+        ) : filteredRelationships.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-slate-400 mb-4">
+              <Component className="h-16 w-16 mx-auto" />
+            </div>
+            <p className="text-muted-foreground text-lg font-medium">Components loaded</p>
+            <p className="text-sm text-slate-500 mt-2">
+              {components.length} components available. Relationships are loaded on-demand when you interact with components.
+            </p>
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                💡 Click on components in the graph view or browse the list to explore relationships
+              </p>
+            </div>
           </div>
         ) : graphView === "graph" ? (
           <div className="h-[85vh] w-full min-h-[700px]">
@@ -760,6 +666,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               focusNodeId={entityId}
               selectedNodeId={selectedNodeId || undefined}
               onNodeClick={handleNodeClick}
+              onGroupClick={handleGroupClick}
             />
           </div>
         ) : (
@@ -999,13 +906,169 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
       </Card>
     )}
 
+    {/* Group Details Side Panel */}
+    {selectedGroupData && (
+      <Card 
+        ref={panelRef}
+        className={`fixed bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl border-2 border-amber-200 dark:border-amber-800 z-50 rounded-xl select-none transition-all duration-300 ${
+          isMinimized 
+            ? 'w-80 h-16' 
+            : 'w-96 max-h-[calc(100vh-5.5rem)] overflow-y-auto'
+        }`}
+        style={{
+          top: `${panelPosition.y}px`,
+          left: `${panelPosition.x}px`,
+          right: 'auto',
+          cursor: isDragging ? 'grabbing' : 'default'
+        }}
+      >
+        <CardHeader 
+          className="pb-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 drag-handle cursor-grab hover:cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg pointer-events-none">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md">
+                <FileCode className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-slate-900 dark:text-slate-100 truncate">{selectedGroupData.name}</span>
+                <Badge 
+                  variant="secondary" 
+                  className="mt-1 w-fit bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 text-amber-700 dark:text-amber-300"
+                >
+                  {selectedGroupData.nodeCount} nodes
+                </Badge>
+              </div>
+            </CardTitle>
+            <div className="flex items-center gap-1 pointer-events-auto">
+              <div className="drag-handle cursor-grab hover:cursor-grab active:cursor-grabbing p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <Move className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="h-8 w-8 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/20"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedGroupId(null)
+                  setSelectedGroupData(null)
+                  setPanelPosition({ 
+                    x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
+                    y: 80 
+                  })
+                  setIsMinimized(false)
+                }}
+                className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        {!isMinimized && (
+          <CardContent className="p-4">
+          
+          {/* Group Summary */}
+          <div className="mb-4 p-3 bg-amber-100/80 dark:bg-amber-800/80 rounded-lg">
+            <div className="text-sm text-amber-600 dark:text-amber-400 font-mono break-words">
+              📁 Group: {selectedGroupData.name}
+            </div>
+            <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              {selectedGroupData.nodeCount} components • {selectedGroupData.externalConnections.length} external connections
+            </div>
+          </div>
+          
+          {/* Node Types Breakdown */}
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Node Types</h4>
+            <div className="flex flex-wrap gap-1">
+              {selectedGroupData.types.map((type: string) => {
+                const count = selectedGroupData.nodes.filter((n: any) => n.type === type).length
+                return (
+                  <Badge key={type} className={`${getRelationshipColor('uses')} text-xs`}>
+                    {type} ({count})
+                  </Badge>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* External Connections */}
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              External Connections ({selectedGroupData.externalConnections.length})
+            </h4>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {selectedGroupData.externalConnections.slice(0, 5).map((rel: any, index: number) => {
+                const isOutgoing = selectedGroupData.nodes.some((n: any) => n.id === rel.source)
+                const externalNode = isOutgoing ? rel.target : rel.source
+                return (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <Badge className={`${getRelationshipColor(rel.type)} text-xs`}>
+                      {getRelationshipLabel(rel.type)}
+                    </Badge>
+                    <span className="text-slate-600 dark:text-slate-400 truncate ml-2 flex-1">
+                      {isOutgoing ? '→' : '←'} {externalNode}
+                    </span>
+                  </div>
+                )
+              })}
+              {selectedGroupData.externalConnections.length > 5 && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                  +{selectedGroupData.externalConnections.length - 5} more...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Group Actions */}
+          <div className="space-y-2">
+            <Button 
+              onClick={() => {
+                // Set focus mode on this group
+                setFocusMode(true)
+                setSelectedNodeId(selectedGroupData.id)
+              }}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-md"
+            >
+              <Focus className="h-4 w-4 mr-2" />
+              Focus on Group
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Open first component in group
+                const firstNode = selectedGroupData.nodes[0]
+                if (firstNode) {
+                  window.open(`/components/${firstNode.id}`, '_blank')
+                }
+              }}
+              className="w-full border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View Components
+            </Button>
+          </div>
+        </CardContent>
+        )}
+      </Card>
+    )}
+
     {/* Beautiful Code Preview Modal */}
     <Dialog open={selectedNodeForCode !== null} onOpenChange={(open) => !open && closeCodePreview()}>
       <DialogContent className="max-w-[98vw] w-[98vw] h-[95vh] flex flex-col p-0 gap-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl">
         <DialogHeader className="flex-shrink-0 p-4 md:p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {nodeCodeData && (
+              {nodeCodeData ? (
                 <>
                   <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-md">
                     {getEntityIcon(nodeCodeData.type || "component")}
@@ -1026,6 +1089,10 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                     </div>
                   </div>
                 </>
+              ) : (
+                <DialogTitle className="font-bold text-slate-900 dark:text-slate-100 truncate text-lg">
+                  Loading...
+                </DialogTitle>
               )}
             </div>
             <div className="flex items-center gap-2">
