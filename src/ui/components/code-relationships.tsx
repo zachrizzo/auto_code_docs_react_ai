@@ -1,14 +1,16 @@
 "use client"
 import * as React from "react"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { ScrollArea } from "./ui/scroll-area"
-import { Code, Component, ActivityIcon as Function, FileCode, X, ExternalLink, Server, Zap, Info } from "lucide-react"
+import { Switch } from "./ui/switch"
+import { Label } from "./ui/label"
+import { Code, Component, ActivityIcon as Function, FileCode, X, ExternalLink, Server, Zap, Info, Focus, Move, Minus } from "lucide-react"
 import { ArrowRightIcon } from "@radix-ui/react-icons"
 import { InteractiveGraph } from "./interactive-graph"
 import { CodeBlock } from "./code-block"
@@ -45,6 +47,12 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   const [nodeCodeData, setNodeCodeData] = useState<any>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedNodeData, setSelectedNodeData] = useState<any>(null)
+  const [focusMode, setFocusMode] = useState(false)
+  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 80 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isMinimized, setIsMinimized] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   // Fetch component data
   useEffect(() => {
@@ -402,7 +410,68 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     // Fetch basic node data for the side panel
     const nodeEntity = components.find(c => c.id === nodeId)
     setSelectedNodeData(nodeEntity)
+    // Reset focus mode when selecting a new node
+    setFocusMode(false)
+    // Reset panel position when selecting a new node (default to right side)
+    setPanelPosition({ 
+      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
+      y: 80 
+    })
+    // Reset minimize state
+    setIsMinimized(false)
   }
+
+  // Drag functionality for the panel
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.drag-handle')) {
+      setIsDragging(true)
+      setDragStart({
+        x: e.clientX - panelPosition.x,
+        y: e.clientY - panelPosition.y
+      })
+      e.preventDefault()
+    }
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      const newX = e.clientX - dragStart.x
+      const newY = e.clientY - dragStart.y
+      
+      // Allow panel to be dragged anywhere, with minimal constraints to keep it accessible
+      const panel = panelRef.current
+      if (panel) {
+        const rect = panel.getBoundingClientRect()
+        const minVisibleArea = 50 // Minimum pixels that must remain visible
+        
+        setPanelPosition({
+          x: Math.max(-rect.width + minVisibleArea, Math.min(window.innerWidth - minVisibleArea, newX)),
+          y: Math.max(-rect.height + minVisibleArea, Math.min(window.innerHeight - minVisibleArea, newY))
+        })
+      }
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'grabbing'
+      document.body.style.userSelect = 'none'
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+  }, [isDragging, dragStart, panelPosition])
 
   // Handle opening the full code modal
   const openCodeModal = (nodeId: string) => {
@@ -444,9 +513,31 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
       return { graphNodes: [], graphEdges: [] }
     }
 
+    // Apply focus mode filtering if enabled and a node is selected
+    let workingRelationships = filteredRelationships
+    if (focusMode && selectedNodeId) {
+      // Find all relationships connected to the selected node
+      const relatedEntityIds = new Set<string>([selectedNodeId])
+      
+      // Get directly connected entities
+      filteredRelationships.forEach(rel => {
+        if (rel.source === selectedNodeId) {
+          relatedEntityIds.add(rel.target)
+        }
+        if (rel.target === selectedNodeId) {
+          relatedEntityIds.add(rel.source)
+        }
+      })
+
+      // Filter relationships to only include those involving related entities
+      workingRelationships = filteredRelationships.filter(rel =>
+        relatedEntityIds.has(rel.source) && relatedEntityIds.has(rel.target)
+      )
+    }
+
     // Get all entities involved in relationships
     const involvedEntityIds = new Set<string>()
-    filteredRelationships.forEach(rel => {
+    workingRelationships.forEach(rel => {
       involvedEntityIds.add(rel.source)
       involvedEntityIds.add(rel.target)
     })
@@ -455,7 +546,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     const nodes = components
       .filter(comp => involvedEntityIds.has(comp.id))
       .map(comp => {
-        const connections = filteredRelationships.filter(
+        const connections = workingRelationships.filter(
           rel => rel.source === comp.id || rel.target === comp.id
         ).length
 
@@ -473,7 +564,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
       })
 
     // Create edges
-    const edges = filteredRelationships.map(rel => ({
+    const edges = workingRelationships.map(rel => ({
       source: rel.source,
       target: rel.target,
       type: rel.type,
@@ -484,7 +575,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     }))
 
     return { graphNodes: nodes, graphEdges: edges }
-  }, [components, filteredRelationships])
+  }, [components, filteredRelationships, focusMode, selectedNodeId])
 
   const getEntityIcon = (type: CodeEntity["type"]) => {
     switch (type) {
@@ -725,10 +816,26 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
     {/* Node Details Side Panel */}
     {selectedNodeData && (
-      <Card className="fixed top-20 right-4 w-96 max-h-[calc(100vh-5.5rem)] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl border-2 border-blue-200 dark:border-blue-800 z-50 rounded-xl">
-        <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
+      <Card 
+        ref={panelRef}
+        className={`fixed bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl border-2 border-blue-200 dark:border-blue-800 z-50 rounded-xl select-none transition-all duration-300 ${
+          isMinimized 
+            ? 'w-80 h-16' 
+            : 'w-96 max-h-[calc(100vh-5.5rem)] overflow-y-auto'
+        }`}
+        style={{
+          top: `${panelPosition.y}px`,
+          left: `${panelPosition.x}px`,
+          right: 'auto',
+          cursor: isDragging ? 'grabbing' : 'default'
+        }}
+      >
+        <CardHeader 
+          className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 drag-handle cursor-grab hover:cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+        >
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg pointer-events-none">
               <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-md">
                 {getEntityIcon(selectedNodeData.type)}
               </div>
@@ -742,20 +849,39 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                 </Badge>
               </div>
             </CardTitle>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                setSelectedNodeId(null)
-                setSelectedNodeData(null)
-              }}
-              className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 pointer-events-auto">
+              <div className="drag-handle cursor-grab hover:cursor-grab active:cursor-grabbing p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <Move className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedNodeId(null)
+                  setSelectedNodeData(null)
+                  setPanelPosition({ 
+                    x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
+                    y: 80 
+                  })
+                  setIsMinimized(false)
+                }}
+                className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4">
+        {!isMinimized && (
+          <CardContent className="p-4">
           {selectedNodeData.filePath && (
             <div className="mb-4 p-3 bg-slate-100/80 dark:bg-slate-800/80 rounded-lg">
               <div className="text-sm text-slate-600 dark:text-slate-400 font-mono break-words">
@@ -766,9 +892,25 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
           
           {/* Connection Info */}
           <div className="mb-4">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Connections</h4>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              Connections {focusMode && <span className="text-amber-600 dark:text-amber-400">(Focus Mode)</span>}
+            </h4>
             <div className="text-sm text-slate-600 dark:text-slate-400">
-              {filteredRelationships.filter(rel => rel.source === selectedNodeId || rel.target === selectedNodeId).length} relationships
+              {(() => {
+                // Calculate connections based on current view (focus mode or normal)
+                const relevantRelationships = focusMode && selectedNodeId 
+                  ? filteredRelationships.filter(rel => {
+                      const relatedEntityIds = new Set<string>([selectedNodeId])
+                      filteredRelationships.forEach(r => {
+                        if (r.source === selectedNodeId) relatedEntityIds.add(r.target)
+                        if (r.target === selectedNodeId) relatedEntityIds.add(r.source)
+                      })
+                      return relatedEntityIds.has(rel.source) && relatedEntityIds.has(rel.target)
+                    })
+                  : filteredRelationships.filter(rel => rel.source === selectedNodeId || rel.target === selectedNodeId)
+                
+                return `${relevantRelationships.length} relationships`
+              })()}
             </div>
           </div>
 
@@ -777,9 +919,21 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Relationship Types</h4>
             <div className="space-y-1">
               {['uses', 'inherits', 'contains'].map(relType => {
-                const count = filteredRelationships.filter(rel => 
-                  (rel.source === selectedNodeId || rel.target === selectedNodeId) && rel.type === relType
-                ).length
+                // Calculate count based on current view (focus mode or normal)  
+                const relevantRelationships = focusMode && selectedNodeId 
+                  ? filteredRelationships.filter(rel => {
+                      const relatedEntityIds = new Set<string>([selectedNodeId])
+                      filteredRelationships.forEach(r => {
+                        if (r.source === selectedNodeId) relatedEntityIds.add(r.target)
+                        if (r.target === selectedNodeId) relatedEntityIds.add(r.source)
+                      })
+                      return relatedEntityIds.has(rel.source) && relatedEntityIds.has(rel.target) && rel.type === relType
+                    })
+                  : filteredRelationships.filter(rel => 
+                      (rel.source === selectedNodeId || rel.target === selectedNodeId) && rel.type === relType
+                    )
+                
+                const count = relevantRelationships.length
                 if (count === 0) return null
                 return (
                   <div key={relType} className="flex items-center justify-between text-sm">
@@ -790,6 +944,27 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                   </div>
                 )
               })}
+            </div>
+          </div>
+
+          {/* Focus Mode Switch */}
+          <div className="mb-4 p-3 bg-amber-50/50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="focus-mode" className="text-sm font-medium cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Focus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span>Focus Mode</span>
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  Show only related components
+                </div>
+              </Label>
+              <Switch
+                id="focus-mode"
+                checked={focusMode}
+                onCheckedChange={setFocusMode}
+                className="data-[state=checked]:bg-amber-600"
+              />
             </div>
           </div>
 
@@ -817,6 +992,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             )}
           </div>
         </CardContent>
+        )}
       </Card>
     )}
 

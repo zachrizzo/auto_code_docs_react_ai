@@ -302,6 +302,17 @@ export class AiDescriptionGenerator {
         component.description += `\nChild components and their descriptions:\n${childDescriptions}`;
       }
 
+      // Generate descriptions for methods if they exist
+      if (component.methods && Array.isArray(component.methods)) {
+        for (const method of component.methods) {
+          if (method && (!method.description || method.description.trim() === '')) {
+            method.description = await this.generateMethodDescription(component, method);
+            generatedCount++;
+            // Note: Caching for methods is not implemented in this version
+          }
+        }
+      }
+
       enhancedComponents.push(component);
     }
 
@@ -422,6 +433,38 @@ export class AiDescriptionGenerator {
       prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
     }
 
+    return this.generateDescription(prompt);
+  }
+
+  private calculateMethodHash(componentName: string, method: any): string {
+    const dataToHash = {
+      componentName,
+      methodName: method.name || "unnamed",
+      params: method.params || [],
+      returnType: method.returnType || "unknown",
+      sourceCode: method.sourceCode || ""
+    };
+
+    return crypto
+      .createHash("md5")
+      .update(JSON.stringify(dataToHash))
+      .digest("hex");
+  }
+
+  private async generateMethodDescription(
+    component: ComponentDefinition,
+    method: any
+  ): Promise<string> {
+    console.log(`Generating description for method: ${method.name} in ${component.name}`);
+    const prompt = `
+      Component: ${component.name}
+      Method: ${method.name}
+      Method signature: ${method.name}(${method.params.map((p: any) => `${p.name}: ${p.type}`).join(', ')}): ${method.returnType}
+      Method code:
+      ${method.sourceCode}
+
+      What is the purpose of this method? Describe its function, parameters, and return value in a single, concise sentence.
+    `;
     return this.generateDescription(prompt);
   }
 

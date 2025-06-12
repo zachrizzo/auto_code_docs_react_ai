@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import * as fs from "fs-extra";
+import * as path from "path";
 
 export async function POST(request: Request) {
   try {
@@ -6,10 +8,11 @@ export async function POST(request: Request) {
     
     // Parse request body
     const body = await request.json();
-    const { componentName, code, filePath } = body;
+    const { componentName, code, filePath, slug } = body;
 
     console.log(`Generating description for component: ${componentName}`);
     console.log(`File path: ${filePath || 'Not provided'}`);
+    console.log(`Slug: ${slug || 'Not provided'}`);
     console.log(`Code length: ${code?.length || 0} characters`);
 
     if (!componentName || !code) {
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
               content: prompt,
             },
           ],
+          stream: false,
         }),
       });
 
@@ -89,6 +93,36 @@ export async function POST(request: Request) {
       } else {
         console.warn("Unexpected response format from Ollama:", JSON.stringify(data));
         description = `The ${componentName} component is a UI element that provides functionality based on its props and implementation. It serves as a reusable building block in the application.`;
+      }
+
+      // Save the description to the component's JSON file if slug is provided
+      if (slug) {
+        try {
+          const docsDataPath = path.join(process.cwd(), "public", "docs-data");
+          const componentFilePath = path.join(docsDataPath, `${slug}.json`);
+          
+          console.log(`Attempting to update component file: ${componentFilePath}`);
+          
+          // Check if the component file exists
+          if (await fs.pathExists(componentFilePath)) {
+            // Read the existing component data
+            const componentData = await fs.readJson(componentFilePath);
+            
+            // Update the description
+            componentData.description = description;
+            componentData.lastUpdated = new Date().toISOString();
+            
+            // Write the updated data back to the file
+            await fs.writeJson(componentFilePath, componentData, { spaces: 2 });
+            
+            console.log(`Successfully updated description for component: ${componentName}`);
+          } else {
+            console.warn(`Component file not found: ${componentFilePath}`);
+          }
+        } catch (saveError) {
+          console.error("Error saving description to component file:", saveError);
+          // Don't fail the request if saving fails, just log the error
+        }
       }
 
       return NextResponse.json({ 

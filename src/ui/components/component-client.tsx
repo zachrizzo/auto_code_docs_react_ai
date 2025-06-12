@@ -150,6 +150,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
           componentName: componentData.name,
           code: componentData.code || `function ${componentData.name}() { /* Code not available */ }`,
           filePath: componentData.filePath,
+          slug: slug,
         }),
       });
       
@@ -164,6 +165,15 @@ export default function ComponentClient({ slug }: { slug: string }) {
       setDescription(data.description);
       if (data.model) {
         setModelUsed(data.model);
+      }
+      
+      // Update the component data with the new description
+      if (componentData) {
+        setComponentData({
+          ...componentData,
+          description: data.description,
+          lastUpdated: new Date().toISOString()
+        });
       }
       
       console.log('Description generated successfully using model:', data.model);
@@ -190,6 +200,8 @@ export default function ComponentClient({ slug }: { slug: string }) {
       </div>
     )
   }
+
+  const selectedMethodData = componentData.methods?.find(m => m.name === selectedMethod)
 
   return (
     <div className="container max-w-5xl py-12">
@@ -331,13 +343,25 @@ export default function ComponentClient({ slug }: { slug: string }) {
               </Card>
             </div>
             <div className="md:col-span-2">
-              {selectedMethod && componentData.methods?.find(m => m.name === selectedMethod) ? (
-                <Card>
-                  <CodeBlock
-                    code={componentData.methods.find(m => m.name === selectedMethod)?.code || ''}
-                    language="typescript"
-                  />
-                </Card>
+              {selectedMethodData ? (
+                <div className="space-y-4">
+                  {selectedMethodData.description && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Description</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground">{selectedMethodData.description}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  <Card>
+                    <CodeBlock
+                      code={selectedMethodData.code || ''}
+                      language="typescript"
+                    />
+                  </Card>
+                </div>
               ) : (
                 <Card className="flex items-center justify-center h-full">
                   <p className="text-muted-foreground">Select a method to view its details</p>

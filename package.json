@@ -22,12 +22,12 @@
     "dev": "ts-node src/cli/index.ts",
     "test": "jest",
     "prepublishOnly": "npm run build",
-    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y serve"
+    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y generate --generate-descriptions"
   },
   "keywords": [
     "react",
     "documentation",
-    "ai",
+    "ai", 
     "generator",
     "cli"
   ],

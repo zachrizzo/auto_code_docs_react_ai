@@ -70,9 +70,9 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null)
   const [groupDragOffset, setGroupDragOffset] = useState({ x: 0, y: 0 })
-  const [groupingMode, setGroupingMode] = useState<'none' | 'file' | 'parent'>('none')
+  const [groupingMode, setGroupingMode] = useState<'none' | 'file' | 'parent'>('file')
   const [showGroupContainers, setShowGroupContainers] = useState(true)
-  const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('straight')
+  const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('curved')
   const animationRef = useRef<number>()
   const nodesRef = useRef<Node[]>(nodes)
   const edgesRef = useRef<Edge[]>(edges)
@@ -210,12 +210,12 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       // Root at top center
       positions.push({ x: 0, y: -spacing })
       
-      // Children arranged in a horizontal line below
-      const childWidth = (children.length - 1) * spacing * 0.8
+      // Children arranged in a horizontal line below with more spacing
+      const childWidth = (children.length - 1) * spacing * 1.2
       children.forEach((_, index) => {
         positions.push({
-          x: -childWidth / 2 + index * spacing * 0.8,
-          y: spacing * 0.5
+          x: -childWidth / 2 + index * spacing * 1.2,
+          y: spacing * 0.8
         })
       })
     } else {
@@ -245,11 +245,11 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         const parentX = level2Count === 1 ? 0 : -level2Width / 2 + parentIndex * spacing
         
         const siblingCount = Math.min(nodesPerParent, level3Nodes.length - parentIndex * nodesPerParent)
-        const siblingWidth = (siblingCount - 1) * spacing * 0.6
+        const siblingWidth = (siblingCount - 1) * spacing * 0.9
         
         positions.push({
-          x: parentX + (siblingCount === 1 ? 0 : -siblingWidth / 2 + childIndex * spacing * 0.6),
-          y: spacing * 1.2
+          x: parentX + (siblingCount === 1 ? 0 : -siblingWidth / 2 + childIndex * spacing * 0.9),
+          y: spacing * 1.5
         })
       })
     }
@@ -731,7 +731,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       // Modern card-based node design
       ctx.save()
       
-      const nodeSize = Math.max(80, node.radius * 3)
+      const nodeSize = Math.max(90, node.radius * 3.5) // Increased node size for better spacing
       const cornerRadius = 20
       
       // Outer glow for selected/hovered nodes
@@ -1517,8 +1517,8 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       const groupCenterX = groupPadding + (col + 0.5) * groupWidth
       const groupCenterY = groupPadding + (row + 0.5) * groupHeight
       
-      // Get tree layout positions relative to center
-      const internalSpacing = nodeSpacing * 0.5
+      // Get tree layout positions relative to center with better spacing
+      const internalSpacing = nodeSpacing * 0.8 // Increased from 0.5 to 0.8 for more space
       const treePositions = calculateTreeLayout(groupNodes, internalSpacing)
       
       // Apply absolute positions to nodes within this group
@@ -1883,33 +1883,10 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     const x = (e.clientX - rect.left - offset.x) / scale
     const y = (e.clientY - rect.top - offset.y) / scale
 
-    // Check if clicking on a group box first (higher priority)
     const currentNodes = nodesRef.current
     const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
     
-    if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
-      let clickedGroup: string | null = null
-      
-      groupBoxes.forEach((box, groupKey) => {
-        if (x >= box.x && x <= box.x + box.width && 
-            y >= box.y && y <= box.y + box.height) {
-          clickedGroup = groupKey
-        }
-      })
-      
-      if (clickedGroup) {
-        // Start group dragging
-        const groupBox = groupBoxes.get(clickedGroup)!
-        setDraggedGroup(clickedGroup)
-        setGroupDragOffset({
-          x: x - groupBox.x,
-          y: y - groupBox.y
-        })
-        return // Don't check for nodes if we're dragging a group
-      }
-    }
-
-    // Check if clicking on a node (only from visible nodes)
+    // First check if clicking on a node (higher priority than groups)
     const currentEdges = edgesRef.current.filter(edge => !filteredTypes.has(edge.type))
     const visibleNodes = showConnectionsOnly && selectedNode 
       ? nodesRef.current.filter(node => 
@@ -1922,14 +1899,16 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           node.type.toLowerCase().includes(searchTerm.toLowerCase())
         )
     
+    // Increase click area for nodes slightly for better UX
     const clickedNode = visibleNodes.find(node => {
       const dx = x - node.x
       const dy = y - node.y
-      return Math.sqrt(dx * dx + dy * dy) <= node.radius
+      const clickRadius = node.radius + 5 // Add 5px buffer for easier clicking
+      return Math.sqrt(dx * dx + dy * dy) <= clickRadius
     })
 
     if (clickedNode) {
-      // Start node dragging
+      // Node clicked - handle node interaction
       setDraggedNode(clickedNode.id)
       setDragOffset({
         x: x - clickedNode.x,
@@ -1940,11 +1919,40 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       // Fix the node position during dragging
       clickedNode.fx = clickedNode.x
       clickedNode.fy = clickedNode.y
-    } else {
-      // Start canvas dragging
-      setIsDragging(true)
-      setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
+      return // Exit early - node takes priority
     }
+    
+    // Only check for group dragging if no node was clicked
+    if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+      let clickedGroup: string | null = null
+      
+      groupBoxes.forEach((box, groupKey) => {
+        if (x >= box.x && x <= box.x + box.width && 
+            y >= box.y && y <= box.y + box.height) {
+          clickedGroup = groupKey
+        }
+      })
+      
+      if (clickedGroup) {
+        // Check if click is in the group header area for dragging
+        const groupBox = groupBoxes.get(clickedGroup)!
+        const headerHeight = 40 // Only drag from header area
+        
+        if (y <= groupBox.y + headerHeight) {
+          // Start group dragging only from header
+          setDraggedGroup(clickedGroup)
+          setGroupDragOffset({
+            x: x - groupBox.x,
+            y: y - groupBox.y
+          })
+          return
+        }
+      }
+    }
+    
+    // If no node or group header clicked, start canvas dragging
+    setIsDragging(true)
+    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y })
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {

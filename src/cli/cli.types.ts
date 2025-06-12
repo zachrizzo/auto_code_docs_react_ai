@@ -20,7 +20,7 @@ export interface CodeYOptions {
   ollamaEmbeddingModel: string;
   chatModel: string;
   showCode: boolean;
-  showMethods: boolean;
-  showSimilarity: boolean;
-  generateDescriptions: boolean;
+  showMethods?: boolean;
+  showSimilarity?: boolean;
+  generateDescriptions?: boolean;
 }
