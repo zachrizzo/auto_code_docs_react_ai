@@ -16,6 +16,9 @@ import { InteractiveGraph } from "./interactive-graph"
 import { CodeBlock } from "./code-block"
 import { McpServerControl } from "./mcp-server-control"
 import { CodeSimilaritySearch } from "./code-similarity-search"
+import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
+import rehypeHighlight from "rehype-highlight"
 
 // Define types locally
 export interface CodeEntity {
@@ -1053,15 +1056,19 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                   <div className="space-y-6">
                     {/* Description Card */}
                     {nodeCodeData.description && (
-                      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                      <Card className="mt-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                        <CardHeader className="p-3 pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                            <Info className="h-4 w-4" />
                             Description
                           </CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                          <p className="text-sm text-slate-700 dark:text-slate-300">{nodeCodeData.description}</p>
+                        <CardContent className="p-3 pt-0">
+                          <div className="prose dark:prose-invert max-w-none text-sm">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                              {nodeCodeData.description}
+                            </ReactMarkdown>
+                          </div>
                         </CardContent>
                       </Card>
                     )}
@@ -1093,11 +1100,10 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                                   )}
                                 </div>
                                 {prop.description && (
-                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{prop.description}</p>
-                                )}
-                                {prop.defaultValue && (
-                                  <div className="text-xs text-slate-500">
-                                    Default: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{prop.defaultValue}</code>
+                                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1 prose dark:prose-invert max-w-none">
+                                    <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                                      {prop.description}
+                                    </ReactMarkdown>
                                   </div>
                                 )}
                               </div>
@@ -1167,7 +1173,11 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                                   )}
                                 </div>
                                 {method.description && (
-                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">{method.description}</p>
+                                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-2 prose dark:prose-invert max-w-none">
+                                    <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                                      {method.description}
+                                    </ReactMarkdown>
+                                  </div>
                                 )}
                                 {method.code && (
                                   <div className="bg-slate-900 rounded p-2 overflow-x-auto">

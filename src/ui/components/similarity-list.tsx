@@ -10,12 +10,21 @@ import { Progress } from "./ui/progress"
 import { Input } from "./ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Skeleton } from "./ui/skeleton"
-import { InfoIcon, SearchIcon, TrendingUpIcon, AlertTriangleIcon, CheckCircleIcon, EyeIcon } from "lucide-react"
+import { InfoIcon, SearchIcon, TrendingUpIcon, AlertTriangleIcon, CheckCircleIcon, EyeIcon, ArchiveIcon, ArchiveRestoreIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip"
 
 interface SimilarityListProps {
   threshold: number
   preloadedComponents?: ComponentData[]
+  showArchived?: boolean
+  onShowArchivedChange?: (show: boolean) => void
+  archivedCount?: number
+  onArchivedCountChange?: (count: number) => void
+}
+
+interface ArchivedItem {
+  key: string // unique key for the similarity pair
+  archivedAt: number // timestamp
 }
 
 interface SimilarityWarning {
@@ -46,7 +55,14 @@ interface ComponentIndex {
   methodCount?: number
 }
 
-export function SimilarityList({ threshold, preloadedComponents }: SimilarityListProps) {
+export function SimilarityList({ 
+  threshold, 
+  preloadedComponents,
+  showArchived: externalShowArchived,
+  onShowArchivedChange,
+  archivedCount,
+  onArchivedCountChange
+}: SimilarityListProps) {
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const [selectedPair, setSelectedPair] = useState<{
     component1: { name: string; code: string; filePath: string }
@@ -67,13 +83,81 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
   const [loading, setLoading] = useState(!preloadedComponents)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [archivedItems, setArchivedItems] = useState<ArchivedItem[]>([])
+  const [internalShowArchived, setInternalShowArchived] = useState(false)
+  
+  // Use external showArchived if provided, otherwise use internal state
+  const showArchived = externalShowArchived !== undefined ? externalShowArchived : internalShowArchived
+  const setShowArchived = onShowArchivedChange || setInternalShowArchived
 
-  // Example method that demonstrates the functionality
-  // This is intentionally similar to methods in other components for testing
-  /* function zach(hi: string) {
-    const z = hi + hi
-    console.log(z)
-  } */
+  // Load archived items from localStorage on component mount
+  useEffect(() => {
+    const stored = localStorage.getItem('similarity-archived-items')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        setArchivedItems(parsed)
+      } catch (error) {
+        console.error('Error loading archived items:', error)
+      }
+    }
+  }, [])
+
+  // Save archived items to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('similarity-archived-items', JSON.stringify(archivedItems))
+    // Notify parent component of archived count change if callback provided
+    if (onArchivedCountChange) {
+      onArchivedCountChange(archivedItems.length)
+    }
+  }, [archivedItems, onArchivedCountChange])
+
+  // Helper function to generate unique key for similarity pair
+  const generatePairKey = (item: {
+    component1: ComponentData
+    component2: ComponentData
+    isMethodLevel?: boolean
+    method1?: string
+    method2?: string
+  }) => {
+    if (item.isMethodLevel) {
+      return [
+        `${item.component1.name}.${item.method1}`,
+        `${item.component2.name}.${item.method2}`
+      ].sort().join('_')
+    }
+    return [item.component1.name, item.component2.name].sort().join('_')
+  }
+
+  // Check if an item is archived
+  const isItemArchived = (item: {
+    component1: ComponentData
+    component2: ComponentData
+    isMethodLevel?: boolean
+    method1?: string
+    method2?: string
+  }) => {
+    const key = generatePairKey(item)
+    return archivedItems.some(archived => archived.key === key)
+  }
+
+  // Toggle archive status
+  const toggleArchive = (item: {
+    component1: ComponentData
+    component2: ComponentData
+    isMethodLevel?: boolean
+    method1?: string
+    method2?: string
+  }) => {
+    const key = generatePairKey(item)
+    const isArchived = isItemArchived(item)
+    
+    if (isArchived) {
+      setArchivedItems(prev => prev.filter(archived => archived.key !== key))
+    } else {
+      setArchivedItems(prev => [...prev, { key, archivedAt: Date.now() }])
+    }
+  }
   
   // Function to generate synthetic similarity data for demonstration purposes
   function generateSyntheticSimilarityData() {
@@ -511,19 +595,28 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
   }, [components, threshold])
 
   const filteredComponents = useMemo(() => {
-    if (!searchTerm) {
-      return similarComponents
+    let filtered = similarComponents
+    
+    // Filter by archive status
+    if (!showArchived) {
+      filtered = filtered.filter(item => !isItemArchived(item))
     }
-    return similarComponents.filter((item) => {
+    
+    // Filter by search term
+    if (searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase()
-      return (
-        item.pair[0].toLowerCase().includes(lowerCaseSearch) ||
-        item.pair[1].toLowerCase().includes(lowerCaseSearch) ||
-        (item.method1 && item.method1.toLowerCase().includes(lowerCaseSearch)) ||
-        (item.method2 && item.method2.toLowerCase().includes(lowerCaseSearch))
-      )
-    })
-  }, [similarComponents, searchTerm])
+      filtered = filtered.filter((item) => {
+        return (
+          item.pair[0].toLowerCase().includes(lowerCaseSearch) ||
+          item.pair[1].toLowerCase().includes(lowerCaseSearch) ||
+          (item.method1 && item.method1.toLowerCase().includes(lowerCaseSearch)) ||
+          (item.method2 && item.method2.toLowerCase().includes(lowerCaseSearch))
+        )
+      })
+    }
+    
+    return filtered
+  }, [similarComponents, searchTerm, showArchived, archivedItems])
 
   const handleCompare = (item: {
     component1: ComponentData
@@ -722,6 +815,9 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
             </h2>
             <p className="text-muted-foreground mt-1">
               {filteredComponents.length} pairs found above {threshold}% similarity
+              {archivedItems.length > 0 && !showArchived && (
+                <span className="ml-2 text-sm">({archivedItems.length} archived)</span>
+              )}
             </p>
           </div>
           <div className="relative w-full sm:w-1/3">
@@ -735,8 +831,12 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
           </div>
         </div>
       <div className="space-y-4">
-        {filteredComponents.map((item, index) => (
+        {filteredComponents.map((item, index) => {
+          const archived = isItemArchived(item)
+          return (
           <Card key={index} className={`transition-all hover:shadow-lg border-l-4 ${
+            archived ? 'opacity-60' : ''
+          } ${
             item.similarity >= 90 ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
             item.similarity >= 75 ? 'border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20' :
             item.similarity >= 60 ? 'border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20' :
@@ -855,8 +955,34 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
                   </p>
                 </div>
 
-                {/* Compare Button */}
-                <div className="flex justify-end pt-2">
+                {/* Actions */}
+                <div className="flex justify-between items-center pt-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isItemArchived(item) ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => toggleArchive(item)}
+                        className="gap-2"
+                      >
+                        {isItemArchived(item) ? (
+                          <>
+                            <ArchiveRestoreIcon className="h-4 w-4" />
+                            Unarchive
+                          </>
+                        ) : (
+                          <>
+                            <ArchiveIcon className="h-4 w-4" />
+                            Archive
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isItemArchived(item) ? "Restore this similarity pair" : "Archive this similarity pair"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -877,7 +1003,8 @@ export function SimilarityList({ threshold, preloadedComponents }: SimilarityLis
               </div>
             </CardContent>
           </Card>
-        ))}
+        )}
+        )}
       </div>
       {selectedPair && <ComparisonModal
         isOpen={comparisonOpen}

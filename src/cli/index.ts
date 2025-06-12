@@ -135,7 +135,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
       // Function declarations at any level
       if (ts.isFunctionDeclaration(node) && node.name) {
         const name = node.name.text;
-        const code = fileContent.substring(node.pos, node.end).trim();
+        const code = node.getText(sourceFile).trim();
         const slug = generateUniqueSlug(name, filePath, rootDir);
         
         // Check if this is a React component (starts with capital letter and returns JSX)
@@ -161,7 +161,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
       // Class declarations at any level
       else if (ts.isClassDeclaration(node) && node.name) {
         const name = node.name.text;
-        const code = fileContent.substring(node.pos, node.end).trim();
+        const code = node.getText(sourceFile).trim();
         const slug = generateUniqueSlug(name, filePath, rootDir);
         
         const item: any = { 
@@ -180,7 +180,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
         node.members.forEach(member => {
           if (ts.isMethodDeclaration(member) && member.name && ts.isIdentifier(member.name)) {
             const methodName = member.name.text;
-            const methodCode = fileContent.substring(member.pos, member.end).trim();
+            const methodCode = member.getText(sourceFile).trim();
             item.methods.push({
               name: methodName,
               code: methodCode,
@@ -207,7 +207,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
             (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
           ) {
             const name = declaration.name.text;
-            const code = fileContent.substring(node.pos, node.end).trim();
+            const code = declaration.parent.parent.getText(sourceFile).trim();
             const slug = generateUniqueSlug(name, filePath, rootDir);
             
             // Check if this is a React component
@@ -244,7 +244,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
       ts.forEachChild(node, child => {
         if ((ts.isFunctionDeclaration(child) || ts.isFunctionExpression(child)) && child.name) {
           const methodName = child.name.text;
-          const methodCode = fileContent.substring(child.pos, child.end).trim();
+          const methodCode = child.getText(sourceFile).trim();
           methods.push({
             name: methodName,
             code: methodCode,
@@ -259,7 +259,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
             if (decl.name && ts.isIdentifier(decl.name) && decl.initializer && 
                 (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
               const methodName = decl.name.text;
-              const methodCode = fileContent.substring(child.pos, child.end).trim();
+              const methodCode = decl.parent.parent.getText(sourceFile).trim();
               methods.push({
                 name: methodName,
                 code: methodCode,
@@ -415,7 +415,7 @@ program
               const enhanced = await aiGenerator.enhanceComponentsWithDescriptions([mockComponent]);
               if (enhanced && enhanced.length > 0) {
                 item.description = enhanced[0].description;
-                console.log(`Generated description for ${item.name}`);
+                console.log(`Generated description for ${item.name} (${item.code?.length || 0} chars)`);
               }
             } catch (error) {
               console.error(`Error generating description for ${item.name}:`, error);

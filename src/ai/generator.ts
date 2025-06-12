@@ -352,30 +352,45 @@ export class AiDescriptionGenerator {
         : "No props.";
 
     let prompt = `
-      Generate a concise, one-sentence description for the following React component.
-      The description should be from the perspective of a developer explaining the component's primary function.
+      You are an expert React developer documenting a component library.
+      Please provide a clear, concise description of the "${
+        component.name
+      }" component below.
+      Focus on:
+      - What the component does
+      - Key features and functionality
+      - Typical use cases
+
+      Keep the description between 2-3 sentences. Be precise and informative.
 
       Component Name: ${component.name || "Unknown"}
       File Path: ${component.filePath || "Unknown"}
       Props: ${propList}
+      Component code:
+      ${component.sourceCode || "No source code available."}
+
+      Format the response in Markdown.
     `;
 
     // First, enhance child components to get their descriptions
     if (component.childComponents && component.childComponents.length > 0) {
-      const childComponentDefinitions = await this.enhanceComponentsWithDescriptions(
-        (component.childComponents as unknown) as ComponentDefinition[]
-      );
+      const childComponentDefinitions =
+        (await this.enhanceComponentsWithDescriptions(
+          (component.childComponents as unknown) as ComponentDefinition[]
+        )) || [];
 
-      const childDescriptions = childComponentDefinitions
-        .map(
-          (child) =>
-            `- ${child.name}: ${
-              child.description || "No description available."
-            }`
-        )
-        .join("\n");
+      if (childComponentDefinitions.length > 0) {
+        const childDescriptions = childComponentDefinitions
+          .map(
+            (child) =>
+              `- ${child.name}: ${
+                child.description || "No description available."
+              }`
+          )
+          .join("\n");
 
-      prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
+        prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
+      }
     }
 
     return this.generateDescription(prompt);
@@ -417,20 +432,23 @@ export class AiDescriptionGenerator {
 
     // First, enhance child components to get their descriptions
     if (component.childComponents && component.childComponents.length > 0) {
-      const childComponentDefinitions = await this.enhanceComponentsWithDescriptions(
-        (component.childComponents as unknown) as ComponentDefinition[]
-      );
+      const childComponentDefinitions =
+        (await this.enhanceComponentsWithDescriptions(
+          (component.childComponents as unknown) as ComponentDefinition[]
+        )) || [];
 
-      const childDescriptions = childComponentDefinitions
-        .map(
-          (child) =>
-            `- ${child.name}: ${
-              child.description || "No description available."
-            }`
-        )
-        .join("\n");
+      if (childComponentDefinitions.length > 0) {
+        const childDescriptions = childComponentDefinitions
+          .map(
+            (child) =>
+              `- ${child.name}: ${
+                child.description || "No description available."
+              }`
+          )
+          .join("\n");
 
-      prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
+        prompt += `\nChild components and their descriptions:\n${childDescriptions}`;
+      }
     }
 
     return this.generateDescription(prompt);

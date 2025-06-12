@@ -5,6 +5,9 @@ import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { CodeBlock } from "./code-block"
 import { TableOfContents } from "./table-of-contents"
+import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
+import rehypeHighlight from "rehype-highlight"
 
 interface ComponentDetailsProps {
   component: any
@@ -40,7 +43,9 @@ export function ComponentDetails({ component }: ComponentDetailsProps) {
             </div>
             <div className="prose dark:prose-invert max-w-none">
               {component.description ? (
-                <p>{component.description}</p>
+                <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                  {component.description}
+                </ReactMarkdown>
               ) : (
                 <p className="text-muted-foreground italic">No description available.</p>
               )}
@@ -59,7 +64,13 @@ export function ComponentDetails({ component }: ComponentDetailsProps) {
                         <Badge variant="outline">{prop.type}</Badge>
                         {prop.required && <Badge>Required</Badge>}
                       </div>
-                      {prop.description && <p className="text-sm text-muted-foreground">{prop.description}</p>}
+                      {prop.description && (
+                        <div className="text-sm text-muted-foreground prose dark:prose-invert max-w-none">
+                          <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                            {prop.description}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                       {prop.defaultValue && (
                         <div className="mt-2">
                           <span className="text-sm font-medium">Default:</span>{" "}
@@ -80,7 +91,13 @@ export function ComponentDetails({ component }: ComponentDetailsProps) {
                 {component.methods.map((method: any, index: number) => (
                   <div key={index} className="space-y-2">
                     <h3 id={`method-${method.name}`} className="text-xl font-semibold">{method.name}</h3>
-                    {method.description && <p className="text-muted-foreground">{method.description}</p>}
+                    {method.description && (
+                      <div className="text-muted-foreground prose dark:prose-invert max-w-none">
+                        <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                          {method.description}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                     
                     {method.params && method.params.length > 0 && (
                       <div className="mt-2">
@@ -89,7 +106,14 @@ export function ComponentDetails({ component }: ComponentDetailsProps) {
                           {method.params.map((param: any, paramIndex: number) => (
                             <li key={paramIndex}>
                               <code>{param.name}</code>: <span className="text-sm">{param.type}</span>
-                              {param.description && <span className="text-muted-foreground"> - {param.description}</span>}
+                              {param.description && (
+                                <div className="text-muted-foreground inline-block ml-1 prose dark:prose-invert max-w-none">
+                                  -&nbsp;
+                                  <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                                    {param.description}
+                                  </ReactMarkdown>
+                                </div>
+                              )}
                             </li>
                           ))}
                         </ul>

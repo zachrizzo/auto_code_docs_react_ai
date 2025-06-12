@@ -178,8 +178,8 @@ async function getChatService() {
     // Load the saved vector database FIRST
     const savedVectorDb = await loadVectorDatabase();
     if (!savedVectorDb || savedVectorDb.length === 0) {
-      console.error("ERROR: No saved vector database found. Documentation needs to be regenerated.");
-      throw new Error("Vector database not found. Please regenerate documentation.");
+      console.warn("WARNING: No saved vector database found. Chat will work but without vector search.");
+      // Don't throw error, just continue with empty database
     }
     
     const components = await getComponentDefinitions();
@@ -213,19 +213,25 @@ async function getChatService() {
     // Create service but skip initialization since we'll import the vector DB
     chatService = new CodebaseChatService(components, config);
     
-    // Import the saved vector database immediately
-    console.log(`Importing saved vector database with ${savedVectorDb.length} entries...`);
-    chatService.vectorService.importVectorDatabase(JSON.stringify(savedVectorDb));
+    // Import the saved vector database immediately (if available)
+    if (savedVectorDb && savedVectorDb.length > 0) {
+      console.log(`Importing saved vector database with ${savedVectorDb.length} entries...`);
+      chatService.vectorService.importVectorDatabase(JSON.stringify(savedVectorDb));
+    } else {
+      console.log("No vector database to import - chat will work without similarity search");
+    }
     
     // Verify the import worked
     const vectorDbString = chatService.vectorService.exportVectorDatabase();
     const importedDb = JSON.parse(vectorDbString);
     console.log(`Vector database after import: ${importedDb.length} entries`);
     
-    // Verify database integrity
-    const isValid = chatService.verifyVectorDatabase();
-    if (!isValid) {
-      console.error("WARNING: Vector database contains invalid entries!");
+    // Verify database integrity (only if we have data)
+    if (importedDb.length > 0) {
+      const isValid = chatService.verifyVectorDatabase();
+      if (!isValid) {
+        console.error("WARNING: Vector database contains invalid entries!");
+      }
     }
     
     // Test Ollama connectivity
@@ -267,12 +273,8 @@ export async function POST(request: NextRequest) {
     console.log(`Vector database status: ${vectorDb.length} entries loaded`);
     
     if (vectorDb.length === 0) {
-      console.error("ERROR: Vector database is empty in API route!");
-      return NextResponse.json({ 
-        error: "Vector database not loaded. Please regenerate documentation.",
-        response: "I'm sorry, but the documentation database is not loaded. Please regenerate the documentation using 'code-y generate' command.",
-        searchResults: []
-      }, { status: 503 });
+      console.warn("WARNING: Vector database is empty - similarity search disabled");
+      // Don't return error, just log warning and continue
     }
     
     // Use the chat service directly - it handles vector search internally

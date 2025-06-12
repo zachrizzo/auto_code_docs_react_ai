@@ -1,5 +1,5 @@
 {
-  "name": "code-y",
+  "name": "@zachrizzo/code-y",
   "version": "0.1.0",
   "description": "Recursively generate documentation for React components with AI-powered descriptions",
   "main": "dist/index.js",
@@ -27,7 +27,7 @@
   "keywords": [
     "react",
     "documentation",
-    "ai", 
+    "ai",
     "generator",
     "cli"
   ],

@@ -6,7 +6,8 @@ import { Slider } from "../../components/ui/slider"
 import { SimilarityList } from "../../components/similarity-list"
 import { Skeleton } from "../../components/ui/skeleton"
 import { Badge } from "../../components/ui/badge"
-import { InfoIcon, TrendingUpIcon, FilterIcon } from "lucide-react"
+import { Button } from "../../components/ui/button"
+import { InfoIcon, TrendingUpIcon, FilterIcon, ArchiveIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip"
 
 // Define types to match with SimilarityList component
@@ -44,6 +45,8 @@ export default function SimilarityPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [componentsData, setComponentsData] = useState<ComponentData[]>([])
+  const [showArchived, setShowArchived] = useState(false)
+  const [archivedCount, setArchivedCount] = useState(0)
 
   // Add debug code to verify the data files are accessible
   useEffect(() => {
@@ -251,6 +254,29 @@ export default function SimilarityPage() {
                       <span>95%</span>
                     </div>
                   </div>
+                  
+                  <div className="border-t pt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium">Archive Options</label>
+                    </div>
+                    <Button
+                      variant={showArchived ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => setShowArchived(!showArchived)}
+                      className="w-full gap-2"
+                    >
+                      <ArchiveIcon className="h-4 w-4" />
+                      {showArchived ? "Hide Archived" : "Show Archived"}
+                      {archivedCount > 0 && !showArchived && (
+                        <Badge variant="secondary" className="ml-auto">
+                          {archivedCount}
+                        </Badge>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Archive items you don't need to review
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -260,6 +286,10 @@ export default function SimilarityPage() {
             <SimilarityList
               threshold={threshold[0]}
               preloadedComponents={componentsData}
+              showArchived={showArchived}
+              onShowArchivedChange={setShowArchived}
+              archivedCount={archivedCount}
+              onArchivedCountChange={setArchivedCount}
             />
           </div>
         </div>

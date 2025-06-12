@@ -8,6 +8,10 @@ import { CodeBlock } from "@/components/code-block";
 import { Badge } from "@/components/ui/badge";
 import { CodeRelationships } from "@/components/code-relationships";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeHighlight from 'rehype-highlight';
+import { motion, AnimatePresence } from "framer-motion"
 
 interface PropDefinition {
   name: string;
@@ -228,21 +232,31 @@ export default function ComponentClient({ slug }: { slug: string }) {
           </Button>
         </div>
       </div>
-      {description && (
-        <Card className="mb-10">
-          <CardHeader>
-            <CardTitle className="text-violet-600 dark:text-violet-400">AI Description</CardTitle>
-            {modelUsed && (
-              <CardDescription>
-                Generated with {modelUsed}
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg">{description}</p>
-          </CardContent>
-        </Card>
-      )}
+      <AnimatePresence>
+        {description && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+            <Card className="mt-4 bg-white/5 border-violet-500/30">
+              <CardHeader>
+                <CardTitle className="text-violet-600 dark:text-violet-400">AI Description</CardTitle>
+                {modelUsed && (
+                  <CardDescription>
+                    Generated with {modelUsed}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="prose dark:prose-invert max-w-none">
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                  >
+                    {description}
+                  </ReactMarkdown>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {generationError && !description && (
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl shadow-sm mb-10 border border-red-100 dark:border-red-900/30">
@@ -323,15 +337,19 @@ export default function ComponentClient({ slug }: { slug: string }) {
             <div className="md:col-span-1">
               <Card>
                 {componentData.methods && componentData.methods.length > 0 ? (
-                  <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {componentData.methods.map((method) => (
+                  <ul className="space-y-4">
+                    {componentData.methods.map((method, index) => (
                       <li
                         key={method.name}
                         className={`p-3 cursor-pointer ${selectedMethod === method.name ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                         onClick={() => setSelectedMethod(method.name)}
                       >
                         <a href={`#${method.name}`} className="font-medium">{method.name}</a>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{method.description}</p>
+                        <div className="text-sm text-muted-foreground line-clamp-2 prose dark:prose-invert max-w-none">
+                          <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                            {method.description || ""}
+                          </ReactMarkdown>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -343,29 +361,52 @@ export default function ComponentClient({ slug }: { slug: string }) {
               </Card>
             </div>
             <div className="md:col-span-2">
-              {selectedMethodData ? (
-                <div className="space-y-4">
-                  {selectedMethodData.description && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Description</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-muted-foreground">{selectedMethodData.description}</p>
-                      </CardContent>
-                    </Card>
-                  )}
+              {selectedMethodData && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-6">
                   <Card>
-                    <CodeBlock
-                      code={selectedMethodData.code || ''}
-                      language="typescript"
-                    />
+                    <CardHeader>
+                      <CardTitle className="text-lg">{selectedMethodData.name}</CardTitle>
+                      <CardDescription>
+                        <div className="text-muted-foreground pt-2 prose dark:prose-invert max-w-none">
+                          <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]}>
+                            {selectedMethodData.description || ""}
+                          </ReactMarkdown>
+                        </div>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {selectedMethodData.params && selectedMethodData.params.length > 0 && (
+                        <div className="mb-4">
+                          <h5 className="font-medium mb-2">Parameters</h5>
+                          <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                            <table className="w-full">
+                              <thead className="bg-slate-50 dark:bg-slate-800/50">
+                                <tr>
+                                  <th className="p-3 text-left font-medium">Name</th>
+                                  <th className="p-3 text-left font-medium">Type</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedMethodData.params.map((param) => (
+                                  <tr key={param.name} className="border-t border-slate-100 dark:border-slate-800">
+                                    <td className="p-3 font-mono text-sm">{param.name}</td>
+                                    <td className="p-3 font-mono text-sm text-violet-500">{param.type}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                      <Card>
+                        <CodeBlock
+                          code={selectedMethodData.code || ''}
+                          language="typescript"
+                        />
+                      </Card>
+                    </CardContent>
                   </Card>
-                </div>
-              ) : (
-                <Card className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Select a method to view its details</p>
-                </Card>
+                </motion.div>
               )}
             </div>
           </div>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "../lib/utils"
 import { Button } from "./ui/button"
 import { ScrollArea } from "./ui/scroll-area"
-import { LayoutDashboard, GitCompare, Component, Code, FileCode, Layers, Network, BookOpen } from "lucide-react"
+import { LayoutDashboard, GitCompare, Component, Code, FileCode, Layers, Network, BookOpen, Workflow } from "lucide-react"
 
 export function SidebarWrapper() {
     const pathname = usePathname() || ""
@@ -61,8 +61,8 @@ export function SidebarWrapper() {
                             )}
                         >
                             <Link href="/structure">
-                                <Layers className="h-4 w-4" />
-                                Code Structure
+                                <Workflow className="h-4 w-4" />
+                                Architecture
                             </Link>
                         </Button>
                         <Button
