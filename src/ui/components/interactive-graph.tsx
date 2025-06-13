@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Slider } from './ui/slider'
-import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle, Focus, Info, Move, Zap } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle, Focus, Info, Move, Zap, Search } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
@@ -2661,77 +2661,189 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       ref={containerRef} 
       className="w-full h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-xl"
     >
-      {/* Compact Controls Header */}
-      <CardHeader className="flex flex-col gap-3 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 z-10 shadow-sm">
-        {/* Primary Controls Row */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Search Section */}
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">🔍</div>
-            <Input
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-32 h-8 text-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
-            />
+      {/* Modern Controls Header */}
+      <CardHeader className="p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 z-10">
+        {/* Main Control Bar */}
+        <div className="flex items-center justify-between w-full p-4 pb-3">
+          {/* Left Section - Search & Layout */}
+          <div className="flex items-center gap-3 flex-1">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search components..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-64 h-10 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg text-sm"
+              />
+            </div>
+            
+            {/* Layout Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Layout:</span>
+              <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
+                <SelectTrigger className="w-32 h-10 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="force">Force</SelectItem>
+                  <SelectItem value="hierarchical">Hierarchy</SelectItem>
+                  <SelectItem value="circular">Circular</SelectItem>
+                  <SelectItem value="grouped">Grouped</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Auto Layout Button */}
+            <Button 
+              variant="outline" 
+              size="default"
+              onClick={autoLayout}
+              disabled={isAutoLayouting}
+              className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Shuffle className={`h-4 w-4 mr-2 ${isAutoLayouting ? 'animate-spin' : ''}`} />
+              {isAutoLayouting ? 'Organizing...' : 'Auto Layout'}
+            </Button>
           </div>
-          
-          {/* Layout Section */}
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📐</div>
-            <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
-              <SelectTrigger className="w-32 h-8 text-sm border-slate-300 dark:border-slate-600">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="force">Force</SelectItem>
-                <SelectItem value="hierarchical">Hierarchy</SelectItem>
-                <SelectItem value="circular">Circular</SelectItem>
-                <SelectItem value="grouped">Grouped</SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Right Section - View Controls */}
+          <div className="flex items-center gap-4">
+            {/* View Toggles */}
+            <div className="flex items-center gap-3 px-3 py-2 bg-slate-50/70 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-600/50">
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showLabels}
+                  onChange={(e) => setShowLabels(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                Labels
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showConnectionsOnly}
+                  onChange={(e) => setShowConnectionsOnly(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  disabled={!selectedNode}
+                />
+                Connected
+              </label>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 px-2 py-1 bg-slate-50/70 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-600/50">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
+                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                title="Zoom In (+)"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <div className="px-3 text-sm font-mono text-slate-600 dark:text-slate-400 min-w-[3rem] text-center">
+                {Math.round(scale * 100)}%
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
+                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                title="Zoom Out (-)"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={fitToView}
+                className="h-8 px-3 hover:bg-green-100 dark:hover:bg-green-900/30 text-sm rounded-md"
+                title="Fit to View (F)"
+              >
+                Fit
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={resetView}
+                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                title="Reset View (R)"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          
-          {/* Auto Layout Button */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={autoLayout}
-            disabled={isAutoLayouting}
-            className="h-8 px-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 text-xs"
-          >
-            <Shuffle className={`h-3 w-3 mr-1 ${isAutoLayouting ? 'animate-spin' : ''}`} />
-            {isAutoLayouting ? 'Organizing...' : 'Auto Layout'}
-          </Button>
         </div>
-        
-        {/* Secondary Controls Row */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* View Options */}
-          <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showLabels}
-                onChange={(e) => setShowLabels(e.target.checked)}
-                className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              Labels
-            </label>
-            <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showConnectionsOnly}
-                onChange={(e) => setShowConnectionsOnly(e.target.checked)}
-                className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                disabled={!selectedNode}
-              />
-              Connected
-            </label>
+
+        {/* Secondary Control Bar */}
+        <div className="flex items-center justify-between w-full px-4 pb-3 border-t border-slate-100/50 dark:border-slate-700/50 pt-3">
+          {/* Left Section - Display Options */}
+          <div className="flex items-center gap-4">
+            {/* Edge Style */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Style:</span>
+              <Select value={edgeStyle} onValueChange={(value: any) => setEdgeStyle(value)}>
+                <SelectTrigger className="w-28 h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="straight">Straight</SelectItem>
+                  <SelectItem value="curved">Curved</SelectItem>
+                  <SelectItem value="step">Step</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Grouping Options */}
+            {layoutMode === 'grouped' && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Group:</span>
+                <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
+                  <SelectTrigger className="w-24 h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="file">File</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showGroupContainers}
+                    onChange={(e) => setShowGroupContainers(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  Boxes
+                </label>
+              </div>
+            )}
+            
+            {/* Spacing Control */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Spacing:</span>
+              <div className="flex items-center gap-3 w-32">
+                <Slider
+                  value={[nodeSpacing]}
+                  onValueChange={(value) => setNodeSpacing(value[0])}
+                  min={150}
+                  max={500}
+                  step={20}
+                  className="flex-1"
+                />
+                <span className="text-sm text-slate-600 dark:text-slate-400 min-w-[3rem] font-mono text-right">{nodeSpacing}</span>
+              </div>
+            </div>
+
+            {/* Focus Mode Indicator */}
             {groupFocusMode && focusedGroup && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-300 dark:border-amber-700">
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-700/50">
                 <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
                   Focused: {focusedGroup}
                 </span>
                 <button
@@ -2739,7 +2851,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                     setGroupFocusMode(false)
                     setFocusedGroup(null)
                   }}
-                  className="ml-1 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
+                  className="ml-1 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-bold"
                   title="Clear group focus"
                 >
                   ×
@@ -2747,136 +2859,34 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
               </div>
             )}
           </div>
-          
-          {/* Line Style Control */}
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📏</div>
-            <Select value={edgeStyle} onValueChange={(value: any) => setEdgeStyle(value)}>
-              <SelectTrigger className="w-20 h-8 text-xs border-slate-300 dark:border-slate-600">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="straight">Straight</SelectItem>
-                <SelectItem value="curved">Curved</SelectItem>
-                <SelectItem value="step">Step</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Grouping Options */}
-          {layoutMode === 'grouped' && (
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-              <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📦</div>
-              <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
-                <SelectTrigger className="w-20 h-8 text-xs border-slate-300 dark:border-slate-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="file">File</SelectItem>
-                  <SelectItem value="parent">Parent</SelectItem>
-                </SelectContent>
-              </Select>
-              <label className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showGroupContainers}
-                  onChange={(e) => setShowGroupContainers(e.target.checked)}
-                  className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                />
-                Boxes
-              </label>
+
+          {/* Right Section - Relationship Filters */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters:
+            </span>
+            <div className="flex gap-2">
+              {relationshipTypes.map(type => (
+                <Badge
+                  key={type}
+                  variant={filteredTypes.has(type) ? "outline" : "default"}
+                  className={`cursor-pointer transition-all duration-200 hover:scale-105 px-3 py-1 text-sm font-medium rounded-full ${
+                    filteredTypes.has(type) ? 'opacity-50 grayscale bg-slate-100 dark:bg-slate-800' : 'shadow-sm hover:shadow-md'
+                  }`}
+                  onClick={() => toggleFilter(type)}
+                  style={{
+                    backgroundColor: filteredTypes.has(type) ? 'transparent' : getEdgeColor(type, 0.15),
+                    borderColor: getEdgeColor(type, 0.8),
+                    color: filteredTypes.has(type) ? 'currentColor' : getEdgeColor(type, 1)
+                  }}
+                >
+                  <span className="inline-block w-2 h-2 rounded-full mr-2" 
+                        style={{ backgroundColor: getEdgeColor(type, 1) }}></span>
+                  {type}
+                </Badge>
+              ))}
             </div>
-          )}
-          
-          {/* Spacing Control */}
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <div className="text-xs font-medium text-slate-700 dark:text-slate-300">📏</div>
-            <div className="flex items-center gap-2 w-24">
-              <Slider
-                value={[nodeSpacing]}
-                onValueChange={(value) => setNodeSpacing(value[0])}
-                min={150}
-                max={500}
-                step={20}
-                className="flex-1"
-              />
-              <span className="text-xs text-slate-600 dark:text-slate-400 min-w-[2.5rem] font-mono text-center">{nodeSpacing}</span>
-            </div>
-          </div>
-          
-          {/* Zoom Controls */}
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded p-1 border border-slate-300 dark:border-slate-600">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
-                className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                title="Zoom In (+)"
-              >
-                <ZoomIn className="h-3 w-3" />
-              </Button>
-              <div className="px-2 text-xs font-mono text-slate-600 dark:text-slate-400 min-w-[2.5rem] text-center">
-                {Math.round(scale * 100)}%
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
-                className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                title="Zoom Out (-)"
-              >
-                <ZoomOut className="h-3 w-3" />
-              </Button>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={fitToView}
-              className="h-6 px-2 hover:bg-green-100 dark:hover:bg-green-900/30 text-xs"
-              title="Fit to View (F)"
-            >
-              Fit
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={resetView}
-              className="h-6 px-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-xs"
-              title="Reset View (R)"
-            >
-              <RotateCcw className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-        
-        {/* Relationship Filters Row */}
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 rounded-md p-2 border border-slate-200 dark:border-slate-700">
-          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <Filter className="h-3 w-3" />
-            Filters:
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {relationshipTypes.map(type => (
-              <Badge
-                key={type}
-                variant={filteredTypes.has(type) ? "outline" : "default"}
-                className={`cursor-pointer transition-all duration-200 hover:scale-105 px-2 py-1 text-xs font-medium ${
-                  filteredTypes.has(type) ? 'opacity-50 grayscale bg-slate-100 dark:bg-slate-800' : 'shadow-sm hover:shadow-md'
-                }`}
-                onClick={() => toggleFilter(type)}
-                style={{
-                  backgroundColor: filteredTypes.has(type) ? 'transparent' : getEdgeColor(type, 0.15),
-                  borderColor: getEdgeColor(type, 0.8),
-                  color: filteredTypes.has(type) ? 'currentColor' : getEdgeColor(type, 1)
-                }}
-              >
-                <span className="inline-block w-2 h-2 rounded-full mr-1" 
-                      style={{ backgroundColor: getEdgeColor(type, 1) }}></span>
-                {type}
-              </Badge>
-            ))}
           </div>
         </div>
       </CardHeader>
