@@ -583,6 +583,8 @@ export async function generateDocumentation(
     name: component.name,
     slug: component.slug,
     filePath: component.filePath,
+    kind: component.type || component.kind || "component",
+    methods: component.methods
   }));
 
   fs.writeJSONSync(path.join(outputDir, "component-index.json"), componentIndex, {

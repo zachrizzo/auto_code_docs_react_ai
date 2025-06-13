@@ -1,6 +1,7 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
+import React from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
@@ -81,6 +82,9 @@ export function CodePreviewModal({
               📁 {nodeCodeData.filePath}
             </div>
           )}
+          <DialogDescription className="sr-only">
+            Full code preview and details for the selected component
+          </DialogDescription>
         </DialogHeader>
 
         {/* Scrollable Content */}

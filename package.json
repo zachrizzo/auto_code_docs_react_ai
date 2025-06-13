@@ -1,6 +1,6 @@
 {
   "name": "@zachrizzo/code-y",
-  "version": "0.1.0",
+  "version": "0.1.7",
   "description": "Recursively generate documentation for React components with AI-powered descriptions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +22,7 @@
     "dev": "ts-node src/cli/index.ts",
     "test": "jest",
     "prepublishOnly": "npm run build",
-    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y generate --generate-descriptions"
+    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y generate"
   },
   "keywords": [
     "react",

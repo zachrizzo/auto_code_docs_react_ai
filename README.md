@@ -159,10 +159,10 @@ Code-y is optimized for local AI processing with Ollama.
 
 1.  **[Install Ollama](https://ollama.ai/download)** on your machine.
 2.  Pull the necessary models. The defaults are a great starting point:
-    ```bash
-    ollama pull gemma3:4b
-    ollama pull nomic-embed-text:latest
-    ```
+   ```bash
+   ollama pull gemma3:4b
+   ollama pull nomic-embed-text:latest
+   ```
 3.  Ensure the Ollama server is running before you use Code-y.
 4.  Update your `codey.config.js` if you use different models or a different server address.
 
@@ -172,14 +172,14 @@ You can also use OpenAI for description generation.
 
 1.  Get an API key from the [OpenAI Platform](https://platform.openai.com).
 2.  Set it in your `codey.config.js` or as an environment variable:
-    ```javascript
-    // codey.config.js
-    module.exports = {
-      aiProvider: 'openai',
-      openaiApiKey: 'your-api-key-here',
-      // ...
-    };
-    ```
+   ```javascript
+   // codey.config.js
+   module.exports = {
+     aiProvider: 'openai',
+     openaiApiKey: 'your-api-key-here',
+     // ...
+   };
+   ```
     *Note: The embedding generation still uses Ollama locally for performance and cost-efficiency.*
 
 ## License

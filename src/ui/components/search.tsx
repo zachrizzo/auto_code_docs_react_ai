@@ -75,59 +75,19 @@ export function Search() {
     async function fetchSearchData() {
       try {
         setLoading(true)
-        const res = await fetch('/docs-data/component-index.json')
+        const res = await fetch('/api/search')
         if (!res.ok) {
-          console.error(`Failed to fetch component index: ${res.status}`)
+          const errorData = await res.json()
+          console.error(`Failed to fetch search data: ${res.status}`, errorData)
           setLoading(false)
           return
         }
-        const indexData = await res.json()
-
-        const allItems: SearchItem[] = []
-        await Promise.all(
-          indexData.map(async (comp: { name: string; slug: string; filePath?: string }) => {
-            try {
-              const detailRes = await fetch(`/docs-data/${comp.slug}.json`)
-              if (!detailRes.ok) {
-                allItems.push({ name: comp.name, type: 'component', slug: comp.slug, filePath: comp.filePath, description: '' })
-                return
-              }
-              const detailData: ComponentData = await detailRes.json()
-              allItems.push({
-                name: detailData.name,
-                type: (detailData.type as SearchItem['type']) || 'component',
-                slug: detailData.slug,
-                filePath: detailData.filePath,
-                description: detailData.description
-              })
-              if (detailData.methods && detailData.methods.length > 0) {
-                detailData.methods.forEach(method => {
-                  if (method.name !== comp.name) {
-                    allItems.push({
-                      name: method.name,
-                      type: 'method',
-                      slug: `${comp.slug}#${method.name.toLowerCase().replace(/\s/g, '-')}`,
-                      parentName: comp.name,
-                      filePath: detailData.filePath,
-                      description: method.description,
-                    })
-                  }
-                })
-              }
-            } catch (error) {
-              console.error(`Error fetching details for ${comp.name}:`, error)
-            }
-          })
-        )
-
-        const uniqueItems = allItems.filter((item, index, self) =>
-          index === self.findIndex((t) => (t.slug === item.slug && t.name === item.name))
-        );
-
-        setSearchItems(uniqueItems)
+        
+        const { items } = await res.json()
+        setSearchItems(items)
         setLoading(false)
       } catch (error) {
-        console.error('Error loading search data:', error)
+        console.error('Error fetching search data:', error)
         setLoading(false)
       }
     }

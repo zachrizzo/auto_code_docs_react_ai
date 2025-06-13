@@ -53,28 +53,49 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         }
         const indexData = await indexRes.json()
 
-        // Create basic components from index data
-        const componentsData: CodeEntity[] = indexData.map((comp: { name: string; slug: string; filePath?: string }) => {
-          let entityType = "component"
-          const name = comp.name.toLowerCase()
-          if (name.includes('use') && name.length > 3 && comp.name[3] === comp.name[3].toUpperCase()) entityType = "function"
-          else if (name.match(/^[a-z][a-z0-9]*[A-Z]/) || ['to', 'get', 'set', 'create', 'update', 'delete', 'fetch', 'handle', 'copy', 'format', 'parse', 'validate'].some(p => name.includes(p))) entityType = "function"
-          if (['service', 'provider', 'manager', 'controller', 'handler'].some(p => name.includes(p)) && !name.includes('handle')) entityType = "class"
-          if (comp.filePath) {
-            const filePath = comp.filePath.toLowerCase()
-            if (['/lib/', '/utils/', '/helpers/', '/functions/'].some(p => filePath.includes(p))) entityType = "function"
-            else if (['/services/', '/classes/', '/models/'].some(p => filePath.includes(p))) entityType = "class"
+        // Create entities from index data using actual kind field
+        const allEntities: CodeEntity[] = []
+        
+        indexData.forEach((entity: { name: string; slug: string; kind: string; filePath?: string; methods?: any[] }) => {
+          // Add the main entity
+          allEntities.push({ 
+            id: entity.slug, 
+            name: entity.name, 
+            type: entity.kind || "component", 
+            filePath: entity.filePath || `src/components/${entity.name}`, 
+            methods: entity.methods || [], 
+            props: [] 
+          })
+          
+          // Add methods as separate entities if they exist
+          if (entity.methods && entity.methods.length > 0) {
+            entity.methods.forEach((method: any) => {
+              allEntities.push({
+                id: `${entity.slug}_${method.name}`,
+                name: method.name,
+                type: "method",
+                filePath: entity.filePath,
+                methods: [],
+                props: []
+              })
+            })
           }
-          return { id: comp.slug, name: comp.name, type: entityType, filePath: comp.filePath || `src/components/${comp.name}`, methods: [], props: [] }
         })
+        
+        const componentsData = allEntities
 
-        // Load all component details to get complete relationships
+        // Load all component details to get complete relationships (skip methods since they don't have separate files)
         const detailedData = await Promise.all(
           componentsData.map(async (comp) => {
+            // Skip method entities - they don't have separate JSON files
+            if (comp.type === "method") {
+              return null
+            }
+            
             try {
               const res = await fetch(`/docs-data/${comp.id}.json`)
               if (!res.ok) {
-                console.warn(`Failed to load details for ${comp.id}: ${res.statusText}`)
+                console.warn(`Failed to load details for ${comp.id}: ${res.status} ${res.statusText}`)
                 return null
               }
               return await res.json()
@@ -112,9 +133,29 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
         // Extract relationships from the loaded component data
         const relationshipsData: Relationship[] = []
+        
+        // First, add parent-child relationships for methods
+        indexData.forEach((entity: { slug: string; methods?: any[] }) => {
+          if (entity.methods && entity.methods.length > 0) {
+            entity.methods.forEach((method: any) => {
+              relationshipsData.push({
+                source: entity.slug,
+                target: `${entity.slug}_${method.name}`,
+                type: "contains",
+                weight: 1,
+                context: "method"
+              })
+            })
+          }
+        })
+        
         detailedData.forEach((data, index) => {
           if (!data) return
           const comp = componentsData[index]
+          
+          // Skip method entities for detailed data processing (they don't have their own files)
+          if (comp.type === "method") return
+          
           if (data.relationships && Array.isArray(data.relationships)) {
             data.relationships.forEach((rel: any) => {
               let sourceId = rel.source
@@ -154,7 +195,11 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         )
 
         console.log('Initialized with data from documentation index')
-        console.log('Components loaded:', componentsData.length)
+        console.log('Total entities loaded:', componentsData.length)
+        console.log('- Components:', componentsData.filter(c => c.type === 'component').length)
+        console.log('- Functions:', componentsData.filter(c => c.type === 'function').length)
+        console.log('- Classes:', componentsData.filter(c => c.type === 'class').length)
+        console.log('- Methods:', componentsData.filter(c => c.type === 'method').length)
         console.log('Relationships loaded:', uniqueRelationships.length)
         
         setComponents(componentsData)
@@ -176,6 +221,10 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   const loadComponentDetails = async (componentId: string) => {
     try {
       const res = await fetch(`/docs-data/${componentId}.json`)
+      if (!res.ok) {
+        console.warn(`Failed to load details for ${componentId}: ${res.status} ${res.statusText}`)
+        return null
+      }
       const data = await res.json()
       
       // Update the component in state with full details
@@ -229,6 +278,34 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
   // Fetch code data for a specific node
   const fetchNodeCodeData = async (nodeId: string) => {
     try {
+      const entity = components.find(c => c.id === nodeId)
+      if (!entity) {
+        setNodeCodeData(null)
+        return
+      }
+      
+      // For methods, get the parent component's data and extract the specific method
+      if (entity.type === "method") {
+        const parentId = nodeId.substring(0, nodeId.lastIndexOf('_'))
+        const methodName = nodeId.substring(nodeId.lastIndexOf('_') + 1)
+        const parentData = await loadComponentDetails(parentId)
+        
+        if (parentData && parentData.methods) {
+          const methodData = parentData.methods.find((m: any) => m.name === methodName)
+          if (methodData) {
+            setNodeCodeData({
+              ...methodData,
+              type: "method",
+              filePath: entity.filePath
+            })
+            return
+          }
+        }
+        setNodeCodeData(null)
+        return
+      }
+      
+      // For other entities, load normally
       const data = await loadComponentDetails(nodeId)
       setNodeCodeData(data)
     } catch (error) {
@@ -357,7 +434,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
   // Prepare graph data
   const { graphNodes, graphEdges } = useMemo(() => {
-    if (components.length === 0 || filteredRelationships.length === 0) {
+    if (components.length === 0) {
       return { graphNodes: [], graphEdges: [] }
     }
 
@@ -390,26 +467,32 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
       involvedEntityIds.add(rel.target)
     })
 
-    // Create nodes - only include components that actually exist
-    const nodes = components
-      .filter(comp => involvedEntityIds.has(comp.id))
-      .map(comp => {
-        const connections = workingRelationships.filter(
-          rel => rel.source === comp.id || rel.target === comp.id
-        ).length
+    // Create nodes - include ALL components when showing all relationships, 
+    // or only connected ones when filtering
+    let nodesToShow = components
+    if (entityId || (focusMode && selectedNodeId)) {
+      // When filtering by entity or in focus mode, only show connected nodes
+      nodesToShow = components.filter(comp => involvedEntityIds.has(comp.id))
+    }
+    // Otherwise show all components to ensure functions and other entities are visible
+    
+    const nodes = nodesToShow.map(comp => {
+      const connections = workingRelationships.filter(
+        rel => rel.source === comp.id || rel.target === comp.id
+      ).length
 
-        return {
-          id: comp.id,
-          name: comp.name,
-          type: comp.type as 'component' | 'class' | 'function' | 'method',
-          x: Math.random() * 1200 + 300,
-          y: Math.random() * 800 + 200,
-          radius: Math.max(25, Math.min(45, 25 + connections * 2)),
-          color: '',
-          connections,
-          filePath: comp.filePath
-        }
-      })
+      return {
+        id: comp.id,
+        name: comp.name,
+        type: comp.type as 'component' | 'class' | 'function' | 'method',
+        x: Math.random() * 1200 + 300,
+        y: Math.random() * 800 + 200,
+        radius: Math.max(25, Math.min(45, 25 + connections * 2)),
+        color: '',
+        connections,
+        filePath: comp.filePath
+      }
+    })
 
     // Create edges
     const edges = workingRelationships.map(rel => ({
@@ -423,7 +506,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     }))
 
     return { graphNodes: nodes, graphEdges: edges }
-  }, [components, filteredRelationships, focusMode, selectedNodeId])
+  }, [components, filteredRelationships, focusMode, selectedNodeId, entityId])
 
   const getEntityIcon = (type: CodeEntity["type"]) => {
     switch (type) {
@@ -558,21 +641,6 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             <p className="text-muted-foreground text-lg font-medium">No components found</p>
             <p className="text-sm text-slate-500 mt-2">Generate documentation first to analyze your code relationships</p>
           </div>
-        ) : filteredRelationships.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-slate-400 mb-4">
-              <Component className="h-16 w-16 mx-auto" />
-            </div>
-            <p className="text-muted-foreground text-lg font-medium">Components loaded</p>
-            <p className="text-sm text-slate-500 mt-2">
-              {components.length} components available. Relationships are loaded on-demand when you interact with components.
-            </p>
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                💡 Click on components in the graph view or browse the list to explore relationships
-              </p>
-            </div>
-          </div>
         ) : graphView === "graph" ? (
           <div className="h-[85vh] w-full min-h-[700px]">
             <InteractiveGraph
@@ -583,6 +651,23 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               onNodeClick={handleNodeClick}
               onGroupClick={handleGroupClick}
             />
+            {filteredRelationships.length === 0 && !entityId && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  💡 All entities are displayed. Click on any node to explore its relationships.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : filteredRelationships.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-slate-400 mb-4">
+              <Component className="h-16 w-16 mx-auto" />
+            </div>
+            <p className="text-muted-foreground text-lg font-medium">No relationships found</p>
+            <p className="text-sm text-slate-500 mt-2">
+              {components.length} components loaded. Switch to graph view to see all entities.
+            </p>
           </div>
         ) : (
           <div className="space-y-6">

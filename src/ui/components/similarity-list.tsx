@@ -158,84 +158,6 @@ export function SimilarityList({
       setArchivedItems(prev => [...prev, { key, archivedAt: Date.now() }])
     }
   }
-  
-  // Function to generate synthetic similarity data for demonstration purposes
-  function generateSyntheticSimilarityData() {
-    console.log('Generating synthetic similarity data for', components.length, 'components');
-    
-    // Only proceed if we have at least 2 components
-    if (components.length < 2) return;
-    
-    // Create a copy of the components array
-    const updatedComponents = [...components];
-    
-    // For each component, add synthetic similarity warnings
-    for (let i = 0; i < updatedComponents.length; i++) {
-      const component = updatedComponents[i];
-      
-      // Add methods array if it doesn't exist
-      if (!component.methods) {
-        component.methods = [];
-      }
-      
-      // If no methods, create a dummy method
-      if (component.methods.length === 0) {
-        component.methods.push({
-          name: 'render',
-          similarityWarnings: []
-        });
-      }
-      
-      // For each method, find a random other component and create a similarity warning
-      component.methods.forEach(method => {
-        // Initialize similarityWarnings array if it doesn't exist
-        if (!method.similarityWarnings) {
-          method.similarityWarnings = [];
-        }
-        
-        // Find a different component to compare with
-        for (let j = 0; j < updatedComponents.length; j++) {
-          if (i === j) continue; // Skip self
-          
-          const otherComponent = updatedComponents[j];
-          
-          // Generate a random similarity score between 70% and 95%
-          const similarityScore = 70 + Math.floor(Math.random() * 25);
-          
-          // Only add if above threshold
-          if (similarityScore >= threshold) {
-            // Add a similarity warning
-            method.similarityWarnings.push({
-              similarTo: otherComponent.name,
-              score: similarityScore,
-              reason: `Similar implementation pattern to ${otherComponent.name}`,
-              filePath: otherComponent.filePath || `src/components/${otherComponent.name}.tsx`,
-              code: '// Example similar code\nfunction example() {\n  // Similar logic\n}'
-            });
-            
-            // Also add a method-level similarity
-            if (otherComponent.methods && otherComponent.methods.length > 0) {
-              const otherMethod = otherComponent.methods[0];
-              method.similarityWarnings.push({
-                similarTo: `${otherComponent.name}.${otherMethod.name}`,
-                score: similarityScore - 5,
-                reason: `Similar implementation to ${otherMethod.name} in ${otherComponent.name}`,
-                filePath: otherComponent.filePath || `src/components/${otherComponent.name}.tsx`,
-                code: '// Example method-level similar code\nfunction specificMethod() {\n  // Similar logic\n}'
-              });
-            }
-            
-            // Only add one similarity per component pair to avoid too many
-            break;
-          }
-        }
-      });
-    }
-    
-    // Update the components state with the synthetic data
-    setComponents(updatedComponents);
-    console.log('Synthetic similarity data generated successfully');
-  }
 
   // Fetch component data (only if no preloaded data)
   useEffect(() => {
@@ -378,9 +300,10 @@ export function SimilarityList({
       (comp.methods && comp.methods.some(m => m.similarityWarnings && m.similarityWarnings.length > 0))
     );
     
-    // If no similarity data is found, generate synthetic similarity data for demo purposes
     if (!hasSimilarityData) {
-      generateSyntheticSimilarityData();
+      console.log('No similarity data found in components');
+    } else {
+      console.log('Found similarity data, processing real similarities');
     }
 
     const similarPairs: {
@@ -412,8 +335,20 @@ export function SimilarityList({
 
     // Find components with similarity warnings
     components.forEach(component => {
-      // Log each component being processed
-      console.log(`Processing component: ${component.name}, has warnings: ${component.similarityWarnings?.length || 0}, has methods: ${component.methods?.length || 0}`);
+      // Log each component being processed with detailed structure
+      console.log(`Processing component: ${component.name}`);
+      console.log(`  - Component warnings: ${component.similarityWarnings?.length || 0}`);
+      console.log(`  - Methods: ${component.methods?.length || 0}`);
+      if (component.methods && component.methods.length > 0) {
+        component.methods.forEach(method => {
+          console.log(`    - Method ${method.name}: ${method.similarityWarnings?.length || 0} warnings`);
+          if (method.similarityWarnings && method.similarityWarnings.length > 0) {
+            method.similarityWarnings.forEach(w => {
+              console.log(`      - Similar to: ${w.similarTo}, score: ${w.score}`);
+            });
+          }
+        });
+      }
 
       // Check top-level similarity warnings
       if (component.similarityWarnings && component.similarityWarnings.length > 0) {
@@ -440,25 +375,58 @@ export function SimilarityList({
       isMethodLevel: boolean = false,
       methodName?: string
     ) {
-      warnings.forEach(warning => {
+      console.log(`Processing ${warnings.length} warnings for ${component.name}${isMethodLevel ? `.${methodName}` : ''}`);
+      warnings.forEach((warning, index) => {
+        console.log(`  Warning ${index + 1}: similarTo=${warning.similarTo}, score=${warning.score}`);
         // Convert similarity score from 0-1 to percentage if needed
         const similarityPercent = warning.score > 1 // Handles if score is already %, unlikely here
           ? warning.score
           : Math.round(warning.score * 100) // Converts 0-1 score to %
 
         // Skip if below threshold
+        console.log(`    Threshold check: ${similarityPercent}% vs ${threshold}%`);
         if (similarityPercent < threshold) {
+          console.log(`    FILTERED OUT: Below threshold`);
           filteredWarnings++;
           return;
         }
+        console.log(`    PASSED threshold check`);
+
+        console.log(`    Looking for similar component: ${warning.similarTo}`);
 
         // Extract component name and method name from similarTo (format could be ComponentName or ComponentName.methodName)
         const parts = warning.similarTo.split('.')
         const similarCompName = parts[0]
-        const similarMethodName = parts.length > 1 ? parts[1] : undefined
+        let similarMethodName = parts.length > 1 ? parts[1] : undefined
 
         // Find the referenced component
-        const similarComp = components.find(c => c.name === similarCompName)
+        // First try to find by exact component name
+        let similarComp = components.find(c => c.name === similarCompName)
+        
+        // If not found and we have a method name, try to find a component containing that method
+        if (!similarComp && similarMethodName) {
+          similarComp = components.find(c => 
+            c.methods && c.methods.some(m => m.name === similarMethodName)
+          )
+          console.log(`    Found component ${similarComp?.name} containing method ${similarMethodName}`);
+        }
+        
+        // If still not found, try to find any component containing a method with the name we're looking for
+        if (!similarComp) {
+          similarComp = components.find(c => 
+            c.methods && c.methods.some(m => m.name === similarCompName)
+          )
+          if (similarComp) {
+            console.log(`    Found component ${similarComp.name} containing method ${similarCompName}, treating as method-level similarity`);
+            // Update the names to reflect this is actually a method-level similarity
+            similarMethodName = similarCompName;
+            // Keep the original isMethodLevel state but make sure we track this properly
+          } else {
+            console.log(`    Could not find component or method named ${similarCompName}`);
+            console.log(`    Available components: ${components.map(c => c.name).join(', ')}`);
+            console.log(`    Available methods: ${components.flatMap(c => c.methods?.map(m => `${c.name}.${m.name}`) || []).join(', ')}`);
+          }
+        }
 
         // Include both cross-component and same-component method-level similarities
         // Only filter out non-method level similarities within the same component
@@ -470,36 +438,42 @@ export function SimilarityList({
           // Create a unique key for this pair
           // For method level, include method names in the key to avoid duplication but ensure sort order
           // to avoid duplicates like A.method1 -> B.method2 and B.method2 -> A.method1
-          const pairKey = isMethodLevel
+          const actuallyMethodLevel = isMethodLevel || !!similarMethodName
+          const pairKey = actuallyMethodLevel
             ? [
-              `${component.name}.${methodName}`,
-              `${similarComp.name}.${similarMethodName}`
+              `${component.name}.${methodName || 'component'}`,
+              `${similarComp.name}.${similarMethodName || 'component'}`
             ].sort().join('_')
             : [component.name, similarComp.name].sort().join('_')
 
+          console.log(`    Creating pair key: ${pairKey} (${similarityPercent}%)`);
+          
           // Check if we've already seen this pair
           const existingPair = processedPairs.get(pairKey);
           if (existingPair) {
+            console.log(`    Pair already exists with ${existingPair.similarity}%`);
             // If the new similarity is higher, update the entry
             if (similarityPercent > existingPair.similarity) {
+              console.log(`    Updating with higher score: ${similarityPercent}%`);
               processedPairs.set(pairKey, {
                 similarity: similarityPercent,
                 reason: warning.reason, // Update reason as well
                 component1: component, // Keep component references
                 component2: similarComp,
-                isMethodLevel,
+                isMethodLevel: actuallyMethodLevel,
                 method1: methodName,
                 method2: similarMethodName
               });
             }
           } else {
+            console.log(`    Adding new pair with ${similarityPercent}%`);
             // Add the new pair
             processedPairs.set(pairKey, {
               similarity: similarityPercent,
               reason: warning.reason,
               component1: component,
               component2: similarComp,
-              isMethodLevel,
+              isMethodLevel: actuallyMethodLevel,
               method1: methodName,
               method2: similarMethodName
             });
@@ -509,15 +483,19 @@ export function SimilarityList({
     }
 
     // Convert the map values to an array
+    console.log(`Converting ${processedPairs.size} processed pairs to final array`);
     processedPairs.forEach((value, key) => {
+      console.log(`Processing pair: ${key}`);
       // For method level similarities, need to handle the key differently
       let name1, name2;
       if (value.isMethodLevel) {
         const [part1, part2] = key.split('_');
         name1 = part1.split('.')[0];
         name2 = part2.split('.')[0];
+        console.log(`  Method-level pair: ${name1} <-> ${name2}`);
       } else {
         [name1, name2] = key.split('_');
+        console.log(`  Component-level pair: ${name1} <-> ${name2}`);
       }
 
       // Allow pairs from the same component if they are method level similarities
@@ -529,9 +507,11 @@ export function SimilarityList({
       // Find the actual component data objects based on names stored in the key
       const comp1Data = components.find(c => c.name === name1);
       const comp2Data = components.find(c => c.name === name2);
+      console.log(`  Found components: ${comp1Data?.name || 'NOT FOUND'} & ${comp2Data?.name || 'NOT FOUND'}`);
 
       // Ensure both components were found before pushing
       if (comp1Data && comp2Data) {
+        console.log(`  Adding final pair: ${name1} <-> ${name2} (${value.similarity}%)`);
         similarPairs.push({
           pair: [name1, name2],
           similarity: value.similarity,
@@ -546,6 +526,7 @@ export function SimilarityList({
         });
       } else {
         console.warn(`Could not find component data for pair key: ${key}`);
+        console.log(`Available component names: ${components.map(c => c.name).join(', ')}`);
       }
     });
 

@@ -11,126 +11,72 @@ import { InfoIcon, TrendingUpIcon, FilterIcon, ArchiveIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip"
 
 // Define types to match with SimilarityList component
+interface SimilarityWarning {
+  similarTo: string;
+  score: number;
+  reason: string;
+  filePath: string;
+  code: string;
+}
+
+interface Method {
+  name: string;
+  similarityWarnings?: SimilarityWarning[];
+}
+
+interface Entity {
+  methods?: Method[];
+}
+
 interface ComponentData {
   name: string;
   slug: string;
   filePath: string;
   code?: string;
-  methods?: {
-    name: string;
-    similarityWarnings?: Array<{
-      similarTo: string;
-      score: number;
-      reason: string;
-      filePath: string;
-      code: string;
-    }>;
-  }[];
-  entities?: Array<{
-    methods?: Array<{
-      name: string;
-      similarityWarnings?: Array<{
-        similarTo: string;
-        score: number;
-        reason: string;
-        filePath: string;
-        code: string;
-      }>;
-    }>;
-  }>;
+  methods?: Method[];
+  entities?: Entity[];
 }
 
 export default function SimilarityPage() {
   const [threshold, setThreshold] = useState([50])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [componentsData, setComponentsData] = useState<ComponentData[]>([])
+  const [componentsData, setComponentsData] = useState<(ComponentData & { _uniqueId: string })[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [archivedCount, setArchivedCount] = useState(0)
 
-  // Add debug code to verify the data files are accessible
+  // Load similarity data efficiently using the optimized endpoint
   useEffect(() => {
-    async function loadAllData() {
+    async function loadSimilarityData() {
       try {
-        // Debug: Check if we can access the component index
-        const indexRes = await fetch('/docs-data/component-index.json')
-        if (!indexRes.ok) {
-          throw new Error(`Failed to fetch component index: ${indexRes.status}`);
+        // Use the optimized similarity endpoint that only loads components with warnings
+        const res = await fetch(`/api/components/similarity?threshold=${threshold[0]}`)
+        if (!res.ok) {
+          const errorData = await res.json()
+          throw new Error(errorData.message || `Failed to fetch components: ${res.status}`);
         }
 
-        const indexData = await indexRes.json();
-        console.log('Component index data loaded:', indexData);
+        const { components, totalCount, totalProcessed } = await res.json();
+        console.log(`Loaded ${totalCount} components with similarities out of ${totalProcessed} processed`);
 
-        // Load all component data files
-        const allComponentsData = await Promise.all(
-          indexData.map(async (comp: { slug: string }) => {
-            try {
-              const res = await fetch(`/docs-data/${comp.slug}.json`);
-              if (!res.ok) {
-                console.error(`Failed to load ${comp.slug}.json: ${res.status}`);
-                return null;
-              }
-              return await res.json();
-            } catch (err) {
-              console.error(`Error loading ${comp.slug}.json:`, err);
-              return null;
-            }
-          })
-        );
-
-        // Filter out null results
-        const validComponentsData = allComponentsData.filter(Boolean) as ComponentData[];
-        console.log('Valid components loaded:', validComponentsData.length);
-
-        // Process the data to extract and incorporate methods from entities
-        const processedData = validComponentsData.map(data => {
-          if (data.entities && data.entities.length > 0) {
-            // Extract methods from entities
-            if (!data.methods) {
-              data.methods = [];
-            }
-
-            data.entities.forEach((entity) => {
-              if (entity.methods && entity.methods.length > 0) {
-                data.methods!.push(...entity.methods);
-              }
-            });
-          }
-          return data;
-        });
-
-        // Check for methods with similarities
-        let totalMethodsWithSimilarities = 0;
-        processedData.forEach((comp) => {
-          if (comp.methods) {
-            const withSimilarities = comp.methods.filter((m) =>
-              m.similarityWarnings && m.similarityWarnings.length > 0
-            );
-            totalMethodsWithSimilarities += withSimilarities.length;
-          }
-        });
-
-        console.log(`Found ${totalMethodsWithSimilarities} total methods with similarity warnings`);
-
-        // Set components data for the SimilarityList to use
-        // Ensure each component has a unique ID to prevent duplicate key issues
-        const uniqueComponents = processedData.map((comp, index) => ({
+        // Components are already filtered and processed by the API
+        // Just add unique IDs for React keys
+        const uniqueComponents = components.map((comp: ComponentData, index: number) => ({
           ...comp,
-          // Add a unique ID based on index to prevent React duplicate key errors
           _uniqueId: `${comp.slug || comp.name}-${index}`
         }));
         
         setComponentsData(uniqueComponents);
         setIsLoading(false);
-      } catch (error) {
-        console.error("Error loading data:", error);
+      } catch (error: any) {
+        console.error("Error loading similarity data:", error);
         setError(error instanceof Error ? error.message : "Unknown error");
         setIsLoading(false);
       }
     }
 
-    loadAllData();
-  }, []);
+    loadSimilarityData();
+  }, [threshold]); // Reload when threshold changes
 
   if (isLoading) {
     return (
