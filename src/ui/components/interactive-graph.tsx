@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Slider } from './ui/slider'
-import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle, Focus, Info, Move, Zap, Search } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Filter, Shuffle, Focus, Info, Move, Zap, Search, MoreVertical, Settings } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from './ui/dropdown-menu'
 
 interface Node {
   id: string
@@ -28,7 +29,7 @@ interface Node {
 interface Edge {
   source: string
   target: string
-  type: 'uses' | 'inherits' | 'contains'
+  type: 'uses' | 'calls' | 'instantiates' | 'contains' | 'imports' | 'exports'
   color: string
   width: number
   weight?: number
@@ -39,7 +40,7 @@ interface InteractiveGraphProps {
   nodes: Node[]
   edges: Edge[]
   focusNodeId?: string
-  selectedNodeId?: string
+  selectedNodeId?: string | null
   onNodeClick?: (nodeId: string) => void
   onNodeHover?: (nodeId: string | null) => void
   onGroupClick?: (groupId: string, groupNodes: Node[]) => void
@@ -79,10 +80,14 @@ export function InteractiveGraph({
   }, [selectedNodeId])
   const [filteredTypes, setFilteredTypes] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchMode, setSearchMode] = useState<'node-only' | 'with-connections'>('with-connections')
+  const [searchResults, setSearchResults] = useState<Node[]>([])
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0)
   const [layoutMode, setLayoutMode] = useState<'force' | 'hierarchical' | 'circular' | 'grouped'>('grouped')
   const [showLabels, setShowLabels] = useState(true)
   const [showConnectionsOnly, setShowConnectionsOnly] = useState(false)
   const [nodeSpacing, setNodeSpacing] = useState(250)
+  const [nodeSize, setNodeSize] = useState(90)
   const [isAutoLayouting, setIsAutoLayouting] = useState(false)
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -93,6 +98,8 @@ export function InteractiveGraph({
   const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('curved')
   const [focusedGroup, setFocusedGroup] = useState<string | null>(null)
   const [groupFocusMode, setGroupFocusMode] = useState(focusMode || false)
+  const [showMinimapLocal, setShowMinimapLocal] = useState(showMinimap)
+  const [showGraphControls, setShowGraphControls] = useState(true)
   
   // Sync focus mode with props
   useEffect(() => {
@@ -478,9 +485,82 @@ export function InteractiveGraph({
     const currentEdges = edgesRef.current
     const groupBoxes = (currentNodes as any).groupBoxes as Map<string, { x: number, y: number, width: number, height: number }> | undefined
 
+    // First, calculate which nodes are visible based on search and filters
+    let visibleNodeIds = new Set<string>()
+    
+    if (searchTerm && searchTerm.trim() !== '') {
+      // Search mode - get visible nodes from search results
+      const matchingNodes = currentNodes.filter(node => 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      
+      if (matchingNodes.length > 0) {
+        const matchingNodeIds = new Set(matchingNodes.map(node => node.id))
+        const connectedNodeIds = new Set<string>()
+        
+        // Add matching nodes to visible set
+        matchingNodeIds.forEach(nodeId => connectedNodeIds.add(nodeId))
+        
+        // Add connected nodes based on search mode
+        if (searchMode === 'with-connections') {
+          currentEdges.forEach(edge => {
+            if (matchingNodeIds.has(edge.source)) {
+              connectedNodeIds.add(edge.target)
+            }
+            if (matchingNodeIds.has(edge.target)) {
+              connectedNodeIds.add(edge.source)
+            }
+          })
+        }
+        
+        visibleNodeIds = connectedNodeIds
+      }
+    } else if (showConnectionsOnly && selectedNode) {
+      // Show connections only mode
+      visibleNodeIds.add(selectedNode)
+      currentEdges.forEach(edge => {
+        if (edge.source === selectedNode || edge.target === selectedNode) {
+          visibleNodeIds.add(edge.source)
+          visibleNodeIds.add(edge.target)
+        }
+      })
+    } else {
+      // Normal mode - all nodes are visible
+      currentNodes.forEach(node => visibleNodeIds.add(node.id))
+    }
+    
+    // Additional filtering for group focus mode
+    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
+      const groupMembers = nodeGroups.get(focusedGroup)!
+      const groupMemberIds = new Set(groupMembers.map(n => n.id))
+      
+      // Find all connected nodes first
+      const connectedNodeIds = new Set<string>()
+      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
+      
+      currentEdges.forEach(edge => {
+        if (groupMemberIds.has(edge.source)) {
+          connectedNodeIds.add(edge.target)
+        }
+        if (groupMemberIds.has(edge.target)) {
+          connectedNodeIds.add(edge.source)
+        }
+      })
+      
+      // Intersect with visible nodes from search/filter
+      visibleNodeIds = new Set([...visibleNodeIds].filter(id => connectedNodeIds.has(id)))
+    }
+
     // Draw group containers first (behind everything else)
     if (showGroupContainers && groupBoxes && groupingMode !== 'none') {
+      // Only show groups that contain visible nodes
       groupBoxes.forEach((box, groupKey) => {
+        // Check if this group has any visible nodes
+        const groupNodes = nodeGroups.get(groupKey) || []
+        const hasVisibleNodes = groupNodes.some(node => visibleNodeIds.has(node.id))
+        
+        if (!hasVisibleNodes) return // Skip groups with no visible nodes
         ctx.save()
         
         const isDraggedGroup = draggedGroup === groupKey
@@ -641,29 +721,10 @@ export function InteractiveGraph({
     // Filter edges for drawing
     let drawableEdges = currentEdges.filter(edge => !filteredTypes.has(edge.type))
     
-    // Additional filtering for group focus mode
-    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
-      const groupMembers = nodeGroups.get(focusedGroup)!
-      const groupMemberIds = new Set(groupMembers.map(n => n.id))
-      
-      // Find all connected nodes first
-      const connectedNodeIds = new Set<string>()
-      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
-      
-      drawableEdges.forEach(edge => {
-        if (groupMemberIds.has(edge.source)) {
-          connectedNodeIds.add(edge.target)
-        }
-        if (groupMemberIds.has(edge.target)) {
-          connectedNodeIds.add(edge.source)
-        }
-      })
-      
-      // Only show edges that connect visible nodes
-      drawableEdges = drawableEdges.filter(edge => 
-        connectedNodeIds.has(edge.source) && connectedNodeIds.has(edge.target)
-      )
-    }
+    // Filter edges to only show connections between visible nodes
+    drawableEdges = drawableEdges.filter(edge => 
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    )
 
     // Draw edges (filtered)
     drawableEdges.forEach(edge => {
@@ -725,12 +786,6 @@ export function InteractiveGraph({
               ctx.lineDashOffset = -dashOffset
             } else {
               ctx.setLineDash([]) // Solid line for uses
-            }
-            break
-          case 'inherits':
-            ctx.setLineDash([12, 3, 3, 3]) // Dash-dot for inheritance
-            if (enableAnimation && (isHighlighted || isHovered)) {
-              ctx.lineDashOffset = -dashOffset * 0.5 // Slower animation for inheritance
             }
             break
           case 'contains':
@@ -815,7 +870,6 @@ export function InteractiveGraph({
         if (enableAnimation && (isHighlighted || isHovered)) {
           const particleSettings = {
             'uses': { numParticles: 3, particleSize: 4, speed: 0.08, trail: false },        // Much slower: 0.08
-            'inherits': { numParticles: 2, particleSize: 3, speed: 0.06, trail: true },    // Much slower: 0.06
             'contains': { numParticles: 2, particleSize: 5, speed: 0.05, trail: false }   // Much slower: 0.05
           }
           
@@ -855,32 +909,6 @@ export function InteractiveGraph({
               ctx.beginPath()
               ctx.arc(particleX, particleY, settings.particleSize, 0, 2 * Math.PI)
               ctx.fill()
-            } else if (edge.type === 'inherits') {
-              // Diamond shapes with trail for 'inherits'
-              const size = settings.particleSize
-              ctx.fillStyle = particleColor
-              ctx.beginPath()
-              ctx.moveTo(particleX, particleY - size)
-              ctx.lineTo(particleX + size, particleY)
-              ctx.lineTo(particleX, particleY + size)
-              ctx.lineTo(particleX - size, particleY)
-              ctx.closePath()
-              ctx.fill()
-              
-              // Add trail effect
-              if (settings.trail) {
-                for (let j = 1; j <= 3; j++) {
-                  const trailPhase = Math.max(0, particlePhase - j * 0.1)
-                  const trailX = startX + (endX - startX) * trailPhase
-                  const trailY = startY + (endY - startY) * trailPhase
-                  const trailAlpha = 0.3 / j
-                  
-                  ctx.fillStyle = fadeColor.replace(/[\d.]+\)$/g, `${trailAlpha})`)
-                  ctx.beginPath()
-                  ctx.arc(trailX, trailY, size / j, 0, 2 * Math.PI)
-                  ctx.fill()
-                }
-              }
             } else if (edge.type === 'contains') {
               // Square particles for 'contains'
               const size = settings.particleSize
@@ -1017,40 +1045,8 @@ export function InteractiveGraph({
       }
     })
 
-    // Draw nodes (only visible ones)
-    let visibleNodes: Node[]
-    
-    if (groupFocusMode && focusedGroup && nodeGroups.has(focusedGroup)) {
-      // Group focus mode - show group members and their connected nodes
-      const groupMembers = nodeGroups.get(focusedGroup)!
-      const groupMemberIds = new Set(groupMembers.map(n => n.id))
-      
-      // Find all nodes connected to any group member
-      const connectedNodeIds = new Set<string>()
-      groupMemberIds.forEach(memberId => connectedNodeIds.add(memberId))
-      
-      drawableEdges.forEach(edge => {
-        if (groupMemberIds.has(edge.source)) {
-          connectedNodeIds.add(edge.target)
-        }
-        if (groupMemberIds.has(edge.target)) {
-          connectedNodeIds.add(edge.source)
-        }
-      })
-      
-      visibleNodes = currentNodes.filter(node => connectedNodeIds.has(node.id))
-    } else if (showConnectionsOnly && selectedNode) {
-      visibleNodes = currentNodes.filter(node => 
-        node.id === selectedNode ||
-        drawableEdges.some(edge => edge.source === node.id || edge.target === node.id)
-      )
-    } else {
-      visibleNodes = currentNodes.filter(node => 
-        !searchTerm || 
-        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        node.type.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
+    // Draw nodes (using the same visibleNodeIds set from edge filtering)
+    const visibleNodes = currentNodes.filter(node => visibleNodeIds.has(node.id))
     
     visibleNodes.forEach(node => {
       const isSelected = selectedNode === node.id
@@ -1060,7 +1056,7 @@ export function InteractiveGraph({
       // Modern card-based node design
       ctx.save()
       
-      const nodeSize = Math.max(90, node.radius * 3.5) // Increased node size for better spacing
+      const calculatedNodeSize = Math.max(nodeSize, node.radius * 3.5) // Dynamic node size
       const cornerRadius = 20
       
       // Outer glow for selected/hovered nodes with pulse animation
@@ -1073,7 +1069,7 @@ export function InteractiveGraph({
         
         const glowGradient = ctx.createRadialGradient(
           node.x, node.y, 0,
-          node.x, node.y, nodeSize + glowSize
+          node.x, node.y, calculatedNodeSize + glowSize
         )
         const glowOpacity = enableAnimation && isSelected ? 
           Math.min(0.6, 0.4 + Math.sin(animationTime / 1600) * 0.15) : 0.4  // Slowed from 800ms to 1600ms, reduced intensity
@@ -1084,7 +1080,7 @@ export function InteractiveGraph({
         
         ctx.fillStyle = glowGradient
         ctx.beginPath()
-        ctx.arc(node.x, node.y, nodeSize + glowSize, 0, 2 * Math.PI)
+        ctx.arc(node.x, node.y, calculatedNodeSize + glowSize, 0, 2 * Math.PI)
         ctx.fill()
       }
       
@@ -1098,19 +1094,19 @@ export function InteractiveGraph({
       ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
       ctx.beginPath()
       if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+        ctx.roundRect(node.x - calculatedNodeSize/2, node.y - calculatedNodeSize/2, calculatedNodeSize, calculatedNodeSize, cornerRadius)
       } else {
         // Fallback for browsers that don't support roundRect
-        const x = node.x - nodeSize/2
-        const y = node.y - nodeSize/2
+        const x = node.x - calculatedNodeSize/2
+        const y = node.y - calculatedNodeSize/2
         const r = cornerRadius
         ctx.moveTo(x + r, y)
-        ctx.lineTo(x + nodeSize - r, y)
-        ctx.quadraticCurveTo(x + nodeSize, y, x + nodeSize, y + r)
-        ctx.lineTo(x + nodeSize, y + nodeSize - r)
-        ctx.quadraticCurveTo(x + nodeSize, y + nodeSize, x + nodeSize - r, y + nodeSize)
-        ctx.lineTo(x + r, y + nodeSize)
-        ctx.quadraticCurveTo(x, y + nodeSize, x, y + nodeSize - r)
+        ctx.lineTo(x + calculatedNodeSize - r, y)
+        ctx.quadraticCurveTo(x + calculatedNodeSize, y, x + calculatedNodeSize, y + r)
+        ctx.lineTo(x + calculatedNodeSize, y + calculatedNodeSize - r)
+        ctx.quadraticCurveTo(x + calculatedNodeSize, y + calculatedNodeSize, x + calculatedNodeSize - r, y + calculatedNodeSize)
+        ctx.lineTo(x + r, y + calculatedNodeSize)
+        ctx.quadraticCurveTo(x, y + calculatedNodeSize, x, y + calculatedNodeSize - r)
         ctx.lineTo(x, y + r)
         ctx.quadraticCurveTo(x, y, x + r, y)
       }
@@ -1123,8 +1119,8 @@ export function InteractiveGraph({
       
       // Gradient border
       const borderGradient = ctx.createLinearGradient(
-        node.x - nodeSize/2, node.y - nodeSize/2,
-        node.x + nodeSize/2, node.y + nodeSize/2
+        node.x - calculatedNodeSize/2, node.y - calculatedNodeSize/2,
+        node.x + calculatedNodeSize/2, node.y + calculatedNodeSize/2
       )
       borderGradient.addColorStop(0, color1)
       borderGradient.addColorStop(1, color2)
@@ -1133,19 +1129,19 @@ export function InteractiveGraph({
       ctx.lineWidth = isSelected ? 4 : isHovered ? 3 : 2
       ctx.beginPath()
       if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius)
+        ctx.roundRect(node.x - calculatedNodeSize/2, node.y - calculatedNodeSize/2, calculatedNodeSize, calculatedNodeSize, cornerRadius)
       } else {
         // Fallback for browsers that don't support roundRect
-        const x = node.x - nodeSize/2
-        const y = node.y - nodeSize/2
+        const x = node.x - calculatedNodeSize/2
+        const y = node.y - calculatedNodeSize/2
         const r = cornerRadius
         ctx.moveTo(x + r, y)
-        ctx.lineTo(x + nodeSize - r, y)
-        ctx.quadraticCurveTo(x + nodeSize, y, x + nodeSize, y + r)
-        ctx.lineTo(x + nodeSize, y + nodeSize - r)
-        ctx.quadraticCurveTo(x + nodeSize, y + nodeSize, x + nodeSize - r, y + nodeSize)
-        ctx.lineTo(x + r, y + nodeSize)
-        ctx.quadraticCurveTo(x, y + nodeSize, x, y + nodeSize - r)
+        ctx.lineTo(x + calculatedNodeSize - r, y)
+        ctx.quadraticCurveTo(x + calculatedNodeSize, y, x + calculatedNodeSize, y + r)
+        ctx.lineTo(x + calculatedNodeSize, y + calculatedNodeSize - r)
+        ctx.quadraticCurveTo(x + calculatedNodeSize, y + calculatedNodeSize, x + calculatedNodeSize - r, y + calculatedNodeSize)
+        ctx.lineTo(x + r, y + calculatedNodeSize)
+        ctx.quadraticCurveTo(x, y + calculatedNodeSize, x, y + calculatedNodeSize - r)
         ctx.lineTo(x, y + r)
         ctx.quadraticCurveTo(x, y, x + r, y)
       }
@@ -1154,15 +1150,15 @@ export function InteractiveGraph({
       // Type icon background
       const iconBgSize = 24
       const iconBgGradient = ctx.createLinearGradient(
-        node.x - iconBgSize/2, node.y - nodeSize/2 + 10,
-        node.x + iconBgSize/2, node.y - nodeSize/2 + 10 + iconBgSize
+        node.x - iconBgSize/2, node.y - calculatedNodeSize/2 + 10,
+        node.x + iconBgSize/2, node.y - calculatedNodeSize/2 + 10 + iconBgSize
       )
       iconBgGradient.addColorStop(0, color1)
       iconBgGradient.addColorStop(1, color2)
       
       ctx.fillStyle = iconBgGradient
       ctx.beginPath()
-      ctx.arc(node.x, node.y - nodeSize/2 + 22, iconBgSize/2, 0, 2 * Math.PI)
+      ctx.arc(node.x, node.y - calculatedNodeSize/2 + 22, iconBgSize/2, 0, 2 * Math.PI)
       ctx.fill()
       
       // Type icon
@@ -1178,7 +1174,7 @@ export function InteractiveGraph({
         method: '◉'
       }
       
-      ctx.fillText(icons[node.type as keyof typeof icons] || '◆', node.x, node.y - nodeSize/2 + 22)
+      ctx.fillText(icons[node.type as keyof typeof icons] || '◆', node.x, node.y - calculatedNodeSize/2 + 22)
       
       ctx.restore()
       
@@ -1189,7 +1185,7 @@ export function InteractiveGraph({
         
         // Text background for better readability
         const textMetrics = ctx.measureText(node.name)
-        const textWidth = Math.min(textMetrics.width, nodeSize - 10)
+        const textWidth = Math.min(textMetrics.width, calculatedNodeSize - 10)
         const textHeight = 16
         
         ctx.fillStyle = 'rgba(0, 0, 0, 0.02)'
@@ -1237,7 +1233,7 @@ export function InteractiveGraph({
         ctx.font = '10px Inter, sans-serif'
         const badgeWidth = Math.max(24, ctx.measureText(badgeText).width + 12)
         const badgeX = node.x
-        const badgeY = node.y + nodeSize/2 - 10
+        const badgeY = node.y + calculatedNodeSize/2 - 10
         
         // Badge background
         ctx.fillStyle = 'rgba(239, 68, 68, 0.1)'
@@ -1266,7 +1262,7 @@ export function InteractiveGraph({
         // Menu dimensions
         const menuHeight = 32
         const menuWidth = 120
-        const menuY = node.y - nodeSize/2 - menuHeight - 8
+        const menuY = node.y - calculatedNodeSize/2 - menuHeight - 8
         const menuX = node.x - menuWidth/2
         
         // Menu shadow
@@ -1333,7 +1329,7 @@ export function InteractiveGraph({
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.moveTo(node.x, menuY + menuHeight)
-        ctx.lineTo(node.x, node.y - nodeSize/2)
+        ctx.lineTo(node.x, node.y - calculatedNodeSize/2)
         ctx.stroke()
         
         ctx.restore()
@@ -1577,7 +1573,7 @@ export function InteractiveGraph({
     
     // Calculate average node size for spacing calculations
     const avgNodeRadius = nodes.length > 0 ? nodes.reduce((sum, node) => sum + node.radius, 0) / nodes.length : 20
-    const minNodeSpacing = Math.max(avgNodeRadius * 3, 80) // Minimum distance between node centers
+    const minNodeSpacing = Math.max(nodeSpacing * 0.8, avgNodeRadius * 2) // Use user's nodeSpacing setting
     
     // Dynamic grid sizing based on group count and sizes
     const gridSize = Math.max(2, Math.ceil(Math.sqrt(numGroups * 1.2))) // Slightly larger grid for better spacing
@@ -1585,7 +1581,7 @@ export function InteractiveGraph({
     // Calculate required spacing based on largest groups
     const maxNodesInAnyGroup = Math.max(...Array.from(groups.values()).map(nodes => nodes.length))
     const estimatedGroupSize = calculateOptimalGroupSize(maxNodesInAnyGroup, minNodeSpacing)
-    const groupSpacing = Math.max(estimatedGroupSize + 100, nodeSpacing * 4)
+    const groupSpacing = Math.max(estimatedGroupSize + nodeSpacing * 0.5, nodeSpacing * 2)
     
     const startX = 300
     const startY = 300
@@ -2406,6 +2402,41 @@ export function InteractiveGraph({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [resetView, fitToView, autoLayout])
 
+  // Update search results when search term or search mode changes
+  useEffect(() => {
+    if (searchTerm && searchTerm.trim() !== '') {
+      const matchingNodes = nodesRef.current.filter(node => 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      setSearchResults(matchingNodes)
+      setCurrentSearchIndex(0)
+      
+      // Auto-zoom to first result if there are matches
+      if (matchingNodes.length > 0) {
+        zoomToNode(matchingNodes[0].id)
+      }
+    } else {
+      setSearchResults([])
+      setCurrentSearchIndex(0)
+    }
+  }, [searchTerm, searchMode, zoomToNode])
+
+  // Navigate to next/previous search result
+  const navigateSearchResults = useCallback((direction: 'next' | 'prev') => {
+    if (searchResults.length === 0) return
+    
+    let newIndex
+    if (direction === 'next') {
+      newIndex = (currentSearchIndex + 1) % searchResults.length
+    } else {
+      newIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1
+    }
+    
+    setCurrentSearchIndex(newIndex)
+    zoomToNode(searchResults[newIndex].id)
+  }, [searchResults, currentSearchIndex, zoomToNode])
+
   // Click outside handler for context menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -2464,12 +2495,34 @@ export function InteractiveGraph({
         node.id === selectedNode ||
         currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
       )
-    } else {
-      visibleNodes = nodesRef.current.filter(node => 
-        !searchTerm || 
+    } else if (searchTerm) {
+      // Filter nodes for visibility based on search - isolate matching nodes and their connections
+      const matchingNodes = nodesRef.current.filter(node => 
         node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         node.type.toLowerCase().includes(searchTerm.toLowerCase())
       )
+      
+      if (matchingNodes.length > 0) {
+        const matchingNodeIds = new Set(matchingNodes.map(node => node.id))
+        const connectedNodeIds = new Set<string>()
+        
+        matchingNodeIds.forEach(nodeId => connectedNodeIds.add(nodeId))
+        
+        currentEdges.forEach(edge => {
+          if (matchingNodeIds.has(edge.source)) {
+            connectedNodeIds.add(edge.target)
+          }
+          if (matchingNodeIds.has(edge.target)) {
+            connectedNodeIds.add(edge.source)
+          }
+        })
+        
+        visibleNodes = nodesRef.current.filter(node => connectedNodeIds.has(node.id))
+      } else {
+        visibleNodes = []
+      }
+    } else {
+      visibleNodes = nodesRef.current
     }
     
     // Increase click area for nodes slightly for better UX
@@ -2484,10 +2537,10 @@ export function InteractiveGraph({
     if (selectedNodeForMenu) {
       const selectedNodeObj = visibleNodes.find(n => n.id === selectedNodeForMenu)
       if (selectedNodeObj) {
-        const nodeSize = Math.max(90, selectedNodeObj.radius * 3.5)
+        const selectedNodeSize = Math.max(nodeSize, selectedNodeObj.radius * 3.5)
         const menuHeight = 32
         const menuWidth = 120
-        const menuY = selectedNodeObj.y - nodeSize/2 - menuHeight - 8
+        const menuY = selectedNodeObj.y - selectedNodeSize/2 - menuHeight - 8
         const menuX = selectedNodeObj.x - menuWidth/2
         const itemWidth = menuWidth / 3
         
@@ -2653,11 +2706,35 @@ export function InteractiveGraph({
               node.id === selectedNode ||
               currentEdges.some(edge => edge.source === node.id || edge.target === node.id)
             )
-          : nodesRef.current.filter(node => 
-              !searchTerm || 
-              node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              node.type.toLowerCase().includes(searchTerm.toLowerCase())
-            )
+          : searchTerm
+            ? (() => {
+                // Filter nodes for visibility based on search - isolate matching nodes and their connections
+                const matchingNodes = nodesRef.current.filter(node => 
+                  node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  node.type.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                
+                if (matchingNodes.length > 0) {
+                  const matchingNodeIds = new Set(matchingNodes.map(node => node.id))
+                  const connectedNodeIds = new Set<string>()
+                  
+                  matchingNodeIds.forEach(nodeId => connectedNodeIds.add(nodeId))
+                  
+                  currentEdges.forEach(edge => {
+                    if (matchingNodeIds.has(edge.source)) {
+                      connectedNodeIds.add(edge.target)
+                    }
+                    if (matchingNodeIds.has(edge.target)) {
+                      connectedNodeIds.add(edge.source)
+                    }
+                  })
+                  
+                  return nodesRef.current.filter(node => connectedNodeIds.has(node.id))
+                } else {
+                  return []
+                }
+              })()
+            : nodesRef.current
         
         const hoveredNode = visibleNodes.find(node => {
           const dx = x - node.x
@@ -2924,85 +3001,79 @@ export function InteractiveGraph({
       className="w-full h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-xl"
     >
       {/* Modern Controls Header */}
-      <CardHeader className="p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 z-10">
+      <CardHeader className="p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 z-10 flex-shrink-0">
         {/* Main Control Bar */}
-        <div className="flex items-center justify-between w-full p-4 pb-3">
-          {/* Left Section - Search & Layout */}
-          <div className="flex items-center gap-3 flex-1">
-            {/* Search */}
-            <div className="relative">
+        <div className="flex items-center justify-between w-full p-4 gap-3 flex-wrap">
+          {/* Left Section - Search */}
+          <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+            <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search components..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 h-10 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg text-sm"
+                className="pl-10 w-full h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg text-sm"
               />
             </div>
             
-            {/* Layout Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Layout:</span>
-              <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
-                <SelectTrigger className="w-32 h-10 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="force">Force</SelectItem>
-                  <SelectItem value="hierarchical">Hierarchy</SelectItem>
-                  <SelectItem value="circular">Circular</SelectItem>
-                  <SelectItem value="grouped">Grouped</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
+            {/* Search Options - Only show when searching */}
+            {searchTerm && (
+              <>
+                <Select value={searchMode} onValueChange={(value: any) => setSearchMode(value)}>
+                  <SelectTrigger className="w-32 h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="node-only">Node only</SelectItem>
+                    <SelectItem value="with-connections">With connections</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {searchResults.length > 0 && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-blue-50/70 dark:bg-blue-900/30 rounded-lg border border-blue-200/50 dark:border-blue-600/50">
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                      {currentSearchIndex + 1}/{searchResults.length}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigateSearchResults('prev')}
+                      className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded"
+                      title="Previous"
+                      disabled={searchResults.length <= 1}
+                    >
+                      <span className="text-sm">←</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigateSearchResults('next')}
+                      className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded"
+                      title="Next"
+                      disabled={searchResults.length <= 1}
+                    >
+                      <span className="text-sm">→</span>
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Center Section - Essential Controls */}
+          {showGraphControls && (
+          <div className="flex items-center gap-2">
             {/* Auto Layout Button */}
             <Button 
               variant="outline" 
-              size="default"
+              size="sm"
               onClick={autoLayout}
               disabled={isAutoLayouting}
-              className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+              className="h-9 px-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
             >
-              <Shuffle className={`h-4 w-4 mr-2 ${isAutoLayouting ? 'animate-spin' : ''}`} />
-              {isAutoLayouting ? 'Organizing...' : 'Auto Layout'}
+              <Shuffle className={`h-4 w-4 ${!isAutoLayouting && 'mr-2'} ${isAutoLayouting ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isAutoLayouting ? 'Organizing...' : 'Auto Layout'}</span>
             </Button>
-          </div>
-
-          {/* Right Section - View Controls */}
-          <div className="flex items-center gap-4">
-            {/* View Toggles */}
-            <div className="flex items-center gap-3 px-3 py-2 bg-slate-50/70 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-600/50">
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showLabels}
-                  onChange={(e) => setShowLabels(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                />
-                Labels
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showConnectionsOnly}
-                  onChange={(e) => setShowConnectionsOnly(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  disabled={!selectedNode}
-                />
-                Connected
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableAnimation}
-                  onChange={(e) => setEnableAnimation(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <Zap className="h-4 w-4" />
-                Animated
-              </label>
-            </div>
 
             {/* Zoom Controls */}
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-50/70 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-600/50">
@@ -3010,29 +3081,29 @@ export function InteractiveGraph({
                 variant="ghost"
                 size="sm"
                 onClick={() => setScale(prev => Math.min(5, prev * 1.2))}
-                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                className="h-7 w-7 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
                 title="Zoom In (+)"
               >
-                <ZoomIn className="h-4 w-4" />
+                <ZoomIn className="h-3.5 w-3.5" />
               </Button>
-              <div className="px-3 text-sm font-mono text-slate-600 dark:text-slate-400 min-w-[3rem] text-center">
+              <div className="px-2 text-xs font-mono text-slate-600 dark:text-slate-400 min-w-[2.5rem] text-center hidden sm:block">
                 {Math.round(scale * 100)}%
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setScale(prev => Math.max(0.2, prev / 1.2))}
-                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                className="h-7 w-7 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
                 title="Zoom Out (-)"
               >
-                <ZoomOut className="h-4 w-4" />
+                <ZoomOut className="h-3.5 w-3.5" />
               </Button>
-              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+              <div className="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5 hidden sm:block"></div>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={fitToView}
-                className="h-8 px-3 hover:bg-green-100 dark:hover:bg-green-900/30 text-sm rounded-md"
+                className="h-7 px-2 hover:bg-green-100 dark:hover:bg-green-900/30 text-xs rounded hidden sm:flex"
                 title="Fit to View (F)"
               >
                 Fit
@@ -3041,99 +3112,154 @@ export function InteractiveGraph({
                 variant="ghost" 
                 size="sm" 
                 onClick={resetView}
-                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md"
+                className="h-7 w-7 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
                 title="Reset View (R)"
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
+          )}
+
+          {/* Right Section - Settings Menu */}
+          <div className="flex items-center gap-2">
+            {/* Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-9 px-3 bg-slate-50/70 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Settings</span>
+                  <MoreVertical className="h-4 w-4 sm:hidden" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Display Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                {/* View Options */}
+                <DropdownMenuCheckboxItem
+                  checked={showLabels}
+                  onCheckedChange={setShowLabels}
+                >
+                  Show Labels
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={enableAnimation}
+                  onCheckedChange={setEnableAnimation}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Enable Animations
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={showMinimapLocal}
+                  onCheckedChange={setShowMinimapLocal}
+                >
+                  Show Minimap
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={showGraphControls}
+                  onCheckedChange={setShowGraphControls}
+                >
+                  Show Graph Controls
+                </DropdownMenuCheckboxItem>
+                
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Layout</DropdownMenuLabel>
+                
+                {/* Layout Mode */}
+                <div className="px-2 py-1.5">
+                  <Select value={layoutMode} onValueChange={(value: any) => setLayoutMode(value)}>
+                    <SelectTrigger className="w-full h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="force">Force Layout</SelectItem>
+                      <SelectItem value="hierarchical">Hierarchical</SelectItem>
+                      <SelectItem value="circular">Circular</SelectItem>
+                      <SelectItem value="grouped">Grouped</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Edge Style */}
+                <div className="px-2 py-1.5">
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Edge Style</span>
+                  <Select value={edgeStyle} onValueChange={(value: any) => setEdgeStyle(value)}>
+                    <SelectTrigger className="w-full h-8 text-sm mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="straight">Straight</SelectItem>
+                      <SelectItem value="curved">Curved</SelectItem>
+                      <SelectItem value="step">Step</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Grouping Mode */}
+                {layoutMode === 'grouped' && (
+                  <div className="px-2 py-1.5">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">Group By</span>
+                    <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
+                      <SelectTrigger className="w-full h-8 text-sm mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="file">File</SelectItem>
+                        <SelectItem value="parent">Parent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {groupingMode !== 'none' && (
+                  <DropdownMenuCheckboxItem
+                    checked={showGroupContainers}
+                    onCheckedChange={setShowGroupContainers}
+                  >
+                    Show Group Containers
+                  </DropdownMenuCheckboxItem>
+                )}
+                
+                <DropdownMenuSeparator />
+                
+                {/* Node Spacing Slider */}
+                <div className="px-2 py-1.5">
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Node Spacing</span>
+                  <Slider
+                    value={[nodeSpacing]}
+                    onValueChange={([v]) => setNodeSpacing(v)}
+                    min={150}
+                    max={400}
+                    step={10}
+                    className="mt-2"
+                  />
+                </div>
+                
+                {/* Node Size Slider */}
+                <div className="px-2 py-1.5">
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Node Size</span>
+                  <Slider
+                    value={[nodeSize]}
+                    onValueChange={([v]) => setNodeSize(v)}
+                    min={50}
+                    max={150}
+                    step={5}
+                    className="mt-2"
+                  />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Secondary Control Bar */}
-        <div className="flex items-center justify-between w-full px-4 pb-3 border-t border-slate-100/50 dark:border-slate-700/50 pt-3">
-          {/* Left Section - Display Options */}
-          <div className="flex items-center gap-4">
-            {/* Edge Style */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Style:</span>
-              <Select value={edgeStyle} onValueChange={(value: any) => setEdgeStyle(value)}>
-                <SelectTrigger className="w-28 h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="straight">Straight</SelectItem>
-                  <SelectItem value="curved">Curved</SelectItem>
-                  <SelectItem value="step">Step</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Grouping Options */}
-            {layoutMode === 'grouped' && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Group:</span>
-                <Select value={groupingMode} onValueChange={(value: any) => setGroupingMode(value)}>
-                  <SelectTrigger className="w-24 h-9 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-600/50 rounded-lg text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="file">File</SelectItem>
-                    <SelectItem value="parent">Parent</SelectItem>
-                  </SelectContent>
-                </Select>
-                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showGroupContainers}
-                    onChange={(e) => setShowGroupContainers(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  Boxes
-                </label>
-              </div>
-            )}
-            
-            {/* Spacing Control */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Spacing:</span>
-              <div className="flex items-center gap-3 w-32">
-                <Slider
-                  value={[nodeSpacing]}
-                  onValueChange={(value) => setNodeSpacing(value[0])}
-                  min={150}
-                  max={500}
-                  step={20}
-                  className="flex-1"
-                />
-                <span className="text-sm text-slate-600 dark:text-slate-400 min-w-[3rem] font-mono text-right">{nodeSpacing}</span>
-              </div>
-            </div>
-
-            {/* Focus Mode Indicator */}
-            {groupFocusMode && focusedGroup && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-700/50">
-                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  Focused: {focusedGroup}
-                </span>
-                <button
-                  onClick={() => {
-                    setGroupFocusMode(false)
-                    setFocusedGroup(null)
-                    setFocusMode?.(false)
-                  }}
-                  className="ml-1 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-bold"
-                  title="Clear group focus"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Right Section - Relationship Filters */}
+        {/* Relationship Filters */}
+        <div className="flex items-center justify-center w-full px-4 pb-3 border-t border-slate-100/50 dark:border-slate-700/50 pt-3">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
               <Filter className="h-4 w-4" />
@@ -3166,12 +3292,10 @@ export function InteractiveGraph({
       
       {/* Enhanced Graph Container */}
       <div
-        className="relative w-full flex-1 shadow-lg border border-slate-200 dark:border-slate-700 rounded-xl"
+        className="relative w-full flex-1 shadow-lg border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden"
         style={{ 
           background: 'linear-gradient(135deg, rgb(248 250 252) 0%, rgb(255 255 255) 50%, rgb(248 250 252) 100%)',
-          overflow: 'hidden',
-          minHeight: '80vh',
-          height: '80vh'
+          minHeight: '500px'
         }}
       >
         {/* Enhanced Decorative Grid Background */}

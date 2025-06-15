@@ -577,7 +577,7 @@ async def generate_ollama_response(query: str, context: str, search_results: lis
         ollama_url = "${this.ollamaUrl}"
         
         # Enhanced prompt that includes instructions for markdown links
-        prompt = f"""Based on the following code documentation context, please answer the user's question.
+        prompt = f"""Based on the following code analysis context, please answer the user's question.
 
 IMPORTANT: When mentioning specific functions, components, or classes by name in your response, try to provide clickable links to help users navigate to the relevant code. Use this markdown link format:
 - For functions: [functionName](/functions/function_slug)

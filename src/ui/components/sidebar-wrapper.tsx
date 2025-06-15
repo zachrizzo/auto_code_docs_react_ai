@@ -20,7 +20,7 @@ export function SidebarWrapper() {
                     <div className="h-8 w-8 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
                         <Component className="h-4 w-4 text-white" />
                     </div>
-                    <h2 className="font-bold text-xl">Code Docs</h2>
+                    <h2 className="font-bold text-xl">Code-y</h2>
                 </Link>
             </div>
             <ScrollArea className="flex-1">

@@ -4,15 +4,14 @@ import { CodeRelationships } from "@/components/code-relationships"
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-6">
-      <div className="w-full max-w-7xl">
-        <div className="flex flex-col gap-4 mb-12">
-            <h1 className="text-4xl font-bold tracking-tight">Code Relationships</h1>
-            <p className="text-muted-foreground text-xl">
-                Explore dependencies and relationships between code elements
-            </p>
+    <main className="flex flex-col h-full p-4">
+      <div className="w-full max-w-7xl mx-auto flex flex-col h-full">
+        <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
+            <h1 className="text-3xl font-bold tracking-tight">Code Relationships</h1>
         </div>
-        <CodeRelationships />
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <CodeRelationships />
+        </div>
       </div>
     </main>
   )

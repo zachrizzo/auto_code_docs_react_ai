@@ -9,8 +9,6 @@ import { Code, Component, ActivityIcon as Function, FileCode } from "lucide-reac
 import { ArrowRightIcon } from "@radix-ui/react-icons"
 import { InteractiveGraph } from "./interactive-graph"
 import {
-  RelationshipStats,
-  RelationshipStatsData,
   NodeDetailsPanel,
   GroupDetailsPanel,
   CodePreviewModal,
@@ -60,7 +58,9 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             type: entity.type || "component", 
             filePath: entity.filePath || `src/${entity.type}s/${entity.name}`, 
             methods: [], 
-            props: [] 
+            props: [],
+            dependencies: [],
+            devDependencies: []
           })
         })
         
@@ -116,9 +116,10 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         // Extract relationships from the loaded component data
         const relationshipsData: Relationship[] = []
         
-        // First, add parent-child relationships for methods
-        searchData.items.forEach((entity: { slug: string; methods?: any[] }) => {
-          if (entity.methods && entity.methods.length > 0) {
+        // Add parent-child relationships for actual methods (functions that belong to classes)
+        searchData.items.forEach((entity: { slug: string; type: string; methods?: any[] }) => {
+          // Only create "contains" relationships for actual methods of classes
+          if (entity.type === 'class' && entity.methods && entity.methods.length > 0) {
             entity.methods.forEach((method: any) => {
               relationshipsData.push({
                 source: entity.slug,
@@ -126,6 +127,18 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
                 type: "contains",
                 weight: 1,
                 context: "method"
+              })
+            })
+          }
+          // For components, create "uses" relationships with their functions instead of "contains"
+          else if (entity.type === 'component' && entity.methods && entity.methods.length > 0) {
+            entity.methods.forEach((method: any) => {
+              relationshipsData.push({
+                source: entity.slug,
+                target: `${entity.slug}_${method.name}`,
+                type: "uses",
+                weight: 1,
+                context: "function"
               })
             })
           }
@@ -453,7 +466,6 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     const getRelationshipLabel = (type: Relationship["type"]) => {
       switch (type) {
         case "uses": return "Uses"
-        case "inherits": return "Inherits"
         case "contains": return "Contains"
         default: return "Unknown"
       }
@@ -462,42 +474,14 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     const getRelationshipColor = (type: Relationship["type"]) => {
       switch (type) {
         case "uses": return "stroke-blue-500"
-        case "inherits": return "stroke-green-500"
         case "contains": return "stroke-gray-400"
         default: return "stroke-gray-300"
       }
     }
     
-    // Calculate statistics based on filtered relationships
-    const relationshipStats: RelationshipStatsData = useMemo(() => {
-      const stats: RelationshipStatsData = {
-        total: filteredRelationships.length,
-        byType: {} as Record<Relationship['type'], number>,
-        mostConnected: { name: '', connections: 0 }
-      };
-
-      const connectionCounts: Record<string, number> = {};
-      filteredRelationships.forEach((rel: Relationship) => {
-        stats.byType[rel.type] = (stats.byType[rel.type] || 0) + 1;
-        connectionCounts[rel.source] = (connectionCounts[rel.source] || 0) + 1;
-        connectionCounts[rel.target] = (connectionCounts[rel.target] || 0) + 1;
-      });
-
-      let mostConnectedEntityInfo = { name: '', connections: 0 };
-      Object.entries(connectionCounts).forEach(([entityId, count]) => {
-        if (count > mostConnectedEntityInfo.connections) {
-          const entity = components.find((c: CodeEntity) => c.id === entityId);
-          mostConnectedEntityInfo = { name: entity?.name || entityId, connections: count };
-        }
-      });
-      stats.mostConnected = mostConnectedEntityInfo;
-
-      return stats;
-    }, [filteredRelationships, components]);
-
     if (loading && !entityId) {
       return (
-        <Card className="bg-white dark:bg-slate-900 shadow-sm">
+        <Card className="bg-white dark:bg-slate-900 shadow-sm flex flex-col flex-1 min-h-0">
           <CardHeader>
             <CardTitle>Loading Relationships...</CardTitle>
           </CardHeader>
@@ -512,8 +496,8 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
     if (currentEntity) {
       return (
-        <div className="space-y-6 pb-16">
-          <div className="flex items-center space-x-4 mb-4">
+        <div className="flex flex-col h-full space-y-3">
+          <div className="flex items-center space-x-4 mb-2">
             <h1 className="text-2xl font-bold">{currentEntity.name} Relationships</h1>
             <Tabs value={view} onValueChange={(v) => setView(v as "dependencies" | "dependents" | "all")}>
               <TabsList>
@@ -523,32 +507,11 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               </TabsList>
             </Tabs>
           </div>
-          {filteredRelationships.length > 0 ? (
-            <p className="text-muted-foreground mb-4">
-              Showing {filteredRelationships.length} relationships for {currentEntity.name}.
-            </p>
-          ) : (
-            <p className="text-muted-foreground mb-4">
-              No relationships found for {currentEntity.name}.
-            </p>
-          )}
 
-          {/* Show the same graph interface as the main page, but filtered for this entity */}
-          {/* Statistics Panel */}
-          {filteredRelationships.length > 0 && (
-            <RelationshipStats 
-              stats={relationshipStats} 
-              componentsCount={components.length} 
-            />
-          )}
-
-          <Card className="bg-white dark:bg-slate-900 shadow-sm">
+          <Card className="bg-white dark:bg-slate-900 shadow-sm flex flex-col flex-1 min-h-0">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Relationship Explorer</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Visualize and analyze connections for {currentEntity.name}.
-                </p>
               </div>
               <Tabs value={graphView} onValueChange={(v) => setGraphView(v as "list" | "graph")}>
                 <TabsList>
@@ -603,7 +566,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
               </CardContent>
             ) : (
               <CardContent className="p-0">
-                <div className="relative h-[800px] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <div className="relative h-[90vh] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                   <InteractiveGraph 
                     nodes={graphNodes} 
                     edges={graphEdges} 
@@ -658,16 +621,8 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     }
 
     return (
-      <div className="space-y-6 pb-16">
-        {/* Statistics Panel */}
-        {filteredRelationships.length > 0 && (
-          <RelationshipStats 
-            stats={relationshipStats} 
-            componentsCount={components.length} 
-          />
-        )}
-
-        <Card className="bg-white dark:bg-slate-900 shadow-sm">
+      <div className="flex flex-col h-full space-y-6">
+        <Card className="bg-white dark:bg-slate-900 shadow-sm flex flex-col flex-1 min-h-0">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Relationship Explorer</CardTitle>
@@ -726,8 +681,8 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
             )}
           </CardContent>
         ) : (
-          <CardContent className="p-0">
-            <div className="relative h-[800px] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+          <CardContent className="p-0 flex-1 flex flex-col">
+            <div className="relative h-[90vh] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
               <InteractiveGraph 
                 nodes={graphNodes} 
                 edges={graphEdges} 

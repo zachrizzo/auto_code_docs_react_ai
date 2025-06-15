@@ -5,18 +5,14 @@ export interface CodeEntity {
   filePath?: string;
   methods?: any[];
   props?: any[];
+  dependencies: string[]
+  devDependencies: string[]
 }
 
 export interface Relationship {
   source: string;
   target: string;
-  type: "uses" | "inherits" | "contains";
+  type: 'uses' | 'calls' | 'instantiates' | 'contains' | 'imports' | 'exports';
   weight?: number;
   context?: string;
-}
-
-export interface RelationshipStatsData {
-  total: number;
-  byType: Record<Relationship['type'], number>;
-  mostConnected: { name: string; connections: number };
 }

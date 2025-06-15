@@ -1,8 +1,8 @@
 "use client"
 import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { MessageSquare, Maximize2, Minimize2, Trash2 } from "lucide-react"
+import { MessageSquare, Maximize2, Minimize2, Trash2, Settings, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "./ui/button"
 import { Textarea } from "./ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
@@ -11,12 +11,31 @@ import ReactMarkdown from "react-markdown"
 import rehypeRaw from "rehype-raw"
 import rehypeHighlight from "rehype-highlight"
 import 'highlight.js/styles/github-dark.css'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Interface for chat messages
 interface ChatMessage {
   text: string
   isUser: boolean
   role?: "system" | "user" | "assistant"
+  thinking?: {
+    title: string
+    details: any 
+  } | null
 }
 
 // Interface for API chat message format
@@ -34,6 +53,29 @@ export function ChatBubble() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [currentModel, setCurrentModel] = useState<string>("")
+  const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({})
+
+  useEffect(() => {
+    // Fetch available models when the component mounts
+    const fetchModels = async () => {
+      try {
+        const response = await fetch("/api/ai-models")
+        if (!response.ok) {
+          throw new Error("Failed to fetch models")
+        }
+        const data = await response.json()
+        setAvailableModels(data.availableModels || [])
+        setCurrentModel(data.currentModel || "")
+      } catch (error) {
+        console.error("Error fetching AI models:", error)
+      }
+    }
+    if (isOpen) {
+        fetchModels()
+    }
+  }, [isOpen])
 
   // Convert UI chat messages to API format
   const getApiMessages = (): ApiChatMessage[] => {
@@ -65,6 +107,7 @@ export function ChatBubble() {
           history: getApiMessages(),
           query: userQuery,
           sessionId: sessionId,
+          model: currentModel,
         }),
       })
 
@@ -73,11 +116,64 @@ export function ChatBubble() {
       }
 
       const data = await response.json()
+      
+      let responseText = data.response
+      let thinkingData = null
+
+      const thinkingMatch = responseText.match(/<thinking>([\s\S]*?)<\/thinking>/)
+      
+      if (thinkingMatch && thinkingMatch[1]) {
+        try {
+          const thinkingDetails = JSON.parse(thinkingMatch[1])
+          thinkingData = {
+            title: "Thinking Process",
+            details: thinkingDetails,
+          }
+        } catch (e) {
+          thinkingData = {
+            title: "Thinking Process",
+            details: thinkingMatch[1],
+          }
+        }
+        responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/, "").trim()
+      } else if (data.metadata && data.metadata.intermediate_steps) {
+        thinkingData = {
+          title: "Thinking Process",
+          details: data.metadata.intermediate_steps,
+        }
+      } else {
+        // Fallback heuristic for models that prepend thinking without tags
+        const parts = responseText.split(/\n\n+/)
+        if (parts.length > 1) {
+          const firstPart = parts[0].trim()
+          // Consider it "thinking" if it's a substantial block of text
+          // and doesn't start with common markdown elements.
+          const seemsLikeThinking =
+            firstPart.length > 80 &&
+            !firstPart.startsWith("#") &&
+            !firstPart.startsWith("*") &&
+            !firstPart.startsWith("-") &&
+            !firstPart.startsWith("```")
+
+          if (seemsLikeThinking) {
+            thinkingData = {
+              title: "Thinking Process",
+              details: firstPart,
+            }
+            responseText = parts.slice(1).join("\n\n").trim()
+          }
+        }
+      }
 
       // Add AI response to chat
       setMessages(prev => [
         ...prev,
-        { text: data.response, isUser: false, role: "assistant" },
+        { 
+          text: responseText, 
+          isUser: false, 
+          role: "assistant",
+          thinking: thinkingData,
+        },
       ])
     } catch (error) {
       console.error("Error sending message:", error)
@@ -86,7 +182,7 @@ export function ChatBubble() {
       setMessages(prev => [
         ...prev,
         {
-          text: "Sorry, I encountered an error. Please try again or check if Ollama is running properly.",
+          text: "Sorry, I encountered an error. Please try again or check if the AI server is running properly.",
           isUser: false,
           role: "assistant"
         },
@@ -100,6 +196,10 @@ export function ChatBubble() {
     setIsExpanded(!isExpanded)
   }
 
+  const toggleThinking = (index: number) => {
+    setExpandedThinking(prev => ({...prev, [index]: !prev[index]}))
+  }
+
   const clearMessages = () => {
     setMessages([
       { text: "Hi there! I can help you understand your code. What would you like to know?", isUser: false, role: "assistant" },
@@ -107,15 +207,13 @@ export function ChatBubble() {
   }
 
   // Custom renderer for code blocks with syntax highlighting
-  const MarkdownMessage = ({ content }: { content: string }) => (
+  const MarkdownMessage = ({ content, isUser }: { content: string, isUser?: boolean }) => (
     <ReactMarkdown
       rehypePlugins={[rehypeRaw, rehypeHighlight]}
       components={{
-        // Override paragraph to avoid nesting issues
         p({ children }) {
-          return <div className="my-3 text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{children}</div>
+          return <div className={`my-3 text-sm md:text-base leading-relaxed ${isUser ? '' : 'text-slate-700 dark:text-slate-300'}`}>{children}</div>
         },
-        // Style for code blocks
         code({ className, children, ...props }: React.HTMLProps<HTMLElement> & { inline?: boolean }) {
           const match = /language-(\w+)/.exec(className || '')
           const inline = props.inline
@@ -131,12 +229,11 @@ export function ChatBubble() {
               </pre>
             </div>
           ) : (
-            <code className="px-2 py-1 mx-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-md text-sm font-mono" {...props}>
+            <code className={`px-2 py-1 mx-0.5 rounded-md text-sm font-mono ${isUser ? 'bg-white/20' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'}`} {...props}>
               {children}
             </code>
           )
         },
-        // Style for links
         a(props) {
           return (
             <a
@@ -147,191 +244,256 @@ export function ChatBubble() {
             />
           )
         },
-        // Style for lists
         ul({ children }) {
           return <ul className="list-disc pl-6 my-3 space-y-2 marker:text-violet-500">{children}</ul>
         },
         ol({ children }) {
           return <ol className="list-decimal pl-6 my-3 space-y-2 marker:text-violet-500">{children}</ol>
         },
-        // Style for list items
         li({ children }) {
-          return <li className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{children}</li>
+          return <li className={`text-sm md:text-base leading-relaxed ${isUser ? '' : 'text-slate-700 dark:text-slate-300'}`}>{children}</li>
         },
-        // Style for headings
         h1({ children }) {
-          return <h1 className="text-2xl font-bold my-4 pb-2 border-b-2 border-violet-200 dark:border-violet-800 text-slate-900 dark:text-white">{children}</h1>
+          return <h1 className={`text-2xl font-bold my-4 pb-2 border-b-2 ${isUser ? 'border-white/30 text-white' : 'border-violet-200 dark:border-violet-800 text-slate-900 dark:text-white'}`}>{children}</h1>
         },
         h2({ children }) {
-          return <h2 className="text-xl font-bold my-3 text-violet-700 dark:text-violet-400">{children}</h2>
+          return <h2 className={`text-xl font-bold my-3 ${isUser ? 'text-white' : 'text-violet-700 dark:text-violet-400'}`}>{children}</h2>
         },
         h3({ children }) {
-          return <h3 className="text-lg font-semibold my-2 text-slate-800 dark:text-slate-200">{children}</h3>
+          return <h3 className={`text-lg font-semibold my-2 ${isUser ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>{children}</h3>
         },
-        // Style for blockquotes
         blockquote({ children }) {
-          return <blockquote className="border-l-4 border-violet-400 dark:border-violet-600 pl-4 py-2 my-3 bg-violet-50 dark:bg-violet-900/10 rounded-r-lg text-slate-700 dark:text-slate-300 italic">{children}</blockquote>
+          return <blockquote className={`border-l-4 pl-4 py-2 my-3 rounded-r-lg italic ${isUser ? 'border-white/40 bg-white/10' : 'border-violet-400 dark:border-violet-600 bg-violet-50 dark:bg-violet-900/10 text-slate-700 dark:text-slate-300'}`}>{children}</blockquote>
         },
-        // Style for horizontal rules
         hr() {
-          return <hr className="my-4 border-slate-200 dark:border-slate-700" />
+          return <hr className={`my-4 ${isUser ? 'border-white/20' : 'border-slate-200 dark:border-slate-700'}`} />
         },
-        // Style for tables
         table({ children }) {
           return (
             <div className="overflow-x-auto my-3">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 border border-slate-200 dark:border-slate-700 rounded-md">
+              <table className={`min-w-full divide-y rounded-md ${isUser ? 'divide-white/20 border border-white/20' : 'divide-slate-200 dark:divide-slate-700 border border-slate-200 dark:border-slate-700'}`}>
                 {children}
               </table>
             </div>
           )
         },
         thead({ children }) {
-          return <thead className="bg-slate-100 dark:bg-slate-800">{children}</thead>
+          return <thead className={`${isUser ? 'bg-white/10' : 'bg-slate-100 dark:bg-slate-800'}`}>{children}</thead>
         },
         tbody({ children }) {
-          return <tbody className="divide-y divide-slate-200 dark:divide-slate-700">{children}</tbody>
+          return <tbody className={`${isUser ? 'divide-white/20' : 'divide-slate-200 dark:divide-slate-700'}`}>{children}</tbody>
         },
         tr({ children }) {
           return <tr>{children}</tr>
         },
         th({ children }) {
-          return <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{children}</th>
+          return <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${isUser ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>{children}</th>
         },
         td({ children }) {
-          return <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{children}</td>
-        }
+          return <td className={`px-4 py-3 text-sm ${isUser ? '' : 'text-slate-600 dark:text-slate-300'}`}>{children}</td>
+        },
       }}
     >
       {content}
     </ReactMarkdown>
   )
 
-  return (
-    <>
-      <Button
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700"
-        onClick={() => setIsOpen(true)}
-      >
-        <MessageSquare className="h-6 w-6" />
-      </Button>
+  const ThinkingBlock = ({ title, details, isExpanded, onToggle }: { title: string, details: any, isExpanded: boolean, onToggle: () => void }) => {
+    let formattedDetails
+    if (typeof details === 'string') {
+        formattedDetails = "```\n" + details + "\n```"
+    } else {
+        formattedDetails = "```json\n" + JSON.stringify(details, null, 2) + "\n```"
+    }
 
+    return (
+        <div className="my-2 p-2 bg-slate-200/50 dark:bg-slate-700/50 rounded-lg">
+            <button onClick={onToggle} className="flex items-center w-full text-left text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100">
+                {isExpanded ? <ChevronDown className="w-4 h-4 mr-2 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 mr-2 flex-shrink-0" />}
+                <span className="truncate">{title}</span>
+            </button>
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                        animate={{ height: "auto", opacity: 1, marginTop: '8px' }}
+                        exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="p-2 bg-slate-100 dark:bg-slate-900/50 rounded">
+                           <MarkdownMessage content={formattedDetails} />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    )
+  }
+
+  return (
+    <div className="fixed bottom-5 right-5 z-50">
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className={`fixed ${isExpanded ? "inset-4 md:inset-8" : "bottom-6 right-6 w-[90vw] max-w-[600px] h-[80vh] max-h-[700px]"
-              } bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 z-50`}
+            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className={`
+              ${isExpanded ? 'w-[80vw] max-w-[800px] h-[80vh]' : 'w-96 h-[60vh]'}
+              bg-white dark:bg-slate-900 shadow-2xl rounded-2xl flex flex-col transition-all duration-300 ease-in-out border border-slate-200 dark:border-slate-800
+            `}
           >
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-violet-500 to-indigo-600 text-white">
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8 border-2 border-white/20">
-                  <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                  <AvatarFallback>AI</AvatarFallback>
-                </Avatar>
-                <h3 className="font-medium">Code Assistant</h3>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-t-2xl border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full shadow-lg">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-lg">AI Assistant</h3>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  onClick={clearMessages}
-                  className="text-white hover:bg-white/20 flex items-center gap-1"
-                  title="Clear chat"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Clear</span>
+              <div className="flex items-center space-x-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                      <Settings className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuLabel>Chat Settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <div className="p-2">
+                      <label className="text-xs font-medium px-2 text-slate-600 dark:text-slate-400">AI Model</label>
+                      {availableModels.length > 0 ? (
+                        <Select value={currentModel} onValueChange={setCurrentModel}>
+                          <SelectTrigger className="w-full text-xs h-9 mt-1">
+                            <SelectValue placeholder="Select model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableModels.map((model) => (
+                              <SelectItem key={model} value={model} className="text-xs">
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 px-2">Models loading...</p>
+                      )}
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={clearMessages}
+                      className="text-red-500 focus:bg-red-50 focus:text-red-500 dark:focus:bg-red-900/50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Clear Chat
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button variant="ghost" size="icon" onClick={toggleExpand} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                  {isExpanded ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
                 </Button>
-                <Button variant="ghost" size="icon" onClick={toggleExpand} className="text-white hover:bg-white/20">
-                  {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                  className="text-white hover:bg-white/20"
-                >
-                  <Cross2Icon className="h-4 w-4" />
+                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                  <Cross2Icon className="w-5 h-5" />
                 </Button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {messages.map((message, i) => (
-                <div key={i} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
-                  {!message.isUser && (
-                    <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                      <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                      <AvatarFallback>AI</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div
-                    className={`max-w-[85%] rounded-2xl ${message.isUser
-                      ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-4 py-3 shadow-md"
-                      : "bg-gray-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm px-5 py-4"
+            {/* Message Area */}
+            <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="space-y-4">
+                {messages.map((message, i) => (
+                  <div key={i} className={`flex items-start gap-3 ${message.isUser ? "justify-end" : "justify-start"}`}>
+                    {!message.isUser && (
+                      <Avatar className="w-8 h-8 border-2 border-violet-200 dark:border-violet-700">
+                        <AvatarFallback>AI</AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div className={`p-3 rounded-2xl max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl ${
+                        message.isUser
+                          ? "bg-violet-500 text-white rounded-br-none"
+                          : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-200 dark:border-slate-700"
                       }`}
-                  >
-                    {message.isUser ? (
-                      message.text
-                    ) : (
-                      <MarkdownMessage content={message.text} />
+                    >
+                      {message.thinking && (
+                        <ThinkingBlock 
+                          title={message.thinking.title}
+                          details={message.thinking.details}
+                          isExpanded={!!expandedThinking[i]}
+                          onToggle={() => toggleThinking(i)}
+                        />
+                      )}
+                      <MarkdownMessage content={message.text} isUser={message.isUser} />
+                    </div>
+                    {message.isUser && (
+                      <Avatar className="w-8 h-8 border-2 border-slate-300 dark:border-slate-600">
+                        <AvatarFallback>U</AvatarFallback>
+                      </Avatar>
                     )}
                   </div>
-                  {message.isUser && (
-                    <Avatar className="h-8 w-8 ml-2 mt-1 flex-shrink-0">
-                      <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                      <AvatarFallback>You</AvatarFallback>
+                ))}
+                {isLoading && (
+                  <div className="flex items-start gap-3">
+                    <Avatar className="w-8 h-8 border-2 border-violet-200 dark:border-violet-700">
+                      <AvatarFallback>AI</AvatarFallback>
                     </Avatar>
-                  )}
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback>AI</AvatarFallback>
-                  </Avatar>
-                  <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-gray-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex space-x-2">
-                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="h-3 w-3 bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                    <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse delay-150"></div>
+                        <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse delay-300"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
-            <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 backdrop-blur-sm">
-              <div className="flex gap-3 items-end">
+            {/* Input Area */}
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-b-2xl border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+              <div className="relative">
                 <Textarea
-                  placeholder="Ask me anything about your code..."
-                  className="min-h-12 max-h-32 resize-none rounded-2xl border-slate-200 dark:border-slate-700 focus-visible:ring-2 focus-visible:ring-violet-500 bg-white dark:bg-slate-800 text-sm md:text-base"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault()
                       handleSend()
                     }
                   }}
-                  disabled={isLoading}
+                  placeholder="Ask about components, methods, or anything else..."
+                  className="w-full pr-12 resize-none bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-violet-500"
+                  rows={2}
                 />
                 <Button
-                  onClick={handleSend}
+                  type="submit"
                   size="icon"
-                  className="h-12 w-12 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg transition-all hover:shadow-xl"
-                  disabled={isLoading}
+                  className="absolute bottom-2 right-2 w-9 h-9 bg-violet-500 hover:bg-violet-600 text-white rounded-lg"
+                  onClick={handleSend}
+                  disabled={isLoading || !input.trim()}
                 >
-                  <PaperPlaneIcon className="h-5 w-5" />
+                  <PaperPlaneIcon className="w-4 h-4" />
                 </Button>
               </div>
+              <p className="text-xs text-center text-slate-400 dark:text-slate-600 mt-2">
+                Shift+Enter for new line. Powered by LangFlow.
+              </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+      {!isOpen && (
+        <Button
+          className="h-16 w-16 rounded-full shadow-lg bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 flex items-center justify-center text-white"
+          onClick={() => setIsOpen(true)}
+          aria-label="Open chat"
+        >
+          <MessageSquare className="h-7 w-7" />
+        </Button>
+      )}
+    </div>
   )
 }

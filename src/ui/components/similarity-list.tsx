@@ -39,6 +39,7 @@ interface ComponentData {
   name: string
   slug: string
   filePath: string
+  kind?: string
   code?: string
   methods?: {
     name: string
@@ -55,6 +56,22 @@ interface ComponentIndex {
   methodCount?: number
 }
 
+// Helper function to get the correct URL path based on entity kind
+const getEntityUrl = (component: ComponentData, methodName?: string): string => {
+  let basePath = '/components'; // default fallback
+  
+  if (component.kind === 'function') {
+    basePath = '/functions';
+  } else if (component.kind === 'class') {
+    basePath = '/classes';
+  } else if (component.kind === 'component') {
+    basePath = '/components';
+  }
+  
+  const url = `${basePath}/${component.slug}`;
+  return methodName ? `${url}#${methodName}` : url;
+};
+
 export function SimilarityList({ 
   threshold, 
   preloadedComponents,
@@ -65,9 +82,12 @@ export function SimilarityList({
 }: SimilarityListProps) {
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const [selectedPair, setSelectedPair] = useState<{
-    component1: { name: string; code: string; filePath: string }
-    component2: { name: string; code: string; filePath: string }
+    component1: { name: string; code: string; filePath: string; slug?: string; kind?: string }
+    component2: { name: string; code: string; filePath: string; slug?: string; kind?: string }
     similarity: number
+    isMethodLevel?: boolean
+    method1Name?: string
+    method2Name?: string
   } | null>(null)
   const [components, setComponents] = useState<ComponentData[]>(preloadedComponents || [])
   const [similarComponents, setSimilarComponents] = useState<{
@@ -652,13 +672,20 @@ export function SimilarityList({
           name: item.component1.name,
           code: code1,
           filePath: item.component1.filePath || `components/${item.component1.name}`,
+          slug: item.component1.slug,
+          kind: item.component1.kind,
         },
         component2: {
           name: item.component2.name,
           code: code2,
           filePath: item.component2.filePath || `components/${item.component2.name}`,
+          slug: item.component2.slug,
+          kind: item.component2.kind,
         },
         similarity: item.similarity,
+        isMethodLevel: item.isMethodLevel,
+        method1Name: item.method1,
+        method2Name: item.method2,
       })
       setComparisonOpen(true)
     })
@@ -820,12 +847,27 @@ export function SimilarityList({
                         <div className="font-semibold text-foreground">
                           {item.isMethodLevel ? (
                             <>
-                              <span className="text-blue-600 dark:text-blue-400 text-lg">{item.component1.name}</span>
+                              <Link 
+                                href={getEntityUrl(item.component1)}
+                                className="text-blue-600 dark:text-blue-400 text-lg hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                              >
+                                {item.component1.name}
+                              </Link>
                               <span className="text-muted-foreground mx-2">::</span>
-                              <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{item.method1}</span>
+                              <Link 
+                                href={getEntityUrl(item.component1, item.method1)}
+                                className="font-mono text-sm bg-muted px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
+                              >
+                                {item.method1}
+                              </Link>
                             </>
                           ) : (
-                            <span className="text-blue-600 dark:text-blue-400 text-xl">{item.component1.name}</span>
+                            <Link 
+                              href={getEntityUrl(item.component1)}
+                              className="text-blue-600 dark:text-blue-400 text-xl hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                            >
+                              {item.component1.name}
+                            </Link>
                           )}
                         </div>
                         {item.isMethodLevel && (
@@ -839,12 +881,27 @@ export function SimilarityList({
                         <span className="font-medium">
                           {item.isMethodLevel ? (
                             <>
-                              <span className="text-blue-600 dark:text-blue-400">{item.component2.name}</span>
+                              <Link 
+                                href={getEntityUrl(item.component2)}
+                                className="text-blue-600 dark:text-blue-400 hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                              >
+                                {item.component2.name}
+                              </Link>
                               <span className="mx-2">::</span>
-                              <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{item.method2}</span>
+                              <Link 
+                                href={getEntityUrl(item.component2, item.method2)}
+                                className="font-mono text-sm bg-muted px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
+                              >
+                                {item.method2}
+                              </Link>
                             </>
                           ) : (
-                            <span className="text-blue-600 dark:text-blue-400 text-lg">{item.component2.name}</span>
+                            <Link 
+                              href={getEntityUrl(item.component2)}
+                              className="text-blue-600 dark:text-blue-400 text-lg hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                            >
+                              {item.component2.name}
+                            </Link>
                           )}
                         </span>
                       </div>
@@ -980,6 +1037,9 @@ export function SimilarityList({
         component1={selectedPair.component1}
         component2={selectedPair.component2}
         similarityScore={selectedPair.similarity}
+        method1Name={selectedPair.method1Name}
+        method2Name={selectedPair.method2Name}
+        isMethodComparison={selectedPair.isMethodLevel}
       />}
     </div>
   )

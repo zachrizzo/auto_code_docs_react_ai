@@ -204,13 +204,14 @@ async function initializeLangFlowWithDocs() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { history, query, sessionId } = await request.json();
+    const { history, query, sessionId, model } = await request.json();
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
     
     console.log(`\n=== PROCESSING CHAT REQUEST VIA LANGFLOW ===`);
     console.log(`User query: "${query}"`);
+    console.log(`Selected model: ${model || 'default'}`);
     console.log(`History length: ${history?.length || 0}`);
     
     // Check if LangFlow is available
@@ -244,7 +245,8 @@ export async function POST(request: NextRequest) {
       const langFlowResponse = await client.chat({
         message: query,
         context,
-        sessionId: persistentSessionId
+        sessionId: persistentSessionId,
+        model: model,
       });
       
       console.log(`LangFlow response: ${langFlowResponse.response.length} characters`);

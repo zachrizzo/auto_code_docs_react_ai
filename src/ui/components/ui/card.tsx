@@ -3,10 +3,6 @@ import * as React from "react"
 import { cn } from "../../lib/utils"
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
-  function zach(hi: string) {
-    let z = hi + hi
-    console.log(z)
-  }
   return (
     <div
       data-slot="card"

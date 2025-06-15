@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import asyncio
 from contextlib import asynccontextmanager
+import copy
 
 # LangFlow imports
 from langflow import load_flow_from_json
@@ -36,6 +37,7 @@ class ChatRequest(BaseModel):
     message: str
     context: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None
+    model: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -123,15 +125,62 @@ class FlowManager:
             logger.error(f"Failed to initialize LangFlow: {e}")
             raise
     
-    async def run_flow(self, input_data: Dict[str, Any], session_id: str) -> Dict[str, Any]:
-        """Run the LangFlow with given input"""
+    async def run_flow(self, input_data: Dict[str, Any], session_id: str, selected_model: Optional[str] = None) -> Dict[str, Any]:
+        """Run the LangFlow with given input, dynamically changing the model if specified."""
         try:
+            flow_to_run = self.flow
+            
+            # If a model is selected, modify the flow configuration in memory
+            if selected_model:
+                logger.info(f"Switching to model: {selected_model}")
+                
+                # Deep copy the original config to avoid modifying it globally
+                temp_config = copy.deepcopy(self.flow_config)
+                
+                # Debug: Print the structure of nodes
+                logger.info(f"Number of nodes in config: {len(temp_config.get('data', {}).get('nodes', []))}")
+                
+                # Find the OllamaModel node and update its model_name
+                model_node_updated = False
+                for node in temp_config.get("data", {}).get("nodes", []):
+                    node_id = node.get("data", {}).get("id", "")
+                    logger.info(f"Checking node: {node_id}")
+                    
+                    if node_id.startswith("OllamaModel"):
+                        logger.info(f"Found OllamaModel node: {node_id}")
+                        
+                        # Debug: Print current model_name value
+                        current_model = node.get("data", {}).get("node", {}).get("template", {}).get("model_name", {}).get("value", "")
+                        logger.info(f"Current model value: {current_model}")
+                        
+                        # Update model_name
+                        node["data"]["node"]["template"]["model_name"]["value"] = selected_model
+                        model_node_updated = True
+                        
+                        # Verify the update
+                        new_model = node.get("data", {}).get("node", {}).get("template", {}).get("model_name", {}).get("value", "")
+                        logger.info(f"Updated node {node_id} from {current_model} to {new_model}")
+                        break
+                
+                if not model_node_updated:
+                    logger.warning("Could not find OllamaModel node to update.")
+                    # Debug: Print all node IDs
+                    all_node_ids = [node.get("data", {}).get("id", "") for node in temp_config.get("data", {}).get("nodes", [])]
+                    logger.warning(f"Available node IDs: {all_node_ids}")
+                else:
+                    # Load the modified flow
+                    logger.info("Loading modified flow configuration...")
+                    flow_to_run = load_flow_from_json(temp_config)
+                    logger.info("Successfully loaded modified flow")
+
             # Execute the flow
+            logger.info(f"Executing flow with session_id: {session_id}")
             results = await self.run_manager.run(
-                flow=self.flow,
+                flow=flow_to_run,
                 input_value=input_data,
                 session_id=session_id
             )
+            logger.info(f"Flow execution completed with {len(results) if results else 0} results")
             return results
         except Exception as e:
             logger.error(f"Flow execution error: {e}")
@@ -225,47 +274,37 @@ async def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Main chat endpoint using LangFlow"""
+    """Handle chat requests"""
+    if not flow_manager:
+        raise HTTPException(status_code=503, detail="LangFlow not initialized")
+    
     try:
-        if not flow_manager:
-            raise HTTPException(status_code=503, detail="LangFlow not initialized")
-        
-        # Generate or use session ID
         session_id = request.session_id or f"session_{datetime.now().timestamp()}"
         
-        # Search for relevant context from vector DB
-        search_results = []
-        if vector_db and vector_db.index.ntotal > 0:
-            search_results = await vector_db.search(request.message, top_k=3)
+        # Run the flow with the user's message and selected model
+        results = await flow_manager.run_flow(
+            input_data={'input_value': request.message}, 
+            session_id=session_id,
+            selected_model=request.model
+        )
         
-        # Prepare input for LangFlow
-        flow_input = {
-            "message": request.message,
-            "context": request.context or {},
-            "search_results": search_results
-        }
-        
-        # Run the flow
-        result = await flow_manager.run_flow(flow_input, session_id)
-        
-        # Cache conversation in Redis
-        if redis_client:
-            conv_key = f"conversation:{session_id}"
-            redis_client.rpush(conv_key, json.dumps({
-                "timestamp": datetime.now().isoformat(),
-                "message": request.message,
-                "response": result.get("response", "")
-            }))
-            redis_client.expire(conv_key, 3600)  # 1 hour expiration
+        # Extract the response from the last result
+        # This may need adjustment based on your specific flow output
+        final_result = results[-1]
+        response_data = final_result.get('data', {}).get('result')
+
+        if not response_data:
+            logger.error(f"Unexpected flow result format: {final_result}")
+            raise HTTPException(status_code=500, detail="Invalid response format from flow")
         
         return ChatResponse(
-            response=result.get("response", "No response generated"),
+            response=response_data.get('message', 'No response found.'),
             session_id=session_id,
-            metadata=result.get("metadata")
+            metadata=response_data.get('metadata')
         )
         
     except Exception as e:
-        logger.error(f"Chat error: {e}")
+        logger.error(f"Chat processing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/documents/add")

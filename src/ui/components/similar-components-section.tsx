@@ -7,6 +7,23 @@ import { Button } from "./ui/button"
 import { GitCompare } from "lucide-react"
 import { ComparisonModal } from "./comparison-modal"
 
+// Helper function to get the correct URL path based on entity kind
+const getEntityUrl = (component: { slug?: string; kind?: string; name: string }): string => {
+  const slug = component.slug || component.name.toLowerCase();
+  
+  let basePath = '/components'; // default fallback
+  
+  if (component.kind === 'function') {
+    basePath = '/functions';
+  } else if (component.kind === 'class') {
+    basePath = '/classes';
+  } else if (component.kind === 'component') {
+    basePath = '/components';
+  }
+  
+  return `${basePath}/${slug}`;
+};
+
 type SimilarComponent = {
   name: string
   similarity: number
@@ -14,6 +31,7 @@ type SimilarComponent = {
   isMethodLevel?: boolean
   methodName?: string
   slug?: string
+  kind?: string
 }
 
 interface SimilarComponentsSectionProps {
@@ -77,7 +95,7 @@ export function ${componentName}({ title, children }) {
                 </div>
                 <div className="flex gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/components/${component.slug || component.name.toLowerCase()}`}>View Component</Link>
+                    <Link href={getEntityUrl(component)}>View {component.kind === 'function' ? 'Function' : component.kind === 'class' ? 'Class' : 'Component'}</Link>
                   </Button>
                   <Button size="sm" className="gap-2" onClick={() => handleCompare(component)}>
                     <GitCompare className="h-4 w-4" />

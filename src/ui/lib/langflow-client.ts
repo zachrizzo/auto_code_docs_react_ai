@@ -4,6 +4,7 @@ export interface LangFlowChatRequest {
   message: string;
   context?: Record<string, any>;
   sessionId?: string;
+  model?: string;
 }
 
 export interface LangFlowChatResponse {
@@ -33,7 +34,7 @@ export class LangFlowClient {
     this.baseUrl = baseUrl;
     this.client = axios.create({
       baseURL: baseUrl,
-      timeout: 30000,
+      timeout: 120000, // Increased to 2 minutes
       headers: {
         'Content-Type': 'application/json'
       }

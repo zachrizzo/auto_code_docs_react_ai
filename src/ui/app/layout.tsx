@@ -14,8 +14,8 @@ const fontSans = FontSans({
 })
 
 export const metadata: Metadata = {
-  title: "Code Documentation",
-  description: "AI-powered code documentation",
+  title: "Code-y",
+  description: "AI-powered code analysis",
 }
 
 export default function RootLayout({

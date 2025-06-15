@@ -1,0 +1,141 @@
+/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/temp/embedded_langflow_server.py:330: SyntaxWarning: invalid escape sequence '\['
+  pattern = f"\b{re.escape(name)}\b(?![^\[]*\])"
+/Users/zachrizzo/Desktop/programming/auto_code_docs_react_ai/temp/embedded_langflow_server.py:166: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [17468]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:6271 (Press CTRL+C to quit)
+✅ All dependencies loaded successfully
+Initializing embedder...
+✅ Embedded LangFlow server initialized
+INFO:     127.0.0.1:59159 - "POST /chat HTTP/1.1" 422 Unprocessable Content
+Found 0 search results for query: What model are you?
+INFO:     127.0.0.1:59242 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60092 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60455 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60497 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60497 - "POST /documents/batch HTTP/1.1" 200 OK
+Found 5 search results for query: who are you
+  Result 1: component_components_chat-bubble_clearmessages (score: 1.6627821922302246)
+  Result 2: component_components_chat-bubble_getapimessages (score: 1.6689730882644653)
+  Result 3: method_components_chat-bubble_chatbubble_clearMessages (score: 1.7063615322113037)
+  Result 4: component_components_ui_avatar_avatarfallback (score: 1.72894287109375)
+  Result 5: method_components_chat-bubble_chatbubble_getApiMessages (score: 1.7306315898895264)
+Ollama error: 
+INFO:     127.0.0.1:60497 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60678 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: who are you
+
+  Result 1: component_components_chat-bubble_clearmessages (score: 1.6627821922302246)
+  Result 2: component_components_chat-bubble_getapimessages (score: 1.6689730882644653)
+  Result 3: method_components_chat-bubble_chatbubble_clearMessages (score: 1.7063615322113037)
+  Result 4: component_components_ui_avatar_avatarfallback (score: 1.72894287109375)
+  Result 5: method_components_chat-bubble_chatbubble_getApiMessages (score: 1.7306315898895264)
+Enhancing response with links from 5 search results
+Processing result: component_components_chat-bubble_clearmessages, name: clearMessages, type: component
+  Generated slug: components_chat-bubble_clearmessages for clearMessages
+Processing result: component_components_chat-bubble_getapimessages, name: getApiMessages, type: component
+  Generated slug: components_chat-bubble_getapimessages for getApiMessages
+Processing result: method_components_chat-bubble_chatbubble_clearMessages, name: clearMessages, type: method
+  Generated slug: components_chat-bubble_chatbubble for clearMessages
+Processing result: component_components_ui_avatar_avatarfallback, name: AvatarFallback, type: component
+  Generated slug: components_ui_avatar_avatarfallback for AvatarFallback
+Processing result: method_components_chat-bubble_chatbubble_getApiMessages, name: getApiMessages, type: method
+  Generated slug: components_chat-bubble_chatbubble for getApiMessages
+Link enhancement complete. Found 3 potential links
+INFO:     127.0.0.1:60678 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60734 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: what ai are you
+  Result 1: component_components_chat-bubble_clearmessages (score: 1.4022020101547241)
+  Result 2: component_components_ui_avatar_avatar (score: 1.4041240215301514)
+  Result 3: component_components_chat-bubble_getapimessages (score: 1.4371240139007568)
+  Result 4: component_components_chat-bubble_chatbubble (score: 1.4602093696594238)
+  Result 5: component_lib_utils_cn (score: 1.4660433530807495)
+Enhancing response with links from 5 search results
+Processing result: component_components_chat-bubble_clearmessages, name: clearMessages, type: component
+  Generated slug: components_chat-bubble_clearmessages for clearMessages
+Processing result: component_components_ui_avatar_avatar, name: Avatar, type: component
+  Generated slug: components_ui_avatar_avatar for Avatar
+Processing result: component_components_chat-bubble_getapimessages, name: getApiMessages, type: component
+  Generated slug: components_chat-bubble_getapimessages for getApiMessages
+Processing result: component_components_chat-bubble_chatbubble, name: ChatBubble, type: component
+  Generated slug: components_chat-bubble_chatbubble for ChatBubble
+Processing result: component_lib_utils_cn, name: cn, type: component
+  Generated slug: lib_utils_cn for cn
+Link enhancement complete. Found 5 potential links
+INFO:     127.0.0.1:60734 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60936 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: who are you
+  Result 1: component_components_chat-bubble_clearmessages (score: 1.6627821922302246)
+  Result 2: component_components_chat-bubble_getapimessages (score: 1.6689730882644653)
+  Result 3: method_components_chat-bubble_chatbubble_clearMessages (score: 1.7063615322113037)
+  Result 4: component_components_ui_avatar_avatarfallback (score: 1.72894287109375)
+  Result 5: method_components_chat-bubble_chatbubble_getApiMessages (score: 1.7306315898895264)
+Ollama error: 
+INFO:     127.0.0.1:60936 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61121 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 3: method_components_ui_card_card_zach (score: 1.7523932456970215)
+  Result 4: component_components_chat-bubble_clearmessages (score: 1.7772340774536133)
+  Result 5: component_components_ui_avatar_avatar (score: 1.7902038097381592)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_chat-bubble_clearmessages, name: clearMessages, type: component
+  Generated slug: components_chat-bubble_clearmessages for clearMessages
+Processing result: component_components_ui_avatar_avatar, name: Avatar, type: component
+  Generated slug: components_ui_avatar_avatar for Avatar
+Link enhancement complete. Found 4 potential links
+INFO:     127.0.0.1:61121 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61433 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 3: method_components_ui_card_card_zach (score: 1.7523932456970215)
+  Result 4: component_components_chat-bubble_clearmessages (score: 1.7772340774536133)
+  Result 5: component_components_ui_avatar_avatar (score: 1.7902038097381592)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_chat-bubble_clearmessages, name: clearMessages, type: component
+  Generated slug: components_chat-bubble_clearmessages for clearMessages
+Processing result: component_components_ui_avatar_avatar, name: Avatar, type: component
+  Generated slug: components_ui_avatar_avatar for Avatar
+Link enhancement complete. Found 4 potential links
+INFO:     127.0.0.1:61433 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61544 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 3: method_components_ui_card_card_zach (score: 1.7523932456970215)
+  Result 4: component_components_chat-bubble_clearmessages (score: 1.7772340774536133)
+  Result 5: component_components_ui_avatar_avatar (score: 1.7902038097381592)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_chat-bubble_clearmessages, name: clearMessages, type: component
+  Generated slug: components_chat-bubble_clearmessages for clearMessages
+Processing result: component_components_ui_avatar_avatar, name: Avatar, type: component
+  Generated slug: components_ui_avatar_avatar for Avatar
+Link enhancement complete. Found 4 potential links
+INFO:     127.0.0.1:61544 - "POST /chat HTTP/1.1" 200 OK

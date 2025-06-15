@@ -71,6 +71,14 @@ export default function ComponentClient({ slug }: { slug: string }) {
       if (fragment) {
         setSelectedMethod(fragment);
         setActiveTab('methods');
+        
+        // Scroll to the method after a brief delay to ensure the tab has switched
+        setTimeout(() => {
+          const element = document.getElementById(fragment);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
       }
     }
   }, []);
@@ -387,6 +395,7 @@ export default function ComponentClient({ slug }: { slug: string }) {
                     {componentData.methods.map((method, index) => (
                       <li
                         key={method.name}
+                        id={method.name}
                         className={`p-3 cursor-pointer ${selectedMethod === method.name ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                         onClick={() => setSelectedMethod(method.name)}
                       >

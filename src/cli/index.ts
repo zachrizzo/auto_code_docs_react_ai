@@ -15,6 +15,12 @@ import ignore from "ignore"; // NEW: for .gitignore parsing
 import axios from "axios";
 import { DockerManager } from "./utils/docker-manager";
 import { LangFlowManager } from "../ai/langflow/langflow-manager";
+import {
+  generateDocumentationData,
+  prepareUiDirectory,
+  startAiServices,
+  startUiServer,
+} from "./gencode";
 
 /**
  * Generate a unique slug for a component based on its file path and name
@@ -388,7 +394,7 @@ function extractAllCodeItems(fileContent: string, filePath: string, rootDir: str
 }
 
 // Parse all code items including nested functions and classes in all JS/TS files in a directory tree
-async function parseAllCodeItems(rootDir: string): Promise<any[]> {
+export async function parseAllCodeItems(rootDir: string): Promise<any[]> {
   const patterns = ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx"];
   const ignorePatterns = ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/build/**", "**/.git/**"];
   const files = await glob(patterns, {
@@ -454,7 +460,21 @@ const packageJson = require("../../package.json");
 program
   .name("code-y")
   .description("Generate documentation for React components")
-  .version(packageJson.version);
+  .version(packageJson.version)
+  .option("--cwd <path>", "Set the current working directory")
+  .hook("preAction", (thisCommand, actionCommand) => {
+    const cwd = thisCommand.opts().cwd;
+    if (cwd) {
+      const targetDir = path.resolve(cwd);
+      if (fs.existsSync(targetDir)) {
+        console.log(`Setting working directory to: ${targetDir}`);
+        process.chdir(targetDir);
+      } else {
+        console.error(`Error: Directory not found - ${targetDir}`);
+        process.exit(1);
+      }
+    }
+  });
 
 // Single 'generate' command: generate docs and serve UI
 program
@@ -485,696 +505,38 @@ program
       const outputDir = path.join(process.cwd(), "documentation");
       const docsDataDir = path.join(outputDir, "docs-data");
 
-      // Start AI services by default (unless --no-ai is specified)
-      let langflowManager: LangFlowManager | undefined;
-      if (!options.noAi) {
-        langflowManager = new LangFlowManager({
-          projectRoot: process.cwd(),
-          langflowConfigPath: options.langflowConfig,
-          ollamaUrl,
-          port: 6271
-        });
-        
-        const result = await langflowManager.start();
-        if (result.success) {
-          console.log(`✅ AI server running (${result.service}): ${result.url}`);
-          
-          // Set environment variables for UI
-          process.env.USE_LANGFLOW = "true";
-          process.env.LANGFLOW_URL = result.url;
-          
-          // Determine cleanup behavior
-          const shouldCleanup = options.cleanupOnExit || false;
-          const shouldKeep = options.keepEnvironment || true;
-          const doCleanup = shouldCleanup && !shouldKeep;
-
-          // Show environment info if embedded server is running
-          if (result.service === 'embedded') {
-            const envInfo = await langflowManager.getEnvironmentInfo();
-            console.log(`   Environment: ${envInfo.location} (${envInfo.size})`);
-            if (doCleanup) {
-              console.log('   ⚠️  Will cleanup on exit (--cleanup-on-exit)');
-            } else {
-              console.log('   💾 Will keep environment for faster restart');
-            }
-          }
-
-          // Handle shutdown gracefully
-          const shutdownHandler = async () => {
-            console.log('\n🛑 Shutting down AI services...');
-            await langflowManager!.stop(doCleanup);
-            if (doCleanup) {
-              console.log('🧹 Cleaned up Python environment');
-            }
-            process.exit(0);
-          };
-          
-          process.on('SIGINT', shutdownHandler);
-          process.on('SIGTERM', shutdownHandler);
-        } else {
-          console.warn("⚠️  AI services unavailable - using legacy chat");
-          console.log("   Install Python 3.8+ or Docker for enhanced AI features");
-        }
-      } else {
-        console.log("🤖 AI features disabled - using basic documentation generation only");
-      }
+      // Start AI services
+      await startAiServices({
+        noAi: options.noAi || false,
+        langflowConfig: options.langflowConfig,
+        ollamaUrl: ollamaUrl,
+        cleanupOnExit: options.cleanupOnExit,
+        keepEnvironment: options.keepEnvironment,
+      });
 
       // Set environment variables for the services
       process.env.OLLAMA_URL = ollamaUrl;
       process.env.OLLAMA_MODEL = ollamaModel;
       process.env.OLLAMA_EMBEDDING_MODEL = ollamaEmbeddingModel;
       
-      // Initialize vector similarity service with Ollama as default
-      const similarityService = createVectorSimilarityService();
-      
-      console.log(`Using Ollama for embeddings: ${process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest"} at ${process.env.OLLAMA_URL || "http://localhost:11434"}`);
-      
-      const codeItems = await parseAllCodeItems(rootDir);
-      
-      // Save code items to JSON files first
-      await fs.ensureDir(docsDataDir);
-      await fs.writeJson(path.join(docsDataDir, "code-index.json"), codeItems, { spaces: 2 });
-
-      for (const item of codeItems) {
-        const slug = item.slug || generateUniqueSlug(item.name, item.filePath, rootDir);
-        item.slug = slug; // Ensure slug is set
-        if (!item.relationships) item.relationships = [];
-        if (!item.imports) item.imports = [];
-        await fs.writeJson(path.join(docsDataDir, `${slug}.json`), item, { spaces: 2 });
-      }
-      
-      // Generate AI descriptions if enabled, using the same logic as the UI
-      if (generateDescriptions) {
-        console.log("Generating AI descriptions for code items...");
-        
-        // Function to generate description using Ollama (same as /api/describe endpoint)
-        const generateDescriptionWithOllama = async (componentName: string, code: string, filePath: string) => {
-          const prompt = `
-            You are an expert React developer documenting a component library.
-            Please provide a clear, concise description of the "${componentName}" component below.
-            Focus on:
-            - What the component does
-            - Key features and functionality
-            - Typical use cases
-
-            Keep the description between 2-3 sentences. Be precise and informative.
-
-            Component code:
-            ${code}
-            ${filePath ? `File path: ${filePath}` : ""}
-          `;
-
-          try {
-            console.log(`Sending request to Ollama API for ${componentName}...`);
-            
-            const response = await axios.post(`${ollamaUrl}/api/chat`, {
-              model: ollamaModel,
-              messages: [
-                {
-                  role: "system",
-                  content: "You are an AI assistant specializing in React component documentation.",
-                },
-                {
-                  role: "user",
-                  content: prompt,
-                },
-              ],
-              stream: false,
-            });
-
-            const data = response.data;
-            
-            if (data.message?.content) {
-              return data.message.content;
-            } else {
-              console.warn("Unexpected response format from Ollama:", JSON.stringify(data));
-              return `The ${componentName} component is a UI element that provides functionality based on its props and implementation.`;
-            }
-          } catch (error) {
-            if (axios.isAxiosError(error)) {
-              console.error(`Ollama API error: ${error.response?.status} ${error.response?.statusText}`);
-            } else {
-              console.error("Error generating description with Ollama:", error);
-            }
-            return `The ${componentName} component is a UI element that provides functionality based on its props and implementation.`;
-          }
-        };
-        
-        for (const item of codeItems) {
-          const itemPath = path.join(docsDataDir, `${item.slug}.json`);
-          try {
-            const currentItem = await fs.readJson(itemPath);
-
-            if (!currentItem.description || currentItem.description.trim() === "") {
-              console.log(`Generating description for ${currentItem.name}...`);
-              
-              const description = await generateDescriptionWithOllama(
-                currentItem.name,
-                currentItem.code || `function ${currentItem.name}() { /* Code not available */ }`,
-                currentItem.filePath
-              );
-              
-              if (description) {
-                currentItem.description = description;
-                currentItem.lastUpdated = new Date().toISOString();
-                await fs.writeJson(itemPath, currentItem, { spaces: 2 });
-                console.log(`Generated and saved description for ${currentItem.name}`);
-              }
-            }
-            
-            // Also generate descriptions for methods if they exist
-            if (currentItem.methods && Array.isArray(currentItem.methods)) {
-              for (const method of currentItem.methods) {
-                if (method && (!method.description || method.description.trim() === '')) {
-                  console.log(`Generating description for method ${method.name} in ${currentItem.name}...`);
-                  
-                  const methodDescription = await generateDescriptionWithOllama(
-                    `${currentItem.name}.${method.name}`,
-                    method.code || `function ${method.name}() { /* Code not available */ }`,
-                    currentItem.filePath
-                  );
-                  
-                  if (methodDescription) {
-                    method.description = methodDescription;
-                  }
-                }
-              }
-              
-              // Save updated methods
-              await fs.writeJson(itemPath, currentItem, { spaces: 2 });
-              console.log(`Updated descriptions for methods in ${currentItem.name}`);
-            }
-          } catch (error) {
-            console.error(`Error processing descriptions for ${item.name}:`, error);
-          }
-        }
-      }
-      
-      // Process each code item to extract methods and generate vectors
-      console.log("Processing methods for similarity analysis...");
-      for (const item of codeItems) {
-        if (item.methods && item.methods.length > 0) {
-          console.log(`Processing ${item.methods.length} methods in ${item.name}`);
-          // Process methods for similarity
-          await similarityService.processComponentMethods(item.name, item.methods, item.filePath);
-        }
-      }
-      console.log("Finished processing methods for similarity analysis.");
-      
-      // Save the vector database to a file in the documentation directory
-      saveVectorDatabase(similarityService, outputDir);
-      
-      // Create a more detailed component index for the UI
-      const componentIndex = codeItems.map(item => ({
-        name: item.name,
-        slug: item.slug,
-        type: item.kind || 'component',
-        filePath: item.filePath
-      }));
-      await fs.writeJson(path.join(docsDataDir, "component-index.json"), componentIndex, { spaces: 2 });
-      await generateDocUI(codeItems, { outputDir });
-      console.log(`Documentation generated for code in: ${rootDir}`);
+      await generateDocumentationData(rootDir, docsDataDir, generateDescriptions, ollamaUrl, ollamaModel);
       
       // Set up UI to serve docs from the current project
       const uiDir = path.join(__dirname, "../../src/ui");
-      const uiPublicDir = path.join(uiDir, "public");
-      const uiDocsDataDir = path.join(uiPublicDir, "docs-data");
-      
-      // Remove any existing docs-data symlink or directory
-      try {
-        await fs.remove(uiDocsDataDir);
-      } catch (error) {
-        console.error(`Error removing existing docs-data: ${error}`);
-      }
-      
-      // Create symlink from project's documentation to UI's public/docs-data
-      try {
-        // On Windows, we need to use junction instead of symlink
-        if (process.platform === "win32") {
-          await fs.symlink(outputDir, uiDocsDataDir, "junction");
-        } else {
-          await fs.symlink(outputDir, uiDocsDataDir);
-        }
-        console.log(`Linked documentation from ${outputDir} to UI server`);
-      } catch (error) {
-        console.error(`Error creating symlink: ${error}`);
-        // Fallback: copy the files if symlink fails
-        try {
-          await fs.copy(outputDir, uiDocsDataDir);
-          console.log(`Copied documentation from ${outputDir} to UI server`);
-        } catch (copyError) {
-          console.error(`Error copying documentation: ${copyError}`);
-        }
-      }
+      await prepareUiDirectory(outputDir, uiDir);
       
       // Start Next.js UI
-      let requestedPort = parseInt(port, 10);
-      let actualPort = requestedPort;
-      if (await isPortInUse(requestedPort)) {
-        actualPort = await findFreePort(requestedPort + 1);
-        console.log(`Port ${requestedPort} is in use. Using available port ${actualPort} instead.`);
-      }
-      console.log(`Starting Next.js UI from ${uiDir} on port ${actualPort}...`);
-      const child = spawn(
-        process.platform === "win32" ? "npx.cmd" : "npx",
-        ["next", "dev", "-p", String(actualPort)],
-        {
-          cwd: uiDir,
-          stdio: "inherit",
-          shell: false,
-          env: {
-            ...process.env,
-            USE_LANGFLOW: process.env.USE_LANGFLOW || "false",
-            LANGFLOW_URL: process.env.LANGFLOW_URL || "http://localhost:6271"
-          }
-        }
-      );
-      child.on("exit", (code) => {
-        process.exit(code ?? 0);
-      });
+      await startUiServer(port, uiDir);
+
     } catch (error: unknown) {
       console.error(
-        "Error serving documentation UI:",
+        "Error generating documentation:",
         error instanceof Error ? error.message : String(error)
       );
       process.exit(1);
     }
   });
 
-// Add a default action to the main program
-/**
- * Default CLI action for code-y.
- * Generates documentation for React components based on provided options.
- * @param options {CodeYOptions} - Parsed CLI options
- */
-program.action(async (options: CodeYOptions) => {
-  console.log("📚 Generating documentation...");
-
-  // Process options
-  const rootDir = path.resolve(options.root || process.cwd());
-  console.log(`Using root directory: ${rootDir}`);
-
-  const excludePatterns = options.exclude.split(",");
-  const includePatterns = options.include.split(",");
-  const maxDepth =
-    options.depth === "Infinity" ? Infinity : parseInt(options.depth);
-
-  // Standardize boolean parsing from commander (it should provide booleans)
-  const useOllama =
-    options.useOllama === true ||
-    String(options.useOllama).toLowerCase() === "true";
-  // Chat is always enabled
-  const enableChat = true;
-  const showCode =
-    options.showCode === true ||
-    String(options.showCode).toLowerCase() === "true";
-  const showMethods =
-    options.showMethods === true ||
-    String(options.showMethods).toLowerCase() === "true";
-  const showSimilarity =
-    options.showSimilarity === true ||
-    String(options.showSimilarity).toLowerCase() === "true";
-  const generateDescriptions =
-    options.generateDescriptions === true ||
-    String(options.generateDescriptions).toLowerCase() === "true";
-  const startUi =
-    options.startUi === true ||
-    String(options.startUi).toLowerCase() === "true";
-
-  try {
-    let allComponents: ComponentDefinition[] = [];
-
-    // Refined API Key logic for Ollama
-    let apiKey = options.ai || process.env.OPENAI_API_KEY;
-    const mockApiKey = "sk-mock-api-key-for-demo-purposes-only";
-    if (useOllama) {
-      apiKey = mockApiKey; // Always use mock key if Ollama is enabled
-      console.log("Using mock API key for Ollama integration");
-    } else if (!apiKey) {
-      console.error("API key is required when using OpenAI");
-      process.exit(1);
-    }
-
-    // If a specific component is provided, start parsing from there
-    if (options.component) {
-      const componentPath = path.resolve(rootDir, options.component);
-      console.log(`Parsing from root component: ${componentPath}`);
-
-
-    } else {
-      // If no component is specified, use the glob approach to find all components
-      console.log(
-        "No root component specified. Scanning entire project for components..."
-      );
-
-      // Use the glob-based approach similar to generate-and-run-docs.sh
-      const glob = require("glob");
-      const reactDocgen = require("react-docgen-typescript");
-      const {
-        parseSingleComponentFile,
-        processComponentListSimilarities,
-      } = require("../core/parser");
-      const { VectorSimilarityService } = require("../ai/vector-similarity/vector-similarity");
-
-      // Find all component files in the project
-      const componentFiles = glob.sync(
-        includePatterns.map((pattern: string) => path.join(rootDir, pattern)),
-        {
-          ignore: excludePatterns,
-        }
-      );
-
-      console.log(`Found ${componentFiles.length} component files to process`);
-
-      // Initialize parser
-      const parserOptions = {
-        propFilter: (prop: any) =>
-          !prop.parent || !prop.parent.fileName.includes("node_modules"),
-        shouldExtractLiteralValuesFromEnum: true,
-        shouldRemoveUndefinedFromOptional: true,
-      };
-
-      let tsconfigPath = path.join(rootDir, "tsconfig.json");
-      if (!fs.existsSync(tsconfigPath)) {
-        tsconfigPath = path.join(process.cwd(), "tsconfig.json");
-      }
-
-      const parser = fs.existsSync(tsconfigPath)
-        ? reactDocgen.withCustomConfig(tsconfigPath, parserOptions)
-        : reactDocgen.withDefaultConfig(parserOptions);
-
-      console.log("Parser initialized");
-
-      // Initialize similarity service using our helper to ensure Ollama is used for embeddings by default
-      const similarityService = createVectorSimilarityService();
-
-      console.log("Similarity service options:", {
-        ollamaUrl: options.ollamaUrl,
-        ollamaEmbeddingModel: options.ollamaEmbeddingModel,
-        similarityThreshold: parseFloat(options.similarityThreshold),
-        hasApiKey: !!apiKey, // Check the final apiKey value
-      });
-
-      // Process each file
-      console.log("--- Starting component collection ---");
-      for (const file of componentFiles) {
-        console.log(`Collecting components from: ${file}`);
-        try {
-          const componentsFromFile = await parseSingleComponentFile(
-            {
-              rootDir,
-              componentPath: file,
-              excludePatterns,
-              includePatterns,
-              maxDepth,
-            },
-            parser
-          );
-
-          if (componentsFromFile && componentsFromFile.length > 0) {
-            allComponents = [...allComponents, ...componentsFromFile];
-            console.log(
-              `Collected ${componentsFromFile.length} component(s) from ${file}`
-            );
-          }
-        } catch (error: unknown) {
-          console.error(
-            `Error parsing ${file}:`,
-            error instanceof Error ? error.message : String(error)
-          );
-        }
-      }
-
-      // Process similarities
-      if (allComponents.length > 0) {
-        console.log("--- Processing component similarities ---");
-        await processComponentListSimilarities(
-          allComponents,
-          similarityService
-        );
-        
-        // Save the vector database to a file in the documentation directory
-        const outputDir = path.resolve(rootDir, options.output);
-        saveVectorDatabase(similarityService, outputDir);
-      }
-    }
-
-    console.log(`Found ${allComponents.length} total components`);
-
-    // Generate AI descriptions if explicitly requested
-    if (generateDescriptions) {
-      // Use parsed boolean
-      console.log("Generating AI descriptions for components...");
-      const aiGenerator = new AiDescriptionGenerator({
-        useOllama: useOllama,
-        ollamaUrl: options.ollamaUrl,
-        ollamaModel: options.chatModel, // Use chatModel for generation
-        apiKey: apiKey, // Pass potentially overridden API key
-      });
-
-      // Ensure all components have sourceCode property for the AI generator
-      for (const component of allComponents) {
-        if (!component.sourceCode && component.code) {
-          component.sourceCode = component.code;
-        }
-        // Methods in components should already have code property from MethodDefinition
-        // No need to duplicate since AI generator checks both sourceCode and code
-      }
-
-      allComponents = await aiGenerator.enhanceComponentsWithDescriptions(
-        allComponents
-      );
-      console.log("AI descriptions generation completed");
-    } else {
-      console.log(
-        "Skipping AI description generation (use --generate-descriptions to enable)"
-      );
-    }
-
-    // Save components to JSON for reference
-    const componentsJsonPath = path.join(process.cwd(), "docs-components.json");
-    fs.writeJsonSync(componentsJsonPath, allComponents, { spaces: 2 });
-
-    // Generate the documentation UI
-    const outputDir = path.join(rootDir, options.output);
-    const docsDataDir = path.join(outputDir, "docs-data");
-
-    await generateDocUI(allComponents, {
-      title: "React Component Documentation",
-      description: "Auto-generated documentation for React components",
-      theme: options.theme,
-      outputDir: docsDataDir,
-      showCode: showCode, // Use parsed boolean
-      showMethods: showMethods, // Use parsed boolean
-      showSimilarity: showSimilarity, // Use parsed boolean
-    });
-
-    console.log(`✅ Documentation generated at: ${outputDir}`);
-
-    // Create a docs URL file
-    const docsUrl = `http://localhost:${options.port}/docs`;
-    fs.writeFileSync(path.join(process.cwd(), "docs-url.txt"), docsUrl);
-
-    // Start the server if requested (default to true)
-    if (startUi) {
-      // Use parsed boolean
-      console.log(
-        `🚀 Starting documentation server on port ${options.port}...`
-      );
-
-      // Find a free port if the specified one is in use
-      const port = await findFreePort(parseInt(options.port));
-      if (port !== parseInt(options.port)) {
-        console.log(
-          `Port ${options.port} was busy, using port ${port} instead`
-        );
-      options.port = port.toString();
-      }
-      
-      // Update the docs URL with the selected port
-      const docsUrl = `http://localhost:${options.port}/docs`;
-
-      console.log(
-        `🚀 Starting documentation server on port ${options.port}...`
-      );
-
-      try {
-        // Instead of just creating an env file, we need to copy the UI files
-        const outputDocsUiDir = path.join(outputDir, "ui");
-        const packageUiDir = path.join(__dirname, "../../dist/ui");
-
-        // Remove any existing UI directory to clean stale artifacts
-        if (fs.existsSync(outputDocsUiDir)) {
-          fs.removeSync(outputDocsUiDir);
-        }
-
-        // Copy the UI files from the package to the output directory (filter out compiled artifacts)
-        console.log(`Copying UI files from package to ${outputDocsUiDir}...`);
-        fs.copySync(packageUiDir, outputDocsUiDir, {
-          overwrite: true,
-          filter: (src) => {
-            const ext = path.extname(src);
-            const base = path.basename(src);
-            // Exclude all .js except essential config files
-            if (ext === ".js") {
-              if (base === "postcss.config.js" || base === "tailwind.config.js") {
-                return true;
-              }
-              return false;
-            }
-            if (ext === ".js.map" || ext === ".d.ts") return false;
-            if (base === "postcss.config.mjs") return false;
-            return true;
-          },
-        });
-
-        // Create .env.local file in the UI directory
-        const envFilePath = path.join(outputDocsUiDir, ".env.local");
-        fs.writeFileSync(
-          envFilePath,
-          `PORT=${options.port}
-NEXT_PUBLIC_ENABLE_CHAT=true
-NEXT_PUBLIC_USE_OLLAMA=${useOllama}
-NEXT_PUBLIC_OLLAMA_URL=${options.ollamaUrl}
-NEXT_PUBLIC_OLLAMA_MODEL=${options.ollamaModel}
-NEXT_PUBLIC_CHAT_MODEL=${options.chatModel}
-NEXT_PUBLIC_SHOW_CODE=${showCode}
-NEXT_PUBLIC_SHOW_METHODS=${showMethods}
-NEXT_PUBLIC_SHOW_SIMILARITY=${showSimilarity}
-            `,
-          "utf8"
-        );
-
-        // Create a docs-config.js file
-        fs.writeFileSync(
-          path.join(outputDocsUiDir, "docs-config.js"),
-          `module.exports = {
-  port: ${options.port},
-  enableChat: true,
-  useOllama: ${useOllama},
-  ollamaUrl: "${options.ollamaUrl}",
-  ollamaModel: "${options.ollamaModel}",
-  chatModel: "${options.chatModel}",
-  showCode: ${showCode},
-  showMethods: ${showMethods},
-  showSimilarity: ${showSimilarity}
-};
-            `
-    );
-
-    console.log(`Configuration saved to ${outputDir}`);
-
-    // Open the browser with dynamic import
-    (async () => {
-      try {
-        const open = await import("open");
-        await open.default(docsUrl);
-        console.log(`✓ Browser opened to ${docsUrl}`);
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : String(err);
-        console.error("Error opening browser:", errorMessage);
-        console.log(
-          `To view documentation, open your browser to: ${docsUrl}`
-        );
-      }
-    })();
-
-        // Start the Next.js server from the UI directory
-        console.log(`Starting Next.js server from ${outputDocsUiDir}...`);
-
-        try {
-          // Change to the UI directory to run Next.js
-          process.chdir(outputDocsUiDir);
-
-          // First install dependencies
-          console.log("Installing UI dependencies...");
-          try {
-            execSync("npm install --legacy-peer-deps", {
-              stdio: "inherit",
-              cwd: outputDocsUiDir,
-            });
-            console.log("Dependencies installed successfully");
-          } catch (npmError) {
-            console.warn("Warning: Could not install dependencies:", npmError);
-            console.log(
-              "Continuing anyway, but the server might fail to start..."
-            );
-          }
-
-          // Start the Next.js server
-          const nextProcess = spawn(
-            "npx",
-            ["next", "dev", "-p", options.port.toString()],
-            {
-              stdio: "inherit",
-              shell: true,
-            }
-          );
-
-          // Handle server process
-          nextProcess.on("error", (err) => {
-            console.error("Failed to start Next.js server:", err);
-            console.log(`Falling back to serving static files...`);
-
-            // Fall back to serving with 'serve' if Next.js fails
-            const serveProcess = spawn(
-              "npx",
-              ["serve", outputDir, "-p", options.port.toString()],
-              {
-                stdio: "inherit",
-                shell: true,
-              }
-            );
-          });
-
-          // Keep the process running
-          process.stdin.resume();
-        } catch (error) {
-          console.error("Error starting Next.js server:", error);
-          console.log(`Falling back to serving static files...`);
-
-          // Fall back to serving with 'serve'
-          try {
-            const serveProcess = spawn(
-              "npx",
-              ["serve", outputDir, "-p", options.port.toString()],
-              {
-                stdio: "inherit",
-                shell: true,
-              }
-            );
-          } catch (serveError) {
-            console.error("Error starting serve:", serveError);
-            console.log(`To view documentation, run:
-1. cd ${outputDocsUiDir}
-2. npm run dev -- -p ${options.port}`);
-          }
-        }
-      } catch (error) {
-        console.error("Error starting UI server:", error);
-        console.log(`To view documentation, run:
-1. cd to your Next.js UI directory
-2. npm run dev -- -p ${options.port}`);
-      }
-    } else {
-      console.log(`To view documentation, run:
-1. cd to your Next.js UI directory
-2. npm run dev -- -p ${options.port}`);
-      console.log(`Or view the docs at: ${docsUrl} after starting your server`);
-    }
-  } catch (error) {
-    console.error("Error generating documentation:", error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-});
-
-
-
-/**
- * Run the CLI program asynchronously.
- * Parses process.argv and executes the appropriate command/action.
- */
 export async function run(): Promise<void> {
   await program.parseAsync(process.argv);
 }

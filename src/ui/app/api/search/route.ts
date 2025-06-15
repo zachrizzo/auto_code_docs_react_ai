@@ -46,16 +46,21 @@ export async function GET() {
             if (name[0] === name[0].toUpperCase()) {
               if (filePath.includes('component') || filePath.includes('/ui/') || 
                   name.includes('Component') || name.includes('Page') || name.includes('Modal') ||
-                  name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout')) {
+                  name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout') ||
+                  name.includes('Dialog') || name.includes('Button') || name.includes('Card') ||
+                  name.includes('Input') || name.includes('Form') || name.includes('List') ||
+                  name.includes('Menu') || name.includes('Nav') || name.includes('Header') ||
+                  name.includes('Footer') || name.includes('Sidebar') || name.includes('Panel')) {
                 entityType = 'component'
               } else if (name.includes('Service') || name.includes('Manager') || name.includes('Controller') ||
-                        name.includes('Class') || name.includes('Handler')) {
+                        name.includes('Class') || name.includes('Handler') || name.includes('Store') ||
+                        name.includes('Repository') || name.includes('Factory') || name.includes('Builder')) {
                 entityType = 'class'
               } else {
-                entityType = 'component' // Uppercase names are usually components
+                entityType = 'component' // Uppercase names are usually components in React
               }
             } else {
-              // Lowercase names are usually functions
+              // Lowercase names are functions (not methods unless explicitly marked)
               entityType = 'function'
             }
           }
@@ -80,13 +85,37 @@ export async function GET() {
               try {
                 const detailData = JSON.parse(fs.readFileSync(componentPath, 'utf-8'))
                 
-                // Add methods from the detailed data
+                // Add methods from the detailed data - only if parent is a class AND not already in component index
                 if (detailData.methods && detailData.methods.length > 0) {
                   detailData.methods.forEach((method: any) => {
                     if (method.name && method.name !== comp.name) {
+                      // Check if this method/function already exists in the component index
+                      const alreadyInIndex = indexData.some((indexItem: any) => 
+                        indexItem.name === method.name && 
+                        (indexItem.filePath === (detailData.filePath || comp.filePath) || 
+                         indexItem.slug.includes(method.name.toLowerCase()))
+                      )
+                      
+                      // Skip if already exists in component index
+                      if (alreadyInIndex) {
+                        return
+                      }
+                      
+                      // Determine if this is truly a method (function of a class) or just a function
+                      let methodType: 'method' | 'function' = 'function'
+                      
+                      // Only mark as method if the parent entity is a class
+                      if (entityType === 'class') {
+                        methodType = 'method'
+                      }
+                      // Or if the method explicitly indicates it's part of a class context
+                      else if (method.isClassMethod || method.memberOf || method.static) {
+                        methodType = 'method'
+                      }
+                      
                       items.push({
                         name: method.name,
-                        type: 'method',
+                        type: methodType,
                         slug: `${comp.slug}#${method.name.toLowerCase().replace(/\s/g, '-')}`,
                         parentName: comp.name,
                         filePath: detailData.filePath || comp.filePath,
@@ -114,10 +143,18 @@ export async function GET() {
           if (name[0] === name[0].toUpperCase()) {
             if (filePath.includes('component') || filePath.includes('/ui/') || 
                 name.includes('Component') || name.includes('Page') || name.includes('Modal') ||
-                name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout')) {
+                name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout') ||
+                name.includes('Dialog') || name.includes('Button') || name.includes('Card') ||
+                name.includes('Input') || name.includes('Form') || name.includes('List') ||
+                name.includes('Menu') || name.includes('Nav') || name.includes('Header') ||
+                name.includes('Footer') || name.includes('Sidebar') || name.includes('Panel')) {
               fallbackType = 'component'
+            } else if (name.includes('Service') || name.includes('Manager') || name.includes('Controller') ||
+                      name.includes('Class') || name.includes('Handler') || name.includes('Store') ||
+                      name.includes('Repository') || name.includes('Factory') || name.includes('Builder')) {
+              fallbackType = 'class'
             } else {
-              fallbackType = 'component' // Uppercase names are usually components
+              fallbackType = 'component' // Uppercase names are usually components in React
             }
           } else {
             fallbackType = 'function'
@@ -143,12 +180,33 @@ export async function GET() {
       }
     }
     
-    // Remove duplicates based on slug and name
-    const uniqueItems = allItems.filter((item, index, self) =>
-      index === self.findIndex((t) => (t.slug === item.slug && t.name === item.name))
-    )
+    // Remove duplicates based on name and filePath (more comprehensive deduplication)
+    const uniqueItems = allItems.filter((item, index, self) => {
+      return index === self.findIndex((t) => {
+        // Match by name and filePath to catch duplicates from different sources
+        const sameNameAndFile = t.name === item.name && t.filePath === item.filePath
+        // Also match by slug for exact duplicates
+        const sameSlug = t.slug === item.slug
+        return sameNameAndFile || sameSlug
+      })
+    })
     
-    console.log(`Generated ${uniqueItems.length} search items from ${indexData.length} components`)
+    // Log duplicate analysis
+    const duplicateAnalysis = allItems.reduce((acc, item) => {
+      const key = `${item.name}|${item.filePath}`
+      if (!acc[key]) {
+        acc[key] = []
+      }
+      acc[key].push(item.type)
+      return acc
+    }, {} as Record<string, string[]>)
+    
+    const duplicates = Object.entries(duplicateAnalysis).filter(([_, types]) => types.length > 1)
+    if (duplicates.length > 0) {
+      console.log('Found duplicates:', duplicates.slice(0, 5)) // Show first 5 duplicates
+    }
+    
+    console.log(`Generated ${uniqueItems.length} search items from ${indexData.length} components (removed ${allItems.length - uniqueItems.length} duplicates)`)
     
     return NextResponse.json({
       items: uniqueItems,

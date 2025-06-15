@@ -1,14 +1,33 @@
 "use client"
 import * as React from "react"
 import { useState } from "react"
+import Link from "next/link"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs"
 import { Badge } from "./ui/badge"
 import { ScrollArea } from "./ui/scroll-area"
-import { CodeIcon, EnterFullScreenIcon } from "@radix-ui/react-icons"
+import { CodeIcon, EnterFullScreenIcon, ExternalLinkIcon } from "@radix-ui/react-icons"
 import { Switch } from "./ui/switch"
 import { Label } from "./ui/label"
 import { diffLines, Change } from 'diff';
+
+// Helper function to get the correct URL path based on entity kind
+const getEntityUrl = (component: { slug?: string; kind?: string }, methodName?: string): string => {
+  if (!component.slug) return '#';
+  
+  let basePath = '/components'; // default fallback
+  
+  if (component.kind === 'function') {
+    basePath = '/functions';
+  } else if (component.kind === 'class') {
+    basePath = '/classes';
+  } else if (component.kind === 'component') {
+    basePath = '/components';
+  }
+  
+  const url = `${basePath}/${component.slug}`;
+  return methodName ? `${url}#${methodName}` : url;
+};
 
 interface ComparisonModalProps {
   isOpen: boolean
@@ -17,14 +36,20 @@ interface ComparisonModalProps {
     name: string
     code: string
     filePath: string
+    slug?: string
+    kind?: string
   }
   component2: {
     name: string
     code: string
     filePath: string
+    slug?: string
+    kind?: string
   }
   similarityScore: number
   methodName?: string
+  method1Name?: string
+  method2Name?: string
   isMethodComparison?: boolean
 }
 
@@ -35,6 +60,8 @@ export function ComparisonModal({
   component2,
   similarityScore: initialSimilarityScore,
   methodName,
+  method1Name,
+  method2Name,
   isMethodComparison = false
 }: ComparisonModalProps) {
   const [view, setView] = useState<"split" | "unified">("split")
@@ -264,12 +291,45 @@ export function ComparisonModal({
               <div className="flex-shrink-0 p-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
                 <CodeIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <div>
-                <h3 className="font-bold text-lg">
-                  {isMethodComparison && methodName
-                    ? `${component1.name}.${methodName}`
-                    : component1.name}
-                </h3>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg">
+                    {component1.slug ? (
+                      isMethodComparison && (method1Name || methodName) ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link 
+                            href={getEntityUrl(component1)}
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1"
+                          >
+                            {component1.name}
+                            <ExternalLinkIcon className="h-3 w-3" />
+                          </Link>
+                          <span className="text-muted-foreground">::</span>
+                          <Link 
+                            href={getEntityUrl(component1, method1Name || methodName)}
+                            className="font-mono text-sm bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/50 transition-colors text-indigo-700 dark:text-indigo-300"
+                          >
+                            {method1Name || methodName}
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link 
+                          href={getEntityUrl(component1)}
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1"
+                        >
+                          {component1.name}
+                          <ExternalLinkIcon className="h-3 w-3" />
+                        </Link>
+                      )
+                    ) : (
+                      <span>
+                        {isMethodComparison && methodName
+                          ? `${component1.name}.${methodName}`
+                          : component1.name}
+                      </span>
+                    )}
+                  </h3>
+                </div>
                 <p className="text-xs text-muted-foreground font-mono">{component1.filePath}</p>
               </div>
             </div>
@@ -278,12 +338,45 @@ export function ComparisonModal({
               <div className="flex-shrink-0 p-2 rounded-full bg-violet-100 dark:bg-violet-900/30">
                 <CodeIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
               </div>
-              <div>
-                <h3 className="font-bold text-lg">
-                  {isMethodComparison && methodName
-                    ? `${component2.name}.${methodName}`
-                    : component2.name}
-                </h3>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg">
+                    {component2.slug ? (
+                      isMethodComparison && (method2Name || methodName) ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link 
+                            href={getEntityUrl(component2)}
+                            className="text-violet-600 dark:text-violet-400 hover:underline hover:text-violet-700 dark:hover:text-violet-300 transition-colors flex items-center gap-1"
+                          >
+                            {component2.name}
+                            <ExternalLinkIcon className="h-3 w-3" />
+                          </Link>
+                          <span className="text-muted-foreground">::</span>
+                          <Link 
+                            href={getEntityUrl(component2, method2Name || methodName)}
+                            className="font-mono text-sm bg-violet-100 dark:bg-violet-900/30 px-2 py-1 rounded hover:bg-violet-200 dark:hover:bg-violet-800/50 transition-colors text-violet-700 dark:text-violet-300"
+                          >
+                            {method2Name || methodName}
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link 
+                          href={getEntityUrl(component2)}
+                          className="text-violet-600 dark:text-violet-400 hover:underline hover:text-violet-700 dark:hover:text-violet-300 transition-colors flex items-center gap-1"
+                        >
+                          {component2.name}
+                          <ExternalLinkIcon className="h-3 w-3" />
+                        </Link>
+                      )
+                    ) : (
+                      <span>
+                        {isMethodComparison && methodName
+                          ? `${component2.name}.${methodName}`
+                          : component2.name}
+                      </span>
+                    )}
+                  </h3>
+                </div>
                 <p className="text-xs text-muted-foreground font-mono">{component2.filePath}</p>
               </div>
             </div>
