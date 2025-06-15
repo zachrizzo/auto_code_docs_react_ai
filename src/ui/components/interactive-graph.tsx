@@ -44,9 +44,26 @@ interface InteractiveGraphProps {
   onNodeHover?: (nodeId: string | null) => void
   onGroupClick?: (groupId: string, groupNodes: Node[]) => void
   showMinimap?: boolean
+  enableAnimations?: boolean
+  setSelectedNodeId?: (nodeId: string | null) => void
+  focusMode?: boolean
+  setFocusMode?: (enabled: boolean) => void
 }
 
-export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, onNodeClick, onNodeHover, onGroupClick, showMinimap = true }: InteractiveGraphProps) {
+export function InteractiveGraph({ 
+  nodes, 
+  edges, 
+  focusNodeId, 
+  selectedNodeId, 
+  onNodeClick, 
+  onNodeHover, 
+  onGroupClick, 
+  showMinimap = true, 
+  enableAnimations = true,
+  setSelectedNodeId,
+  focusMode,
+  setFocusMode
+}: InteractiveGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.25)
@@ -75,7 +92,14 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const [showGroupContainers, setShowGroupContainers] = useState(true)
   const [edgeStyle, setEdgeStyle] = useState<'straight' | 'curved' | 'step'>('curved')
   const [focusedGroup, setFocusedGroup] = useState<string | null>(null)
-  const [groupFocusMode, setGroupFocusMode] = useState(false)
+  const [groupFocusMode, setGroupFocusMode] = useState(focusMode || false)
+  
+  // Sync focus mode with props
+  useEffect(() => {
+    if (focusMode !== undefined) {
+      setGroupFocusMode(focusMode)
+    }
+  }, [focusMode])
   const [selectedNodeForMenu, setSelectedNodeForMenu] = useState<string | null>(null)
   const [selectedGroupForMenu, setSelectedGroupForMenu] = useState<string | null>(null)
   const [menuActionHover, setMenuActionHover] = useState<string | null>(null)
@@ -84,11 +108,55 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
   const animationRef = useRef<number>()
   const nodesRef = useRef<Node[]>(nodes)
   const edgesRef = useRef<Edge[]>(edges)
+  const [animationTime, setAnimationTime] = useState(0)
+  const [enableAnimation, setEnableAnimation] = useState(enableAnimations)
+  const [animationSpeed, setAnimationSpeed] = useState(1) // Speed multiplier (1 = normal, 0.5 = half speed, 2 = double speed)
+  const baseAnimationSpeed = 2000 // milliseconds for full cycle
 
   // Physics simulation parameters - adjusted for grouped layouts
   const FORCE_STRENGTH = layoutMode === 'grouped' ? 0.01 : layoutMode === 'force' ? 0.02 : 0.008
   const DAMPING = 0.88
   const CENTER_FORCE = layoutMode === 'grouped' ? 0.001 : layoutMode === 'force' ? 0.003 : 0.001
+
+  // Animation loop for line animations
+  useEffect(() => {
+    if (!enableAnimation) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = undefined
+      }
+      return
+    }
+    
+    const startTime = Date.now()
+    const updateAnimation = () => {
+      const elapsed = Date.now() - startTime
+      setAnimationTime(elapsed)
+      
+      // Only continue animation if still enabled and component is mounted
+      if (enableAnimation && animationRef.current !== undefined) {
+        animationRef.current = requestAnimationFrame(updateAnimation)
+      }
+    }
+    
+    animationRef.current = requestAnimationFrame(updateAnimation)
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = undefined
+      }
+    }
+  }, [enableAnimation])
+  
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [])
 
   // Create groups based on grouping mode
   const nodeGroups = useMemo(() => {
@@ -641,20 +709,35 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
           ctx.shadowOffsetY = 0
         }
         
-        // Draw main edge line
+        // Draw main edge line with animation
         ctx.strokeStyle = edgeColor
         ctx.lineWidth = lineWidth
         
-        // Different line styles for different relationship types
+        // Different line styles for different relationship types with animation
+        const animationPhase = enableAnimation ? (animationTime / animationSpeed) % 1 : 0
+        const dashOffset = animationPhase * 24 // Animate dash offset
+        
         switch (edge.type) {
           case 'uses':
-            ctx.setLineDash([]) // Solid line for uses
+            if (enableAnimation && (isHighlighted || isHovered)) {
+              // Animated flowing dots for highlighted uses relationships
+              ctx.setLineDash([6, 12])
+              ctx.lineDashOffset = -dashOffset
+            } else {
+              ctx.setLineDash([]) // Solid line for uses
+            }
             break
           case 'inherits':
             ctx.setLineDash([12, 3, 3, 3]) // Dash-dot for inheritance
+            if (enableAnimation && (isHighlighted || isHovered)) {
+              ctx.lineDashOffset = -dashOffset * 0.5 // Slower animation for inheritance
+            }
             break
           case 'contains':
             ctx.setLineDash([8, 4]) // Dashed for containment
+            if (enableAnimation && (isHighlighted || isHovered)) {
+              ctx.lineDashOffset = -dashOffset * 0.3 // Even slower for containment
+            }
             break
           default:
             ctx.setLineDash([])
@@ -687,9 +770,129 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         
         ctx.stroke()
         
+        // Reset line dash for subsequent drawings
+        ctx.setLineDash([])
         ctx.shadowBlur = 0
         ctx.shadowOffsetX = 0
         ctx.shadowOffsetY = 0
+        
+        // Draw basic animated dashes for all edges when enabled
+        if (enableAnimation) {
+          // Show subtle flowing dashes on all edges (much slower, reversed direction)
+          const flowSpeed = 0.05 * animationSpeed  // Much slower: reduced from 0.15 to 0.05
+          const dashPhase = 1 - ((animationTime * flowSpeed / 1000) % 1)  // Reversed direction
+          
+          ctx.save()
+          ctx.strokeStyle = edgeColor.replace(/[\d.]+\)$/g, '0.4)')
+          ctx.lineWidth = Math.max(1, lineWidth - 1)
+          ctx.setLineDash([8, 8])
+          ctx.lineDashOffset = dashPhase * 16
+          
+          ctx.beginPath()
+          if (edgeStyle === 'straight') {
+            ctx.moveTo(startX, startY)
+            ctx.lineTo(endX, endY)
+          } else if (edgeStyle === 'curved') {
+            const midX = (startX + endX) / 2
+            const midY = (startY + endY) / 2
+            const controlOffset = distance * 0.2
+            const controlX = midX + (dy / distance) * controlOffset
+            const controlY = midY - (dx / distance) * controlOffset
+            ctx.moveTo(startX, startY)
+            ctx.quadraticCurveTo(controlX, controlY, endX, endY)
+          } else if (edgeStyle === 'step') {
+            const midX = (startX + endX) / 2
+            ctx.moveTo(startX, startY)
+            ctx.lineTo(midX, startY)
+            ctx.lineTo(midX, endY)
+            ctx.lineTo(endX, endY)
+          }
+          ctx.stroke()
+          ctx.restore()
+        }
+        
+        // Draw enhanced animated flow particles for highlighted edges
+        if (enableAnimation && (isHighlighted || isHovered)) {
+          const particleSettings = {
+            'uses': { numParticles: 3, particleSize: 4, speed: 0.08, trail: false },        // Much slower: 0.08
+            'inherits': { numParticles: 2, particleSize: 3, speed: 0.06, trail: true },    // Much slower: 0.06
+            'contains': { numParticles: 2, particleSize: 5, speed: 0.05, trail: false }   // Much slower: 0.05
+          }
+          
+          const settings = particleSettings[edge.type as keyof typeof particleSettings] || particleSettings['uses']
+          const particleColor = edgeColor.replace(/[\d.]+\)$/g, '0.9)')
+          const fadeColor = edgeColor.replace(/[\d.]+\)$/g, '0.3)')
+          
+          for (let i = 0; i < settings.numParticles; i++) {
+            const particlePhase = 1 - (((animationPhase * settings.speed) + i / settings.numParticles) % 1)  // Reversed direction
+            let particleX = startX + (endX - startX) * particlePhase
+            let particleY = startY + (endY - startY) * particlePhase
+            
+            // Add slight curve to particle path if using curved edges
+            if (edgeStyle === 'curved') {
+              const midX = (startX + endX) / 2
+              const midY = (startY + endY) / 2
+              const controlOffset = distance * 0.2
+              const controlX = midX + (dy / distance) * controlOffset
+              const controlY = midY - (dx / distance) * controlOffset
+              
+              // Bezier curve calculation for particle position
+              const t = particlePhase
+              const oneMinusT = 1 - t
+              particleX = oneMinusT * oneMinusT * startX + 2 * oneMinusT * t * controlX + t * t * endX
+              particleY = oneMinusT * oneMinusT * startY + 2 * oneMinusT * t * controlY + t * t * endY
+            }
+            
+            // Draw particle with enhanced effects
+            ctx.save()
+            
+            // Different particle styles for different relationship types
+            if (edge.type === 'uses') {
+              // Fast moving glowing dots for 'uses'
+              ctx.shadowBlur = 12
+              ctx.shadowColor = particleColor
+              ctx.fillStyle = particleColor
+              ctx.beginPath()
+              ctx.arc(particleX, particleY, settings.particleSize, 0, 2 * Math.PI)
+              ctx.fill()
+            } else if (edge.type === 'inherits') {
+              // Diamond shapes with trail for 'inherits'
+              const size = settings.particleSize
+              ctx.fillStyle = particleColor
+              ctx.beginPath()
+              ctx.moveTo(particleX, particleY - size)
+              ctx.lineTo(particleX + size, particleY)
+              ctx.lineTo(particleX, particleY + size)
+              ctx.lineTo(particleX - size, particleY)
+              ctx.closePath()
+              ctx.fill()
+              
+              // Add trail effect
+              if (settings.trail) {
+                for (let j = 1; j <= 3; j++) {
+                  const trailPhase = Math.max(0, particlePhase - j * 0.1)
+                  const trailX = startX + (endX - startX) * trailPhase
+                  const trailY = startY + (endY - startY) * trailPhase
+                  const trailAlpha = 0.3 / j
+                  
+                  ctx.fillStyle = fadeColor.replace(/[\d.]+\)$/g, `${trailAlpha})`)
+                  ctx.beginPath()
+                  ctx.arc(trailX, trailY, size / j, 0, 2 * Math.PI)
+                  ctx.fill()
+                }
+              }
+            } else if (edge.type === 'contains') {
+              // Square particles for 'contains'
+              const size = settings.particleSize
+              ctx.fillStyle = particleColor
+              ctx.shadowBlur = 8
+              ctx.shadowColor = particleColor
+              ctx.fillRect(particleX - size/2, particleY - size/2, size, size)
+            }
+            
+            ctx.restore()
+          }
+        }
         
         // Enhanced arrow for all relationships with size based on weight
         const angle = Math.atan2(dy, dx)
@@ -719,6 +922,57 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
         )
         ctx.closePath()
         ctx.fill()
+        
+        // Add animated flowing dot indicators for better visibility
+        if (enableAnimation) {
+          const flowPhase = 1 - ((animationTime / 16000) % 1)  // Even slower: 16 seconds for full cycle (half speed), reversed direction
+          const dotSpacing = distance / Math.max(2, Math.floor(distance / 200))  // More spacing between dots
+          const numFlowDots = Math.min(2, Math.max(1, Math.floor(distance / 250)))  // Fewer dots: max 2, larger spacing
+          
+          for (let i = 0; i < numFlowDots; i++) {
+            const dotPhase = (flowPhase + i / numFlowDots) % 1
+            let flowDotX = startX + (endX - startX) * dotPhase
+            let flowDotY = startY + (endY - startY) * dotPhase
+            
+            // Adjust for curved paths
+            if (edgeStyle === 'curved') {
+              const midX = (startX + endX) / 2
+              const midY = (startY + endY) / 2
+              const controlOffset = distance * 0.2
+              const controlX = midX + (dy / distance) * controlOffset
+              const controlY = midY - (dx / distance) * controlOffset
+              
+              const t = dotPhase
+              const oneMinusT = 1 - t
+              flowDotX = oneMinusT * oneMinusT * startX + 2 * oneMinusT * t * controlX + t * t * endX
+              flowDotY = oneMinusT * oneMinusT * startY + 2 * oneMinusT * t * controlY + t * t * endY
+            }
+            
+            const dotSize = 6  // Size of the flowing dots
+            const alpha = Math.sin(dotPhase * Math.PI) * 0.6 + 0.4 // Fade in/out but stay more visible
+            
+            ctx.save()
+            ctx.globalAlpha = alpha
+            
+            // Draw glowing dot
+            ctx.shadowBlur = 8
+            ctx.shadowColor = edgeColor.replace(/[\d.]+\)$/g, '0.8)')
+            ctx.fillStyle = edgeColor.replace(/[\d.]+\)$/g, '0.9)')
+            
+            ctx.beginPath()
+            ctx.arc(flowDotX, flowDotY, dotSize, 0, 2 * Math.PI)
+            ctx.fill()
+            
+            // Add inner bright dot for better visibility
+            ctx.shadowBlur = 0
+            ctx.fillStyle = '#ffffff'
+            ctx.beginPath()
+            ctx.arc(flowDotX, flowDotY, dotSize * 0.4, 0, 2 * Math.PI)
+            ctx.fill()
+            
+            ctx.restore()
+          }
+        }
         
         // Relationship type label on highlighted edges
         if (isHighlighted) {
@@ -809,15 +1063,23 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
       const nodeSize = Math.max(90, node.radius * 3.5) // Increased node size for better spacing
       const cornerRadius = 20
       
-      // Outer glow for selected/hovered nodes
+      // Outer glow for selected/hovered nodes with pulse animation
       if (isSelected || isHovered) {
-        const glowSize = isSelected ? 20 : 12
+        const baseGlowSize = isSelected ? 20 : 12
+        // Add subtle pulse animation to selected nodes (slowed down)
+        const pulseMultiplier = enableAnimation && isSelected ? 
+          (1 + Math.sin(animationTime / 2000) * 0.15) : 1  // Slowed from 1000ms to 2000ms, reduced intensity from 0.2 to 0.15
+        const glowSize = baseGlowSize * pulseMultiplier
+        
         const glowGradient = ctx.createRadialGradient(
           node.x, node.y, 0,
           node.x, node.y, nodeSize + glowSize
         )
-        glowGradient.addColorStop(0, isSelected ? color1 + '40' : color1 + '20')
-        glowGradient.addColorStop(0.5, isSelected ? color1 + '20' : color1 + '10')
+        const glowOpacity = enableAnimation && isSelected ? 
+          Math.min(0.6, 0.4 + Math.sin(animationTime / 1600) * 0.15) : 0.4  // Slowed from 800ms to 1600ms, reduced intensity
+        
+        glowGradient.addColorStop(0, isSelected ? color1 + Math.floor(glowOpacity * 255).toString(16) : color1 + '20')
+        glowGradient.addColorStop(0.5, isSelected ? color1 + Math.floor(glowOpacity * 127).toString(16) : color1 + '10')
         glowGradient.addColorStop(1, 'transparent')
         
         ctx.fillStyle = glowGradient
@@ -1079,7 +1341,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
     })
 
     ctx.restore()
-  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers, groupFocusMode, focusedGroup, selectedNodeForMenu, selectedGroupForMenu, menuActionHover])
+  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers, groupFocusMode, focusedGroup, selectedNodeForMenu, selectedGroupForMenu, menuActionHover, animationTime, enableAnimation, edgeStyle])
 
   // Minimap component with proper viewport tracking
   const MinimapComponent = ({ nodes, edges, scale, offset, canvasRef, selectedNode }: {
@@ -2730,6 +2992,16 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                 />
                 Connected
               </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableAnimation}
+                  onChange={(e) => setEnableAnimation(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <Zap className="h-4 w-4" />
+                Animated
+              </label>
             </div>
 
             {/* Zoom Controls */}
@@ -2850,6 +3122,7 @@ export function InteractiveGraph({ nodes, edges, focusNodeId, selectedNodeId, on
                   onClick={() => {
                     setGroupFocusMode(false)
                     setFocusedGroup(null)
+                    setFocusMode?.(false)
                   }}
                   className="ml-1 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-bold"
                   title="Clear group focus"

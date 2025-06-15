@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "../lib/utils"
 import { Button } from "./ui/button"
 import { ScrollArea } from "./ui/scroll-area"
-import { LayoutDashboard, GitCompare, Component, Code, FileCode, Layers, Network, BookOpen, Workflow } from "lucide-react"
+import { LayoutDashboard, GitCompare, Component, Code, FileCode, Layers, Network, BookOpen, Workflow, AlertTriangle } from "lucide-react"
 
 export function SidebarWrapper() {
     const pathname = usePathname() || ""
@@ -63,6 +63,32 @@ export function SidebarWrapper() {
                             <Link href="/structure">
                                 <Workflow className="h-4 w-4" />
                                 Architecture
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            asChild
+                            className={cn(
+                                "w-full justify-start gap-2",
+                                pathname === "/mcp" && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
+                            )}
+                        >
+                            <Link href="/mcp">
+                                <Layers className="h-4 w-4" />
+                                MCP
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            asChild
+                            className={cn(
+                                "w-full justify-start gap-2",
+                                pathname === "/unused-functions" && "bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400",
+                            )}
+                        >
+                            <Link href="/unused-functions">
+                                <AlertTriangle className="h-4 w-4" />
+                                Unused Functions
                             </Link>
                         </Button>
                         <Button

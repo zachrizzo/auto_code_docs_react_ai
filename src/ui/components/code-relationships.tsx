@@ -8,19 +8,15 @@ import { Badge } from "./ui/badge"
 import { Code, Component, ActivityIcon as Function, FileCode } from "lucide-react"
 import { ArrowRightIcon } from "@radix-ui/react-icons"
 import { InteractiveGraph } from "./interactive-graph"
-import { McpServerControl } from "./mcp-server-control"
-import { CodeSimilaritySearch } from "./code-similarity-search"
 import {
   RelationshipStats,
+  RelationshipStatsData,
   NodeDetailsPanel,
   GroupDetailsPanel,
   CodePreviewModal,
   type CodeEntity,
   type Relationship,
-  type RelationshipStatsData
 } from "./relationships"
-
-// Types are now imported from ./relationships
 
 interface CodeRelationshipsProps {
   entityId?: string // If provided, show relationships for this specific entity
@@ -46,40 +42,26 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
     async function fetchData() {
       try {
         setLoading(true)
-        // Fetch component index first
-        const indexRes = await fetch('/docs-data/component-index.json')
-        if (!indexRes.ok) {
-          throw new Error(`Failed to fetch component index: ${indexRes.statusText}`)
+        // Fetch all entities with proper types from search API
+        const searchRes = await fetch('/api/search')
+        if (!searchRes.ok) {
+          throw new Error(`Failed to fetch entities: ${searchRes.statusText}`)
         }
-        const indexData = await indexRes.json()
+        const searchData = await searchRes.json()
 
-        // Create entities from index data using actual kind field
+        // Create entities from search data which has proper type information
         const allEntities: CodeEntity[] = []
         
-        indexData.forEach((entity: { name: string; slug: string; kind: string; filePath?: string; methods?: any[] }) => {
+        searchData.items.forEach((entity: { name: string; slug: string; type: string; filePath?: string; parentName?: string }) => {
           // Add the main entity
           allEntities.push({ 
             id: entity.slug, 
             name: entity.name, 
-            type: entity.kind || "component", 
-            filePath: entity.filePath || `src/components/${entity.name}`, 
-            methods: entity.methods || [], 
+            type: entity.type || "component", 
+            filePath: entity.filePath || `src/${entity.type}s/${entity.name}`, 
+            methods: [], 
             props: [] 
           })
-          
-          // Add methods as separate entities if they exist
-          if (entity.methods && entity.methods.length > 0) {
-            entity.methods.forEach((method: any) => {
-              allEntities.push({
-                id: `${entity.slug}_${method.name}`,
-                name: method.name,
-                type: "method",
-                filePath: entity.filePath,
-                methods: [],
-                props: []
-              })
-            })
-          }
         })
         
         const componentsData = allEntities
@@ -135,7 +117,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         const relationshipsData: Relationship[] = []
         
         // First, add parent-child relationships for methods
-        indexData.forEach((entity: { slug: string; methods?: any[] }) => {
+        searchData.items.forEach((entity: { slug: string; methods?: any[] }) => {
           if (entity.methods && entity.methods.length > 0) {
             entity.methods.forEach((method: any) => {
               relationshipsData.push({
@@ -267,15 +249,12 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         )
         return [...prev, ...filtered]
       })
-      
-      return data
+
     } catch (error) {
       console.error(`Error loading details for ${componentId}:`, error)
-      return null
     }
   }
 
-  // Fetch code data for a specific node
   const fetchNodeCodeData = async (nodeId: string) => {
     try {
       const entity = components.find(c => c.id === nodeId)
@@ -283,71 +262,52 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         setNodeCodeData(null)
         return
       }
-      
-      // For methods, get the parent component's data and extract the specific method
-      if (entity.type === "method") {
-        const parentId = nodeId.substring(0, nodeId.lastIndexOf('_'))
-        const methodName = nodeId.substring(nodeId.lastIndexOf('_') + 1)
-        const parentData = await loadComponentDetails(parentId)
-        
-        if (parentData && parentData.methods) {
-          const methodData = parentData.methods.find((m: any) => m.name === methodName)
-          if (methodData) {
-            setNodeCodeData({
-              ...methodData,
-              type: "method",
-              filePath: entity.filePath
-            })
-            return
-          }
-        }
-        setNodeCodeData(null)
-        return
+
+      const res = await fetch(`/docs-data/${entity.id}.json`)
+      if (!res.ok) {
+        throw new Error(`Failed to fetch code for ${entity.name}`)
       }
+      const data = await res.json()
       
-      // For other entities, load normally
-      const data = await loadComponentDetails(nodeId)
-      setNodeCodeData(data)
+      // Set the complete data object that the modal expects
+      setNodeCodeData({
+        ...data,
+        name: data.name || entity.name,
+        type: data.type || data.kind || entity.type,
+        code: data.sourceCode || data.code,
+        filePath: data.filePath || entity.filePath
+      })
     } catch (error) {
-      console.error('Error fetching node code data:', error)
+      console.error("Error fetching node code:", error)
       setNodeCodeData(null)
     }
   }
 
-  // Handle node click to select node and show side panel
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId)
     // Fetch basic node data for the side panel
     const nodeEntity = components.find(c => c.id === nodeId)
     setSelectedNodeData(nodeEntity)
     
-    // Load detailed data for this component if not already loaded
-    if (nodeEntity && (!nodeEntity.methods || nodeEntity.methods.length === 0)) {
+    // Check if component details (methods, props) are already loaded
+    if (nodeEntity && nodeEntity.type !== 'method' && (!nodeEntity.methods || nodeEntity.methods.length === 0)) {
       loadComponentDetails(nodeId)
     }
     
-    // Clear group selection when selecting a node
-    setSelectedGroupId(null)
-    setSelectedGroupData(null)
-    // Reset focus mode when selecting a new node
-    setFocusMode(false)
-    // Reset panel position when selecting a new node (default to right side)
-    setPanelPosition({ 
-      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
-      y: 80 
-    })
-    // Reset minimize state
+    // For methods, we don't need to load more data as they are part of the parent
+    if (nodeEntity?.type === 'method') {
+      const parentId = nodeId.substring(0, nodeId.lastIndexOf('_'))
+      loadComponentDetails(parentId)
+    }
+
     setIsMinimized(false)
+    setSelectedGroupId(null)
   }
 
-  // Handle group click to select group and show side panel
   const handleGroupClick = (groupId: string, groupNodes: any[]) => {
     setSelectedGroupId(groupId)
-    // Create group data object with summary information
-    const groupData = {
+    setSelectedGroupData({
       id: groupId,
-      name: groupId,
-      nodeCount: groupNodes.length,
       nodes: groupNodes,
       types: [...new Set(groupNodes.map(n => n.type))],
       // Calculate connections to nodes outside this group
@@ -355,421 +315,479 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         const groupNodeIds = new Set(groupNodes.map(n => n.id))
         return (groupNodeIds.has(rel.source) && !groupNodeIds.has(rel.target)) ||
                (groupNodeIds.has(rel.target) && !groupNodeIds.has(rel.source))
-      })
-    }
-    setSelectedGroupData(groupData)
-    // Clear node selection when selecting a group
-    setSelectedNodeId(null)
-    setSelectedNodeData(null)
-    // Reset focus mode when selecting a group
-    setFocusMode(false)
-    // Reset panel position when selecting a group
-    setPanelPosition({ 
-      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
-      y: 80 
+      }).length
     })
-    // Reset minimize state
     setIsMinimized(false)
+    setSelectedNodeId(null)
   }
 
-  // Panel management functions
   const handleNodePanelClose = () => {
     setSelectedNodeId(null)
     setSelectedNodeData(null)
-    setPanelPosition({ 
-      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
-      y: 80 
-    })
-    setIsMinimized(false)
   }
 
   const handleGroupPanelClose = () => {
     setSelectedGroupId(null)
     setSelectedGroupData(null)
-    setPanelPosition({ 
-      x: typeof window !== 'undefined' ? window.innerWidth - 400 : 0, 
-      y: 80 
-    })
-    setIsMinimized(false)
   }
 
   const handleFocusGroup = (groupId: string) => {
     setFocusMode(true)
-    setSelectedNodeId(groupId)
+    setSelectedNodeId(groupId) // Use selectedNodeId to trigger focus in the graph
   }
 
-  // Handle opening the full code modal
   const openCodeModal = (nodeId: string) => {
     setSelectedNodeForCode(nodeId)
     fetchNodeCodeData(nodeId)
-    setSelectedNodeId(null)
-    setSelectedNodeData(null)
   }
 
-  // Close code preview modal
   const closeCodePreview = () => {
     setSelectedNodeForCode(null)
     setNodeCodeData(null)
   }
+  
+    // Filter relationships based on entityId, focus mode, and selected node
+    const filteredRelationships = useMemo(() => {
+      let baseRelationships = relationships
 
-  // If entityId is provided, filter relationships for this entity
-  const filteredRelationships = useMemo(() => {
-    if (!entityId || relationships.length === 0) {
-      return relationships
-    }
+      // First apply entityId filtering if provided
+      if (entityId && relationships.length > 0) {
+        baseRelationships = relationships.filter((rel) => {
+          if (view === "dependencies") return rel.source === entityId
+          if (view === "dependents") return rel.target === entityId
+          return rel.source === entityId || rel.target === entityId
+        })
+      }
 
-    return relationships.filter((rel) => {
-      if (view === "dependencies") return rel.source === entityId
-      if (view === "dependents") return rel.target === entityId
-      return rel.source === entityId || rel.target === entityId
-    })
-  }, [entityId, view, relationships])
+      // Then apply focus mode filtering if enabled and a node is selected
+      if (focusMode && selectedNodeId && baseRelationships.length > 0) {
+        return baseRelationships.filter((rel) => {
+          return rel.source === selectedNodeId || rel.target === selectedNodeId
+        })
+      }
+
+      return baseRelationships
+    }, [entityId, view, relationships, focusMode, selectedNodeId])
 
 
-  // Get the current entity if entityId is provided
-  const currentEntity = useMemo(() => {
-    if (!entityId || components.length === 0) return undefined
-    return components.find((e) => e.id === entityId)
-  }, [entityId, components])
+    // Get the current entity if entityId is provided
+    const currentEntity = useMemo(() => {
+      if (!entityId || components.length === 0) return undefined
+      return components.find((e) => e.id === entityId)
+    }, [entityId, components])
 
-  // Prepare graph data
-  const { graphNodes, graphEdges } = useMemo(() => {
-    if (components.length === 0) {
-      return { graphNodes: [], graphEdges: [] }
-    }
+    // Prepare graph data
+    const { graphNodes, graphEdges } = useMemo(() => {
+      if (components.length === 0) {
+        return { graphNodes: [], graphEdges: [] }
+      }
 
-    // Apply focus mode filtering if enabled and a node is selected
-    let workingRelationships = filteredRelationships
-    if (focusMode && selectedNodeId) {
-      // Find all relationships connected to the selected node
-      const relatedEntityIds = new Set<string>([selectedNodeId])
+      const workingRelationships = filteredRelationships
+      const involvedEntityIds = new Set(
+        workingRelationships.flatMap(rel => [rel.source, rel.target])
+      )
+
+      // Create nodes - include ALL components when showing all relationships, 
+      // or only connected ones when filtering
+      let nodesToShow = components
+      if (entityId || (focusMode && selectedNodeId)) {
+        // When filtering by entity or in focus mode, show connected nodes AND the target entity itself
+        const connectedNodes = components.filter(comp => involvedEntityIds.has(comp.id))
+        
+        // Always include the target entity/selected node even if it has no relationships
+        const targetNodeIds = new Set()
+        if (entityId) targetNodeIds.add(entityId)
+        if (focusMode && selectedNodeId) targetNodeIds.add(selectedNodeId)
+        
+        const targetNodes = components.filter(comp => targetNodeIds.has(comp.id))
+        
+        nodesToShow = [...connectedNodes, ...targetNodes].filter((node, index, self) => 
+          index === self.findIndex(n => n.id === node.id)
+        )
+      }
+      // Otherwise show all components to ensure functions and other entities are visible
       
-      // Get directly connected entities
-      filteredRelationships.forEach(rel => {
-        if (rel.source === selectedNodeId) {
-          relatedEntityIds.add(rel.target)
-        }
-        if (rel.target === selectedNodeId) {
-          relatedEntityIds.add(rel.source)
+      const nodes = nodesToShow.map(comp => {
+        const connections = workingRelationships.filter(
+          rel => rel.source === comp.id || rel.target === comp.id
+        ).length
+
+        return {
+          id: comp.id,
+          name: comp.name,
+          type: comp.type as 'component' | 'class' | 'function' | 'method',
+          x: Math.random() * 1200 + 300,
+          y: Math.random() * 800 + 200,
+          radius: Math.max(25, Math.min(45, 25 + connections * 2)),
+          color: '',
+          connections,
+          filePath: comp.filePath
         }
       })
 
-      // Filter relationships to only include those involving related entities
-      workingRelationships = filteredRelationships.filter(rel =>
-        relatedEntityIds.has(rel.source) && relatedEntityIds.has(rel.target)
+      // Create edges
+      const edges = workingRelationships.map(rel => ({
+        source: rel.source,
+        target: rel.target,
+        type: rel.type,
+        color: '',
+        width: 2,
+        weight: rel.weight || 1,
+        context: rel.context
+      }))
+
+      return { graphNodes: nodes, graphEdges: edges }
+    }, [components, filteredRelationships, focusMode, selectedNodeId, entityId])
+
+    const getEntityIcon = (type: CodeEntity["type"]) => {
+      switch (type) {
+        case "component": return <Component className="h-4 w-4" />
+        case "function": return <Function className="h-4 w-4" />
+        case "class": return <Code className="h-4 w-4" />
+        case "method": return <Function className="h-4 w-4 text-purple-500" />
+        default: return <FileCode className="h-4 w-4" />
+      }
+    }
+
+    const getRelationshipLabel = (type: Relationship["type"]) => {
+      switch (type) {
+        case "uses": return "Uses"
+        case "inherits": return "Inherits"
+        case "contains": return "Contains"
+        default: return "Unknown"
+      }
+    }
+
+    const getRelationshipColor = (type: Relationship["type"]) => {
+      switch (type) {
+        case "uses": return "stroke-blue-500"
+        case "inherits": return "stroke-green-500"
+        case "contains": return "stroke-gray-400"
+        default: return "stroke-gray-300"
+      }
+    }
+    
+    // Calculate statistics based on filtered relationships
+    const relationshipStats: RelationshipStatsData = useMemo(() => {
+      const stats: RelationshipStatsData = {
+        total: filteredRelationships.length,
+        byType: {} as Record<Relationship['type'], number>,
+        mostConnected: { name: '', connections: 0 }
+      };
+
+      const connectionCounts: Record<string, number> = {};
+      filteredRelationships.forEach((rel: Relationship) => {
+        stats.byType[rel.type] = (stats.byType[rel.type] || 0) + 1;
+        connectionCounts[rel.source] = (connectionCounts[rel.source] || 0) + 1;
+        connectionCounts[rel.target] = (connectionCounts[rel.target] || 0) + 1;
+      });
+
+      let mostConnectedEntityInfo = { name: '', connections: 0 };
+      Object.entries(connectionCounts).forEach(([entityId, count]) => {
+        if (count > mostConnectedEntityInfo.connections) {
+          const entity = components.find((c: CodeEntity) => c.id === entityId);
+          mostConnectedEntityInfo = { name: entity?.name || entityId, connections: count };
+        }
+      });
+      stats.mostConnected = mostConnectedEntityInfo;
+
+      return stats;
+    }, [filteredRelationships, components]);
+
+    if (loading && !entityId) {
+      return (
+        <Card className="bg-white dark:bg-slate-900 shadow-sm">
+          <CardHeader>
+            <CardTitle>Loading Relationships...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-center items-center py-12">
+              <div className="loader ease-linear rounded-full border-4 border-t-4 border-slate-200 h-12 w-12 mb-4"></div>
+            </div>
+          </CardContent>
+        </Card>
       )
     }
 
-    // Get all entities involved in relationships
-    const involvedEntityIds = new Set<string>()
-    workingRelationships.forEach(rel => {
-      involvedEntityIds.add(rel.source)
-      involvedEntityIds.add(rel.target)
-    })
-
-    // Create nodes - include ALL components when showing all relationships, 
-    // or only connected ones when filtering
-    let nodesToShow = components
-    if (entityId || (focusMode && selectedNodeId)) {
-      // When filtering by entity or in focus mode, only show connected nodes
-      nodesToShow = components.filter(comp => involvedEntityIds.has(comp.id))
-    }
-    // Otherwise show all components to ensure functions and other entities are visible
-    
-    const nodes = nodesToShow.map(comp => {
-      const connections = workingRelationships.filter(
-        rel => rel.source === comp.id || rel.target === comp.id
-      ).length
-
-      return {
-        id: comp.id,
-        name: comp.name,
-        type: comp.type as 'component' | 'class' | 'function' | 'method',
-        x: Math.random() * 1200 + 300,
-        y: Math.random() * 800 + 200,
-        radius: Math.max(25, Math.min(45, 25 + connections * 2)),
-        color: '',
-        connections,
-        filePath: comp.filePath
-      }
-    })
-
-    // Create edges
-    const edges = workingRelationships.map(rel => ({
-      source: rel.source,
-      target: rel.target,
-      type: rel.type,
-      color: '',
-      width: 2,
-      weight: rel.weight || 1,
-      context: rel.context
-    }))
-
-    return { graphNodes: nodes, graphEdges: edges }
-  }, [components, filteredRelationships, focusMode, selectedNodeId, entityId])
-
-  const getEntityIcon = (type: CodeEntity["type"]) => {
-    switch (type) {
-      case "component":
-        return <Component className="h-4 w-4" />
-      case "class":
-        return <Code className="h-4 w-4" />
-      case "function":
-        return <Function className="h-4 w-4" />
-      case "method":
-        return <FileCode className="h-4 w-4" />
-      default:
-        return <Component className="h-4 w-4" />
-    }
-  }
-
-  const getRelationshipLabel = (type: Relationship["type"]) => {
-    switch (type) {
-      case "uses":
-        return "Uses"
-      case "inherits":
-        return "Inherits"
-      case "contains":
-        return "Contains"
-      default:
-        return type
-    }
-  }
-
-  const getRelationshipColor = (type: Relationship["type"]) => {
-    switch (type) {
-      case "uses":
-        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
-      case "inherits":
-        return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800"
-      case "contains":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800"
-      default:
-        return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800"
-    }
-  }
-
-  // Calculate relationship statistics
-  const relationshipStats = useMemo(() => {
-    const stats = {
-      total: filteredRelationships.length,
-      byType: {} as Record<Relationship['type'], number>,
-      mostConnected: { name: '', connections: 0 }
-    };
-
-    filteredRelationships.forEach((rel: Relationship) => {
-      stats.byType[rel.type] = (stats.byType[rel.type] || 0) + 1;
-    });
-
-    const connectionCounts: Record<string, number> = {};
-    filteredRelationships.forEach((rel: Relationship) => {
-      connectionCounts[rel.source] = (connectionCounts[rel.source] || 0) + 1;
-      connectionCounts[rel.target] = (connectionCounts[rel.target] || 0) + 1;
-    });
-
-    let mostConnectedEntityInfo = { name: '', connections: 0 };
-    Object.entries(connectionCounts).forEach(([entityId, count]) => {
-      if (count > mostConnectedEntityInfo.connections) {
-        const entity = components.find((c: CodeEntity) => c.id === entityId);
-        mostConnectedEntityInfo = { name: entity?.name || entityId, connections: count };
-      }
-    });
-    stats.mostConnected = mostConnectedEntityInfo;
-
-    return stats;
-  }, [filteredRelationships, components]);
-
-  if (loading) {
-    return (
-      <Card className="bg-white dark:bg-slate-900 shadow-sm">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-          <CardTitle>Code Relationships</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-muted-foreground text-lg font-medium">Loading components...</p>
-            <p className="text-sm text-slate-500 mt-2">Loading component index and building relationships</p>
+    if (currentEntity) {
+      return (
+        <div className="space-y-6 pb-16">
+          <div className="flex items-center space-x-4 mb-4">
+            <h1 className="text-2xl font-bold">{currentEntity.name} Relationships</h1>
+            <Tabs value={view} onValueChange={(v) => setView(v as "dependencies" | "dependents" | "all")}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
+                <TabsTrigger value="dependents">Dependents</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
+          {filteredRelationships.length > 0 ? (
+            <p className="text-muted-foreground mb-4">
+              Showing {filteredRelationships.length} relationships for {currentEntity.name}.
+            </p>
+          ) : (
+            <p className="text-muted-foreground mb-4">
+              No relationships found for {currentEntity.name}.
+            </p>
+          )}
 
-  return (
-    <div className="space-y-6 pb-16">
-      <McpServerControl />
-      <CodeSimilaritySearch />
-
-      {/* Statistics Panel */}
-      {filteredRelationships.length > 0 && (
-        <RelationshipStats 
-          stats={relationshipStats} 
-          componentsCount={components.length} 
-        />
-      )}
-
-      <Card className="bg-white dark:bg-slate-900 shadow-sm">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between">
-            <CardTitle>{currentEntity ? `Code Relationships for ${currentEntity.name}` : "Code Relationships"}</CardTitle>
-            <div className="flex gap-4">
-              <Tabs value={graphView} onValueChange={(v) => setGraphView(v as any)}>
-                <TabsList className="bg-slate-100 dark:bg-slate-800">
-                  <TabsTrigger value="graph">Graph</TabsTrigger>
-                  <TabsTrigger value="list">List</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {currentEntity && (
-                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                  <TabsList className="bg-slate-100 dark:bg-slate-800">
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
-                    <TabsTrigger value="dependents">Dependents</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-      <CardContent className="p-6">
-        {components.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-slate-400 mb-4">
-              <Component className="h-16 w-16 mx-auto" />
-            </div>
-            <p className="text-muted-foreground text-lg font-medium">No components found</p>
-            <p className="text-sm text-slate-500 mt-2">Generate documentation first to analyze your code relationships</p>
-          </div>
-        ) : graphView === "graph" ? (
-          <div className="h-[85vh] w-full min-h-[700px]">
-            <InteractiveGraph
-              nodes={graphNodes}
-              edges={graphEdges}
-              focusNodeId={entityId}
-              selectedNodeId={selectedNodeId || undefined}
-              onNodeClick={handleNodeClick}
-              onGroupClick={handleGroupClick}
+          {/* Show the same graph interface as the main page, but filtered for this entity */}
+          {/* Statistics Panel */}
+          {filteredRelationships.length > 0 && (
+            <RelationshipStats 
+              stats={relationshipStats} 
+              componentsCount={components.length} 
             />
-            {filteredRelationships.length === 0 && !entityId && (
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  💡 All entities are displayed. Click on any node to explore its relationships.
+          )}
+
+          <Card className="bg-white dark:bg-slate-900 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Relationship Explorer</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Visualize and analyze connections for {currentEntity.name}.
                 </p>
               </div>
-            )}
-          </div>
-        ) : filteredRelationships.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-slate-400 mb-4">
-              <Component className="h-16 w-16 mx-auto" />
-            </div>
-            <p className="text-muted-foreground text-lg font-medium">No relationships found</p>
-            <p className="text-sm text-slate-500 mt-2">
-              {components.length} components loaded. Switch to graph view to see all entities.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {filteredRelationships.map((rel, index) => {
-              const sourceEntity = components.find((e) => e.id === rel.source)
-              const targetEntity = components.find((e) => e.id === rel.target)
-
-              if (!sourceEntity || !targetEntity) return null
-
-              return (
-                <div
-                  key={index}
-                  className="flex items-center gap-4 p-4 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {getEntityIcon(sourceEntity.type)}
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-base">{sourceEntity.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono truncate" title={sourceEntity.filePath}>
-                        {sourceEntity.filePath?.split('/').slice(-2).join('/') || sourceEntity.filePath}
-                      </div>
+              <Tabs value={graphView} onValueChange={(v) => setGraphView(v as "list" | "graph")}>
+                <TabsList>
+                  <TabsTrigger value="graph">Graph View</TabsTrigger>
+                  <TabsTrigger value="list">List View</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardHeader>
+            
+            {graphView === 'list' ? (
+              <CardContent className="p-6">
+                {filteredRelationships.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-slate-400 mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
                     </div>
+                    <p className="text-muted-foreground text-lg font-medium">No relationships found</p>
+                    <p className="text-sm text-slate-500 mt-2">
+                      {currentEntity.name} has no documented relationships.
+                    </p>
                   </div>
+                ) : (
+                  <div className="space-y-6">
+                    {filteredRelationships.map((rel, index) => {
+                      const sourceEntity = components.find((e) => e.id === rel.source)
+                      const targetEntity = components.find((e) => e.id === rel.target)
 
-                  <div className="flex flex-col items-center mx-2 flex-shrink-0">
-                    <Badge className={`${getRelationshipColor(rel.type)} text-xs`}>
-                      {getRelationshipLabel(rel.type)}
-                      {rel.weight && rel.weight > 1 && (
-                        <span className="ml-1">×{rel.weight}</span>
-                      )}
-                    </Badge>
-                    {rel.context && (
-                      <div className="text-xs text-muted-foreground mt-1 max-w-16 text-center truncate" title={rel.context}>
-                        {rel.context}
-                      </div>
-                    )}
-                    <ArrowRightIcon className="h-5 w-5 text-muted-foreground my-1" />
-                  </div>
+                      if (!sourceEntity || !targetEntity) return null
 
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {getEntityIcon(targetEntity.type)}
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-base">{targetEntity.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono truncate" title={targetEntity.filePath}>
-                        {targetEntity.filePath?.split('/').slice(-2).join('/') || targetEntity.filePath}
-                      </div>
-                    </div>
+                      return (
+                        <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                          <div className="flex-shrink-0">
+                            {getEntityIcon(sourceEntity.type)}
+                          </div>
+                          <div className="flex-1 font-medium">{sourceEntity.name}</div>
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <ArrowRightIcon />
+                            <Badge variant="secondary">{getRelationshipLabel(rel.type)}</Badge>
+                            <ArrowRightIcon />
+                          </div>
+                          <div className="flex-shrink-0">
+                            {getEntityIcon(targetEntity.type)}
+                          </div>
+                          <div className="flex-1 font-medium">{targetEntity.name}</div>
+                        </div>
+                      )
+                    })}
                   </div>
+                )}
+              </CardContent>
+            ) : (
+              <CardContent className="p-0">
+                <div className="relative h-[800px] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <InteractiveGraph 
+                    nodes={graphNodes} 
+                    edges={graphEdges} 
+                    onNodeClick={handleNodeClick}
+                    onGroupClick={handleGroupClick}
+                    selectedNodeId={selectedNodeId} 
+                    setSelectedNodeId={setSelectedNodeId}
+                    focusMode={focusMode}
+                    setFocusMode={setFocusMode}
+                    enableAnimations={true}
+                    showMinimap={true}
+                  />
                 </div>
-              )
-            })}
-          </div>
+              </CardContent>
+            )}
+          </Card>
+
+          {selectedNodeId && selectedNodeData && !isMinimized && (
+            <NodeDetailsPanel
+              selectedNodeData={selectedNodeData}
+              selectedNodeId={selectedNodeId}
+              focusMode={focusMode}
+              setFocusMode={setFocusMode}
+              filteredRelationships={filteredRelationships}
+              panelPosition={panelPosition}
+              setPanelPosition={setPanelPosition}
+              isMinimized={isMinimized}
+              setIsMinimized={setIsMinimized}
+              onClose={handleNodePanelClose}
+              onOpenCodeModal={openCodeModal}
+              getEntityIcon={getEntityIcon}
+              getRelationshipColor={getRelationshipColor}
+              getRelationshipLabel={getRelationshipLabel}
+            />
+          )}
+
+          {selectedGroupId && selectedGroupData && !isMinimized && (
+            <GroupDetailsPanel
+              selectedGroupData={selectedGroupData}
+              panelPosition={panelPosition}
+              setPanelPosition={setPanelPosition}
+              isMinimized={isMinimized}
+              setIsMinimized={setIsMinimized}
+              onClose={handleGroupPanelClose}
+              onFocusGroup={handleFocusGroup}
+              getRelationshipColor={getRelationshipColor}
+              getRelationshipLabel={getRelationshipLabel}
+            />
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6 pb-16">
+        {/* Statistics Panel */}
+        {filteredRelationships.length > 0 && (
+          <RelationshipStats 
+            stats={relationshipStats} 
+            componentsCount={components.length} 
+          />
         )}
-      </CardContent>
-    </Card>
 
-    {/* Node Details Side Panel */}
-    {selectedNodeData && (
-      <NodeDetailsPanel
-        selectedNodeData={selectedNodeData}
-        selectedNodeId={selectedNodeId!}
-        focusMode={focusMode}
-        setFocusMode={setFocusMode}
-        filteredRelationships={filteredRelationships}
-        panelPosition={panelPosition}
-        setPanelPosition={setPanelPosition}
-        isMinimized={isMinimized}
-        setIsMinimized={setIsMinimized}
-        onClose={handleNodePanelClose}
-        onOpenCodeModal={openCodeModal}
-        getEntityIcon={getEntityIcon}
-        getRelationshipColor={getRelationshipColor}
-        getRelationshipLabel={getRelationshipLabel}
-      />
-    )}
+        <Card className="bg-white dark:bg-slate-900 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Relationship Explorer</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Visualize and analyze connections between your components.
+              </p>
+            </div>
+            <Tabs value={graphView} onValueChange={(v) => setGraphView(v as "list" | "graph")}>
+              <TabsList>
+                <TabsTrigger value="graph">Graph View</TabsTrigger>
+                <TabsTrigger value="list">List View</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+        {graphView === 'list' ? (
+          <CardContent className="p-6">
+            {filteredRelationships.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-slate-400 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <p className="text-muted-foreground text-lg font-medium">No relationships found</p>
+                <p className="text-sm text-slate-500 mt-2">
+                  {components.length} components loaded. Switch to graph view to see all entities.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {filteredRelationships.map((rel, index) => {
+                  const sourceEntity = components.find((e) => e.id === rel.source)
+                  const targetEntity = components.find((e) => e.id === rel.target)
 
-    {/* Group Details Side Panel */}
-    {selectedGroupData && (
-      <GroupDetailsPanel
-        selectedGroupData={selectedGroupData}
-        panelPosition={panelPosition}
-        setPanelPosition={setPanelPosition}
-        isMinimized={isMinimized}
-        setIsMinimized={setIsMinimized}
-        onClose={handleGroupPanelClose}
-        onFocusGroup={handleFocusGroup}
-        getRelationshipColor={getRelationshipColor}
-        getRelationshipLabel={getRelationshipLabel}
-      />
-    )}
+                  if (!sourceEntity || !targetEntity) return null
 
-    {/* Beautiful Code Preview Modal */}
-    <CodePreviewModal
-      isOpen={selectedNodeForCode !== null}
-      onClose={closeCodePreview}
-      selectedNodeForCode={selectedNodeForCode}
-      nodeCodeData={nodeCodeData}
-      getEntityIcon={getEntityIcon}
-      getRelationshipColor={getRelationshipColor}
-      getRelationshipLabel={getRelationshipLabel}
-    />
-    </div>
-  )
+                  return (
+                    <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <div className="flex-shrink-0">
+                        {getEntityIcon(sourceEntity.type)}
+                      </div>
+                      <div className="flex-1 font-medium">{sourceEntity.name}</div>
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <ArrowRightIcon />
+                        <Badge variant="secondary">{getRelationshipLabel(rel.type)}</Badge>
+                        <ArrowRightIcon />
+                      </div>
+                      <div className="flex-shrink-0">
+                        {getEntityIcon(targetEntity.type)}
+                      </div>
+                      <div className="flex-1 font-medium">{targetEntity.name}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        ) : (
+          <CardContent className="p-0">
+            <div className="relative h-[800px] bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+              <InteractiveGraph 
+                nodes={graphNodes} 
+                edges={graphEdges} 
+                onNodeClick={handleNodeClick}
+                onGroupClick={handleGroupClick}
+                selectedNodeId={selectedNodeId} 
+                setSelectedNodeId={setSelectedNodeId}
+                focusMode={focusMode}
+                setFocusMode={setFocusMode}
+                enableAnimations={true}
+                showMinimap={true}
+              />
+            </div>
+          </CardContent>
+        )}
+        </Card>
+
+        {selectedNodeId && selectedNodeData && !isMinimized && (
+          <NodeDetailsPanel
+            selectedNodeData={selectedNodeData}
+            selectedNodeId={selectedNodeId}
+            focusMode={focusMode}
+            setFocusMode={setFocusMode}
+            filteredRelationships={filteredRelationships}
+            panelPosition={panelPosition}
+            setPanelPosition={setPanelPosition}
+            isMinimized={isMinimized}
+            setIsMinimized={setIsMinimized}
+            onClose={handleNodePanelClose}
+            onOpenCodeModal={openCodeModal}
+            getEntityIcon={getEntityIcon}
+            getRelationshipColor={getRelationshipColor}
+            getRelationshipLabel={getRelationshipLabel}
+          />
+        )}
+
+        {selectedGroupId && selectedGroupData && !isMinimized && (
+          <GroupDetailsPanel
+            selectedGroupData={selectedGroupData}
+            panelPosition={panelPosition}
+            setPanelPosition={setPanelPosition}
+            isMinimized={isMinimized}
+            setIsMinimized={setIsMinimized}
+            onClose={handleGroupPanelClose}
+            onFocusGroup={handleFocusGroup}
+            getRelationshipColor={getRelationshipColor}
+            getRelationshipLabel={getRelationshipLabel}
+          />
+        )}
+
+        {/* Code Preview Modal */}
+        <CodePreviewModal
+          isOpen={!!selectedNodeForCode}
+          onClose={closeCodePreview}
+          selectedNodeForCode={selectedNodeForCode}
+          nodeCodeData={nodeCodeData}
+          getEntityIcon={getEntityIcon}
+          getRelationshipColor={getRelationshipColor}
+          getRelationshipLabel={getRelationshipLabel}
+        />
+      </div>
+    )
 }
 

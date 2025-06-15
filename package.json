@@ -1,6 +1,6 @@
 {
   "name": "@zachrizzo/code-y",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Recursively generate documentation for React components with AI-powered descriptions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

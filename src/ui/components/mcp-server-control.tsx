@@ -8,10 +8,31 @@ import { ScrollArea } from "./ui/scroll-area"
 import { Server, Zap, Info } from "lucide-react"
 import { CodeBlock } from "./code-block"
 
+interface Route {
+  method: string;
+  path: string;
+  description: string;
+}
+
+interface ServerInfo {
+  name: string;
+  version: string;
+  port: number;
+  uptime: number;
+  timestamp: string;
+}
+
+interface RoutesResponse {
+  serverInfo: ServerInfo;
+  routes: Route[];
+  totalRoutes: number;
+}
+
 export function McpServerControl() {
   const [mcpStatus, setMcpStatus] = useState<'stopped' | 'running' | 'loading' | 'error'>('stopped');
   const [mcpPort, setMcpPort] = useState<number | null>(null);
   const [mcpConfig, setMcpConfig] = useState<any>(null);
+  const [routesData, setRoutesData] = useState<RoutesResponse | null>(null);
   const mcpServerPort = 6270;
 
   useEffect(() => {
@@ -36,17 +57,33 @@ export function McpServerControl() {
             if (res.ok) {
                 setMcpStatus('running');
                 setMcpPort(mcpServerPort);
+                // Fetch routes data when server is running
+                fetchRoutesData();
             } else {
                 setMcpStatus('stopped');
+                setRoutesData(null);
             }
         } catch (e) {
             setMcpStatus('stopped');
+            setRoutesData(null);
         }
     };
     checkStatus();
     const interval = setInterval(checkStatus, 5000); // Check every 5 seconds
     return () => clearInterval(interval);
   }, [mcpServerPort]);
+
+  const fetchRoutesData = async () => {
+    try {
+        const res = await fetch(`http://localhost:${mcpServerPort}/routes`);
+        if (res.ok) {
+            const data: RoutesResponse = await res.json();
+            setRoutesData(data);
+        }
+    } catch (e) {
+        console.error('Failed to fetch routes data:', e);
+    }
+  };
 
   const handleStartMcpServer = async () => {
     setMcpStatus('loading');
@@ -83,8 +120,23 @@ export function McpServerControl() {
 ### Get server health
 GET http://localhost:${mcpServerPort}/health
 
+### Get all available routes
+GET http://localhost:${mcpServerPort}/routes
+
 ### Get all code entities
 GET http://localhost:${mcpServerPort}/entities
+
+### Get unused functions analysis
+GET http://localhost:${mcpServerPort}/unused-functions
+
+### Find similar code
+POST http://localhost:${mcpServerPort}/similarity
+Content-Type: application/json
+
+{
+  "code": "function example() { return 'hello'; }",
+  "limit": 5
+}
   `.trim();
 
   return (
@@ -134,25 +186,40 @@ GET http://localhost:${mcpServerPort}/entities
               </CardContent>
             </Card>
 
-            {mcpStatus === 'running' && mcpPort && (
+            {mcpStatus === 'running' && mcpPort && routesData && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Info className="h-4 w-4" />
-                    Active Endpoints
+                    Server Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm mb-2">Server is running on <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">http://localhost:{mcpPort}</code></p>
-                  <ScrollArea className="h-24">
-                    <ul className="list-disc list-inside text-sm space-y-1 pr-4">
-                      <li><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">GET /health</code></li>
-                      <li><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">GET /entities</code></li>
-                      <li><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">GET /entity/:slug</code></li>
-                      <li><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">POST /similarity</code></li>
-                      <li><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">POST /completion</code></li>
-                    </ul>
-                  </ScrollArea>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><strong>Name:</strong> {routesData.serverInfo.name}</div>
+                    <div><strong>Version:</strong> {routesData.serverInfo.version}</div>
+                    <div><strong>Port:</strong> {routesData.serverInfo.port}</div>
+                    <div><strong>Uptime:</strong> {Math.floor(routesData.serverInfo.uptime)}s</div>
+                  </div>
+                  <div>
+                    <p className="text-sm mb-2"><strong>Server URL:</strong> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">http://localhost:{mcpPort}</code></p>
+                    <p className="text-sm mb-2"><strong>Available Routes ({routesData.totalRoutes}):</strong></p>
+                    <ScrollArea className="h-32">
+                      <div className="space-y-2 pr-4">
+                        {routesData.routes.map((route, index) => (
+                          <div key={index} className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant={route.method === 'GET' ? 'default' : 'secondary'} className="text-xs">
+                                {route.method}
+                              </Badge>
+                              <code className="font-mono">{route.path}</code>
+                            </div>
+                            <p className="text-muted-foreground">{route.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
                 </CardContent>
               </Card>
             )}
