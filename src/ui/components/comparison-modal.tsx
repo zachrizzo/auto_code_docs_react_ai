@@ -237,7 +237,7 @@ export function ComparisonModal({
                     : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
                   }`}
               >
-                {similarityScore >= 100 || similarityScore === 1
+                {similarityScore >= 100
                   ? "Identical Components"
                   : `${Math.round(similarityScore)}% Similar ${diffCount > 0
                     ? `• ${diffCount} Differences`

@@ -644,22 +644,8 @@ export function SimilarityList({
       loadComponentCode(item.component1, item.isMethodLevel ? item.method1 : undefined),
       loadComponentCode(item.component2, item.isMethodLevel ? item.method2 : undefined)
     ]).then(([code1, code2]) => {
-      // Perform direct code comparison to catch identical components
-      // This is a client-side fallback to ensure identical components show as 100% similar
-      let similarity = item.similarity;
-
-      if (code1 && code2) {
-        // Normalize the code by removing whitespace variations
-        const normalizedCode1 = code1.trim().replace(/\s+/g, ' ');
-        const normalizedCode2 = code2.trim().replace(/\s+/g, ' ');
-
-        // If codes are identical, set similarity to 100%
-        if (normalizedCode1 === normalizedCode2) {
-          similarity = 100;
-          console.log(`Components detected as identical via client-side check: ${item.component1.name}${item.isMethodLevel ? `.${item.method1}` : ''} and ${item.component2.name}${item.isMethodLevel ? `.${item.method2}` : ''}`);
-        }
-      }
-
+      // Use the vector similarity score from the backend
+      // This represents semantic similarity based on functionality, not just string matching
       setSelectedPair({
         component1: {
           name: item.component1.name,
@@ -671,7 +657,7 @@ export function SimilarityList({
           code: code2,
           filePath: item.component2.filePath || `components/${item.component2.name}`,
         },
-        similarity: similarity,
+        similarity: item.similarity,
       })
       setComparisonOpen(true)
     })

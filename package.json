@@ -10,10 +10,14 @@
   "files": [
     "dist",
     "src/ui",
+    "docker",
+    "python-server",
+    "scripts",
     "generate-and-run-docs.sh",
     "generate_docs_helper.sh",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "LANGFLOW_INTEGRATION.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig-temp.json && cp package.json dist/",
@@ -22,7 +26,11 @@
     "dev": "ts-node src/cli/index.ts",
     "test": "jest",
     "prepublishOnly": "npm run build",
-    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y generate"
+    "postinstall": "node scripts/postinstall.js",
+    "build:install-to-test-docs-project:run-test-docs-project": "npm run build:js && cd test-docs-project && npm install --no-save .. && chmod +x node_modules/.bin/code-y && npx code-y generate",
+    "docker:start": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:stop": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f"
   },
   "keywords": [
     "react",

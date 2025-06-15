@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  langflow-server:
+    build:
+      context: ../python-server
+      dockerfile: Dockerfile
+    container_name: codey-langflow-server
+    ports:
+      - "6271:6271"
+    environment:
+      - LANGFLOW_CONFIG_PATH=/app/langflow-config.json
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - VECTOR_DB_PATH=/app/data/vector_db
+    volumes:
+      - ./langflow-config.json:/app/langflow-config.json:ro
+      - codey-vector-data:/app/data
+    networks:
+      - codey-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6271/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: codey-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - codey-redis-data:/data
+    networks:
+      - codey-network
+    restart: unless-stopped
+
+volumes:
+  codey-vector-data:
+  codey-redis-data:
+
+networks:
+  codey-network:
+    driver: bridge

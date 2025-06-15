@@ -13,6 +13,8 @@ import { glob } from "glob";
 import * as ts from "typescript";
 import ignore from "ignore"; // NEW: for .gitignore parsing
 import axios from "axios";
+import { DockerManager } from "./utils/docker-manager";
+import { LangFlowManager } from "../ai/langflow/langflow-manager";
 
 /**
  * Generate a unique slug for a component based on its file path and name
@@ -457,14 +459,18 @@ program
 // Single 'generate' command: generate docs and serve UI
 program
   .command("generate")
-  .description("Generate documentation for the project and serve the documentation UI (Next.js)")
+  .description("Generate documentation for the project and serve the documentation UI with AI-powered chat")
   .option("-r, --root <path>", "Root directory of the project")
   .option("-p, --port <number>", "Port for documentation server")
   .option("--ollama-url <url>", "URL for Ollama API")
   .option("--ollama-model <model>", "Model to use with Ollama for chat")
   .option("--ollama-embedding-model <model>", "Model to use with Ollama for embeddings")
   .option("--generate-descriptions", "Generate AI descriptions for components and props")
-  .action(async (options: { root?: string, port?: string, ollamaUrl?: string, ollamaModel?: string, ollamaEmbeddingModel?: string, generateDescriptions?: boolean }) => {
+  .option("--langflow-config <path>", "Path to LangFlow configuration JSON file")
+  .option("--no-ai", "Disable AI features and use legacy chat only")
+  .option("--cleanup-on-exit", "Remove Python virtual environment when stopping")
+  .option("--keep-environment", "Keep Python virtual environment for faster subsequent runs (default)")
+  .action(async (options: { root?: string, port?: string, ollamaUrl?: string, ollamaModel?: string, ollamaEmbeddingModel?: string, generateDescriptions?: boolean, noAi?: boolean, langflowConfig?: string, cleanupOnExit?: boolean, keepEnvironment?: boolean }) => {
     try {
       // Load configuration
       const config = loadConfig();
@@ -478,6 +484,60 @@ program
       const generateDescriptions = options.generateDescriptions || config.generateDescriptions || false;
       const outputDir = path.join(process.cwd(), "documentation");
       const docsDataDir = path.join(outputDir, "docs-data");
+
+      // Start AI services by default (unless --no-ai is specified)
+      let langflowManager: LangFlowManager | undefined;
+      if (!options.noAi) {
+        langflowManager = new LangFlowManager({
+          projectRoot: process.cwd(),
+          langflowConfigPath: options.langflowConfig,
+          ollamaUrl,
+          port: 6271
+        });
+        
+        const result = await langflowManager.start();
+        if (result.success) {
+          console.log(`✅ AI server running (${result.service}): ${result.url}`);
+          
+          // Set environment variables for UI
+          process.env.USE_LANGFLOW = "true";
+          process.env.LANGFLOW_URL = result.url;
+          
+          // Determine cleanup behavior
+          const shouldCleanup = options.cleanupOnExit || false;
+          const shouldKeep = options.keepEnvironment || true;
+          const doCleanup = shouldCleanup && !shouldKeep;
+
+          // Show environment info if embedded server is running
+          if (result.service === 'embedded') {
+            const envInfo = await langflowManager.getEnvironmentInfo();
+            console.log(`   Environment: ${envInfo.location} (${envInfo.size})`);
+            if (doCleanup) {
+              console.log('   ⚠️  Will cleanup on exit (--cleanup-on-exit)');
+            } else {
+              console.log('   💾 Will keep environment for faster restart');
+            }
+          }
+
+          // Handle shutdown gracefully
+          const shutdownHandler = async () => {
+            console.log('\n🛑 Shutting down AI services...');
+            await langflowManager!.stop(doCleanup);
+            if (doCleanup) {
+              console.log('🧹 Cleaned up Python environment');
+            }
+            process.exit(0);
+          };
+          
+          process.on('SIGINT', shutdownHandler);
+          process.on('SIGTERM', shutdownHandler);
+        } else {
+          console.warn("⚠️  AI services unavailable - using legacy chat");
+          console.log("   Install Python 3.8+ or Docker for enhanced AI features");
+        }
+      } else {
+        console.log("🤖 AI features disabled - using basic documentation generation only");
+      }
 
       // Set environment variables for the services
       process.env.OLLAMA_URL = ollamaUrl;
@@ -682,6 +742,11 @@ program
           cwd: uiDir,
           stdio: "inherit",
           shell: false,
+          env: {
+            ...process.env,
+            USE_LANGFLOW: process.env.USE_LANGFLOW || "false",
+            LANGFLOW_URL: process.env.LANGFLOW_URL || "http://localhost:6271"
+          }
         }
       );
       child.on("exit", (code) => {
@@ -1225,6 +1290,45 @@ program
       
     } catch (error) {
       console.error("Error initializing configuration:", error);
+      process.exit(1);
+    }
+  });
+
+// Add cleanup command
+program
+  .command("cleanup")
+  .description("Clean up Python virtual environments and temporary files")
+  .option("--dry-run", "Show what would be cleaned up without actually doing it")
+  .action(async (options: { dryRun?: boolean }) => {
+    try {
+      console.log('🧹 Cleaning up code-y environments...');
+      
+      const { LangFlowManager } = require('../ai/langflow/langflow-manager');
+      const manager = new LangFlowManager({
+        projectRoot: process.cwd()
+      });
+      
+      if (options.dryRun) {
+        console.log('🔍 Dry run - showing what would be cleaned:');
+        
+        const envInfo = await manager.getEnvironmentInfo();
+        if (envInfo.service === 'embedded') {
+          console.log(`   📁 Virtual environment: ${envInfo.location} (${envInfo.size})`);
+          console.log('   📄 Temporary Python scripts');
+          console.log('   📁 Temporary directories');
+        } else {
+          console.log('   ✅ No Python environments found to clean');
+        }
+        
+        console.log('');
+        console.log('To actually clean up, run: npx code-y cleanup');
+      } else {
+        await manager.cleanup();
+        console.log('✅ Cleanup completed');
+      }
+      
+    } catch (error) {
+      console.error('Error during cleanup:', error);
       process.exit(1);
     }
   });
