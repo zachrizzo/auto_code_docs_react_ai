@@ -32,10 +32,38 @@ export async function GET() {
       
       const batchPromises = batch.map(async (comp: any) => {
         try {
+          // Determine type based on component name and file path patterns
+          let entityType: 'component' | 'function' | 'method' | 'class' = 'function' // default
+          
+          const name = comp.name
+          const filePath = comp.filePath || ''
+          
+          // Use explicit kind if available
+          if (comp.kind) {
+            entityType = comp.kind
+          } else {
+            // Classify based on patterns
+            if (name[0] === name[0].toUpperCase()) {
+              if (filePath.includes('component') || filePath.includes('/ui/') || 
+                  name.includes('Component') || name.includes('Page') || name.includes('Modal') ||
+                  name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout')) {
+                entityType = 'component'
+              } else if (name.includes('Service') || name.includes('Manager') || name.includes('Controller') ||
+                        name.includes('Class') || name.includes('Handler')) {
+                entityType = 'class'
+              } else {
+                entityType = 'component' // Uppercase names are usually components
+              }
+            } else {
+              // Lowercase names are usually functions
+              entityType = 'function'
+            }
+          }
+
           // Add the main component from index data
           const mainItem: SearchItem = {
             name: comp.name,
-            type: comp.kind || 'component',
+            type: entityType,
             slug: comp.slug,
             filePath: comp.filePath,
             description: comp.description || ''
@@ -78,10 +106,26 @@ export async function GET() {
           return items
         } catch (err) {
           console.error(`Error processing ${comp.slug}:`, err)
-          // Return at least the basic component info
+          // Return at least the basic component info with proper type classification
+          let fallbackType: 'component' | 'function' | 'method' | 'class' = 'function'
+          const name = comp.name
+          const filePath = comp.filePath || ''
+          
+          if (name[0] === name[0].toUpperCase()) {
+            if (filePath.includes('component') || filePath.includes('/ui/') || 
+                name.includes('Component') || name.includes('Page') || name.includes('Modal') ||
+                name.includes('Provider') || name.includes('Wrapper') || name.includes('Layout')) {
+              fallbackType = 'component'
+            } else {
+              fallbackType = 'component' // Uppercase names are usually components
+            }
+          } else {
+            fallbackType = 'function'
+          }
+          
           return [{
             name: comp.name,
-            type: comp.kind || 'component',
+            type: fallbackType,
             slug: comp.slug,
             filePath: comp.filePath,
             description: comp.description || ''

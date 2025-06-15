@@ -182,6 +182,7 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         console.log('- Functions:', componentsData.filter(c => c.type === 'function').length)
         console.log('- Classes:', componentsData.filter(c => c.type === 'class').length)
         console.log('- Methods:', componentsData.filter(c => c.type === 'method').length)
+        console.log('Sample entities:', componentsData.slice(0, 5).map(c => ({ name: c.name, type: c.type })))
         console.log('Relationships loaded:', uniqueRelationships.length)
         
         setComponents(componentsData)
