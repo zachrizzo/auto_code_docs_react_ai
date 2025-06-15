@@ -188,15 +188,20 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=503, detail="Vector DB not initialized")
         
         # Search for relevant context
-        search_results = vector_db.search(request.message, top_k=3)
+        search_results = vector_db.search(request.message, top_k=5)
+        
+        # Log search results for debugging
+        print(f"Found {len(search_results)} search results for query: {request.message}")
+        for i, result in enumerate(search_results):
+            print(f"  Result {i+1}: {result.get('doc_id', 'N/A')} (score: {result.get('score', 'N/A')})")
         
         # Simple response generation (can be enhanced with actual LangFlow)
         context_text = ""
         if search_results:
-            context_text = "\n".join([r['content'][:200] + "..." for r in search_results[:2]])
+            context_text = "\n".join([r['content'][:200] + "..." for r in search_results[:3]])
         
         # Generate response using Ollama if available
-        response_text = await generate_ollama_response(request.message, context_text)
+        response_text = await generate_ollama_response(request.message, context_text, search_results)
         
         session_id = request.session_id or f"session_{datetime.now().timestamp()}"
         
@@ -209,18 +214,26 @@ async def chat(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def generate_ollama_response(query: str, context: str) -> str:
+async def generate_ollama_response(query: str, context: str, search_results: list = None) -> str:
     try:
         ollama_url = "http://localhost:11434"
         
-        prompt = f"""Based on the following code documentation context, please answer the user's question:
+        # Enhanced prompt that includes instructions for markdown links
+        prompt = f"""Based on the following code documentation context, please answer the user's question.
+
+IMPORTANT: When mentioning specific functions, components, or classes by name in your response, try to provide clickable links to help users navigate to the relevant code. Use this markdown link format:
+- For functions: [functionName](/functions/function_slug)
+- For components: [ComponentName](/components/component_slug)  
+- For classes: [ClassName](/classes/class_slug)
+
+The system will automatically enhance your response with proper links based on the context provided.
 
 Context:
 {context}
 
 Question: {query}
 
-Please provide a helpful and accurate response based on the context provided."""
+Please provide a helpful and accurate response. Focus on being informative and include specific code element names when relevant."""
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -237,13 +250,90 @@ Please provide a helpful and accurate response based on the context provided."""
             
             if response.status_code == 200:
                 data = response.json()
-                return data.get("message", {}).get("content", "I couldn't generate a response.")
+                ai_response = data.get("message", {}).get("content", "I couldn't generate a response.")
+                
+                # Post-process the response to add links if the AI didn't include them
+                enhanced_response = enhance_response_with_links(ai_response, search_results or [])
+                return enhanced_response
             else:
                 return f"Based on the documentation: {context[:300]}... I can help answer questions about this code."
                 
     except Exception as e:
         print(f"Ollama error: {e}")
         return f"I found relevant documentation: {context[:300]}... Please let me know if you need more specific information."
+
+def enhance_response_with_links(response: str, search_results: list) -> str:
+    """
+    Enhance AI response by adding clickable links to mentioned functions/components
+    """
+    try:
+        if not search_results:
+            print("No search results provided for link enhancement")
+            return response
+            
+        print(f"Enhancing response with links from {len(search_results)} search results")
+            
+        # Create a mapping of function/component names to their slugs and types
+        name_to_info = {}
+        for result in search_results:
+            if 'metadata' in result and result['metadata']:
+                metadata = result['metadata']
+                name = metadata.get('name') or metadata.get('methodName') or metadata.get('componentName')
+                doc_type = metadata.get('type', 'function')
+                doc_id = result.get('doc_id', '')
+                
+                print(f"Processing result: {doc_id}, name: {name}, type: {doc_type}")
+                
+                if name:
+                    # Use the slug from metadata if available, otherwise generate one
+                    slug = metadata.get('slug') or metadata.get('componentSlug')
+                    if not slug:
+                        # Generate slug from the docId or create one
+                        if '_' in doc_id:
+                            slug = doc_id.split('_', 1)[1]  # Remove type prefix
+                        else:
+                            slug = name.lower().replace(' ', '-')
+                    
+                    print(f"  Generated slug: {slug} for {name}")
+                    
+                    name_to_info[name] = {
+                        'slug': slug,
+                        'type': doc_type,
+                        'path': metadata.get('filePath', '')
+                    }
+        
+        # Replace function/component names with markdown links
+        enhanced_response = response
+        for name, info in name_to_info.items():
+            # Skip very short names to avoid false matches
+            if len(name) < 3:
+                continue
+                
+            route_prefix = "functions"
+            if info['type'] == 'component':
+                route_prefix = "components"
+            elif info['type'] == 'class':
+                route_prefix = "classes"
+            elif info['type'] == 'method':
+                route_prefix = "functions"  # Methods are viewed as functions
+            
+            # Create the markdown link
+            link = f"[{name}](/{route_prefix}/{info['slug']})"
+            
+            # Replace mentions of the name (avoid replacing if already in a link)
+            import re
+            # Only replace if not already part of a markdown link
+            pattern = f"\b{re.escape(name)}\b(?![^\[]*\])"
+            if re.search(pattern, enhanced_response):
+                enhanced_response = re.sub(pattern, link, enhanced_response, count=1)
+                print(f"  Replaced '{name}' with link: {link}")
+        
+        print(f"Link enhancement complete. Found {len(name_to_info)} potential links")
+        return enhanced_response
+        
+    except Exception as e:
+        print(f"Error enhancing response with links: {e}")
+        return response
 
 @app.post("/documents/add")
 async def add_document(request: DocumentRequest):

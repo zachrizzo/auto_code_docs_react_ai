@@ -33,6 +33,7 @@ export function ChatBubble() {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
 
   // Convert UI chat messages to API format
   const getApiMessages = (): ApiChatMessage[] => {
@@ -63,6 +64,7 @@ export function ChatBubble() {
         body: JSON.stringify({
           history: getApiMessages(),
           query: userQuery,
+          sessionId: sessionId,
         }),
       })
 

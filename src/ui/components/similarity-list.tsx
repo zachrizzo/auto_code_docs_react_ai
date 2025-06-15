@@ -646,6 +646,7 @@ export function SimilarityList({
     ]).then(([code1, code2]) => {
       // Use the vector similarity score from the backend
       // This represents semantic similarity based on functionality, not just string matching
+      // The ComparisonModal should preserve this score as it's more accurate than text diff
       setSelectedPair({
         component1: {
           name: item.component1.name,

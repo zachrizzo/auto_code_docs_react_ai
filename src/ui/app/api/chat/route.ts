@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CodebaseChatService } from "../../../../ai/chat/chat-service";
-import type { ChatMessage } from "../../../../ai/shared/ai.types";
 import path from "path";
 import fs from "fs-extra";
 import axios from "axios";
@@ -57,7 +55,7 @@ async function getComponentDefinitions() {
     // Read the index file and determine its type
     const indexData = await fs.readJson(indexPath);
     const isCodeIndex = indexPath.includes('code-index.json');
-    const components = [];
+    const components: any[] = [];
     
     if (isCodeIndex) {
       // Handle code-index.json format
@@ -136,134 +134,23 @@ async function getComponentDefinitions() {
   }
 }
 
-// Load the saved vector database
-async function loadVectorDatabase() {
-  try {
-    console.log("Loading saved vector database...");
-    
-    // Try multiple possible locations for the vector database
-    const possiblePaths = [
-      path.join(process.cwd(), "public/docs-data/docs-data/vector-database.json"),  // Symlinked path
-      path.join(process.cwd(), "public/docs-data/vector-database.json"),
-      path.join(process.cwd(), "docs-data/vector-database.json"),
-      path.join(process.cwd(), "src/ui/public/docs-data/vector-database.json"),
-      path.join(process.cwd(), "src/ui/docs-data/vector-database.json"),
-      path.join(process.cwd(), "test-docs-project/documentation/docs-data/vector-database.json"),
-      path.join(process.cwd(), "../test-docs-project/documentation/docs-data/vector-database.json")
-    ];
-    
-    for (const possiblePath of possiblePaths) {
-      if (await fs.exists(possiblePath)) {
-        console.log(`Found vector database at: ${possiblePath}`);
-        const vectorDb = await fs.readJson(possiblePath);
-        console.log(`Loaded vector database with ${vectorDb.length} entries`);
-        return vectorDb;
-      }
-    }
-    
-    console.warn("Vector database file not found in any of the expected locations");
-    return null;
-  } catch (error) {
-    console.error("Error loading vector database:", error);
-    return null;
-  }
-}
-
-// Initialize the chat service (lazy loading)
-let chatService: CodebaseChatService | null = null;
-
-async function getChatService() {
-  if (!chatService) {
-    console.log("=== CREATING NEW CHAT SERVICE INSTANCE ===");
-    
-    // Load the saved vector database FIRST
-    const savedVectorDb = await loadVectorDatabase();
-    if (!savedVectorDb || savedVectorDb.length === 0) {
-      console.warn("WARNING: No saved vector database found. Chat will work but without vector search.");
-      // Don't throw error, just continue with empty database
-    }
-    
-    const components = await getComponentDefinitions();
-    console.log(`Loaded ${components.length} component definitions`);
-    
-    // Log details about loaded components
-    let totalMethods = 0;
-    components.forEach(comp => {
-      if (comp.methods && comp.methods.length > 0) {
-        totalMethods += comp.methods.length;
-      }
-    });
-    console.log(`Total methods across all components: ${totalMethods}`);
-    
-    const config = {
-      useOllama: true,
-      ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
-      ollamaModel: process.env.OLLAMA_MODEL || "nomic-embed-text:latest",
-      ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text:latest",
-      chatModel: process.env.CHAT_MODEL || "gemma3:4b",
-      similarityThreshold: process.env.SIMILARITY_THRESHOLD ? parseFloat(process.env.SIMILARITY_THRESHOLD) : 0.2
-    };
-    
-    console.log("Chat service configuration:", {
-      ollamaUrl: config.ollamaUrl,
-      embeddingModel: config.ollamaEmbeddingModel,
-      chatModel: config.chatModel,
-      similarityThreshold: config.similarityThreshold
-    });
-    
-    // Create service but skip initialization since we'll import the vector DB
-    chatService = new CodebaseChatService(components, config);
-    
-    // Import the saved vector database immediately (if available)
-    if (savedVectorDb && savedVectorDb.length > 0) {
-      console.log(`Importing saved vector database with ${savedVectorDb.length} entries...`);
-      chatService.vectorService.importVectorDatabase(JSON.stringify(savedVectorDb));
-    } else {
-      console.log("No vector database to import - chat will work without similarity search");
-    }
-    
-    // Verify the import worked
-    const vectorDbString = chatService.vectorService.exportVectorDatabase();
-    const importedDb = JSON.parse(vectorDbString);
-    console.log(`Vector database after import: ${importedDb.length} entries`);
-    
-    // Verify database integrity (only if we have data)
-    if (importedDb.length > 0) {
-      const isValid = chatService.verifyVectorDatabase();
-      if (!isValid) {
-        console.error("WARNING: Vector database contains invalid entries!");
-      }
-    }
-    
-    // Test Ollama connectivity
-    try {
-      const testResponse = await axios.get(`${config.ollamaUrl}/api/tags`, { timeout: 5000 });
-      console.log("Ollama server is running. Available models:", testResponse.data.models?.map((m: any) => m.name));
-      
-      // Check if the embedding model is available
-      const hasEmbeddingModel = testResponse.data.models?.some((m: any) => m.name === config.ollamaEmbeddingModel);
-      if (!hasEmbeddingModel) {
-        console.warn(`WARNING: Embedding model '${config.ollamaEmbeddingModel}' not found in Ollama. Run: ollama pull ${config.ollamaEmbeddingModel}`);
-      }
-    } catch (error) {
-      console.error("WARNING: Cannot connect to Ollama server. Vector search will fail!");
-    }
-    
-    console.log("=== CHAT SERVICE INITIALIZATION COMPLETE ===");
-  }
-
-  return chatService;
-}
-
 // Check if LangFlow is enabled and available
-async function isLangFlowEnabled(): Promise<boolean> {
-  const useLangFlow = process.env.USE_LANGFLOW === 'true';
-  if (!useLangFlow) return false;
+async function isLangFlowAvailable(): Promise<boolean> {
+  // LangFlow is now required, so we just check if it's running
+  if (process.env.USE_LANGFLOW !== 'true') {
+    console.error("LangFlow is not enabled. Set USE_LANGFLOW=true environment variable.");
+    return false;
+  }
   
   try {
     const client = getLangFlowClient(process.env.LANGFLOW_URL);
-    return await client.healthCheck();
-  } catch {
+    const isHealthy = await client.healthCheck();
+    if (!isHealthy) {
+        console.error("LangFlow health check failed.");
+    }
+    return isHealthy;
+  } catch (error) {
+    console.error("Error connecting to LangFlow:", error);
     return false;
   }
 }
@@ -276,15 +163,16 @@ async function initializeLangFlowWithDocs() {
   console.log(`Initializing LangFlow with ${components.length} components...`);
   
   // Add all components to LangFlow vector database
-  const documents = [];
+  const documents: any[] = [];
   for (const component of components) {
     // Add component itself
     documents.push({
-      docId: `component_${component.name}`,
+      docId: `component_${component.slug || component.name}`,
       content: `Component: ${component.name}\nFile: ${component.filePath}\nCode: ${component.code || ''}\nDescription: ${component.description || ''}`,
       metadata: {
         type: 'component',
         name: component.name,
+        slug: component.slug || component.name.toLowerCase().replace(/\s+/g, '-'),
         filePath: component.filePath
       }
     });
@@ -293,11 +181,12 @@ async function initializeLangFlowWithDocs() {
     if (component.methods && Array.isArray(component.methods)) {
       for (const method of component.methods) {
         documents.push({
-          docId: `method_${component.name}_${method.name}`,
+          docId: `method_${component.slug || component.name}_${method.name}`,
           content: `Method: ${method.name} in ${component.name}\nCode: ${method.code || ''}\nDescription: ${method.description || ''}\nParameters: ${JSON.stringify(method.params || [])}\nReturn Type: ${method.returnType || 'void'}`,
           metadata: {
             type: 'method',
             componentName: component.name,
+            componentSlug: component.slug || component.name.toLowerCase().replace(/\s+/g, '-'),
             methodName: method.name,
             filePath: component.filePath
           }
@@ -315,93 +204,62 @@ async function initializeLangFlowWithDocs() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { history, query } = await request.json();
+    const { history, query, sessionId } = await request.json();
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
     
-    console.log(`\n=== PROCESSING CHAT REQUEST ===`);
+    console.log(`\n=== PROCESSING CHAT REQUEST VIA LANGFLOW ===`);
     console.log(`User query: "${query}"`);
     console.log(`History length: ${history?.length || 0}`);
     
     // Check if LangFlow is available
-    const langFlowEnabled = await isLangFlowEnabled();
-    console.log(`LangFlow enabled: ${langFlowEnabled}`);
+    const langFlowAvailable = await isLangFlowAvailable();
+    if (!langFlowAvailable) {
+        return NextResponse.json({ error: "Chat service is unavailable. LangFlow is not running or not configured correctly." }, { status: 503 });
+    }
     
-    if (langFlowEnabled) {
-      console.log("Using LangFlow for enhanced AI chat...");
+    console.log("Using LangFlow for AI chat...");
       
-      try {
-        const client = getLangFlowClient(process.env.LANGFLOW_URL);
-        
-        // Initialize LangFlow with docs if this is the first request
-        let initialized = (global as any).langflowInitialized || false;
-        if (!initialized) {
-          await initializeLangFlowWithDocs();
-          (global as any).langflowInitialized = true;
-        }
-        
-        // Convert history to chat context
-        const context = {
-          history: history || [],
-          timestamp: new Date().toISOString()
-        };
-        
-        // Send to LangFlow
-        const langFlowResponse = await client.chat({
-          message: query,
-          context,
-          sessionId: `session_${Date.now()}`
-        });
-        
-        console.log(`LangFlow response: ${langFlowResponse.response.length} characters`);
-        
-        return NextResponse.json({ 
-          response: langFlowResponse.response,
-          searchResults: [], // LangFlow handles search internally
-          source: 'langflow',
-          metadata: langFlowResponse.metadata
-        });
-        
-      } catch (langFlowError) {
-        console.error("LangFlow error, falling back to legacy chat:", langFlowError);
-        // Fall through to legacy chat service
+    try {
+      const client = getLangFlowClient(process.env.LANGFLOW_URL);
+      
+      // Initialize LangFlow with docs if this is the first request
+      let initialized = (global as any).langflowInitialized || false;
+      if (!initialized) {
+        await initializeLangFlowWithDocs();
+        (global as any).langflowInitialized = true;
       }
-    }
-    
-    // Legacy chat service fallback
-    console.log("Using legacy chat service...");
-    const service = await getChatService();
-    
-    // Verify vector database is loaded
-    const vectorDbString = service.vectorService.exportVectorDatabase();
-    const vectorDb = JSON.parse(vectorDbString);
-    console.log(`Vector database status: ${vectorDb.length} entries loaded`);
-    
-    if (vectorDb.length === 0) {
-      console.warn("WARNING: Vector database is empty - similarity search disabled");
-    }
-    
-    // Use the chat service directly - it handles vector search internally
-    console.log("Calling legacy chat service...");
-    const { response, searchResults } = await service.chat(history || [], query);
-    
-    console.log(`Chat service returned ${searchResults.length} search results`);
-    console.log(`Response length: ${response.length} characters`);
-    
-    // Log search results for debugging
-    if (searchResults.length > 0) {
-      console.log("Search results summary:");
-      searchResults.forEach((result, idx) => {
-        console.log(`  ${idx + 1}. ${result.componentName}.${result.methodName || 'N/A'} (similarity: ${result.similarity?.toFixed(3) || 'N/A'})`);
+      
+      // Convert history to chat context
+      const context = {
+        history: history || [],
+        timestamp: new Date().toISOString()
+      };
+      
+      // Use provided session ID or generate a persistent one based on browser session
+      const persistentSessionId = sessionId || `session_${Buffer.from(JSON.stringify(context.history.slice(-3))).toString('base64').slice(0, 12)}`;
+      
+      // Send to LangFlow
+      const langFlowResponse = await client.chat({
+        message: query,
+        context,
+        sessionId: persistentSessionId
       });
-    } else {
-      console.warn("No search results found for the query");
+      
+      console.log(`LangFlow response: ${langFlowResponse.response.length} characters`);
+      
+      return NextResponse.json({ 
+        response: langFlowResponse.response,
+        searchResults: [], // LangFlow handles search internally
+        source: 'langflow',
+        metadata: langFlowResponse.metadata
+      });
+      
+    } catch (langFlowError) {
+      console.error("An error occurred during LangFlow communication:", langFlowError);
+      return NextResponse.json({ error: "Failed to get response from chat service.", details: (langFlowError as Error).message }, { status: 500 });
     }
-    
-    console.log("=== CHAT REQUEST COMPLETE ===\n");
-    
-    return NextResponse.json({ response, searchResults, source: 'legacy' });
   } catch (error: any) {
     console.error("Error processing chat request:", error.message || error);
     console.error("Stack trace:", error.stack);

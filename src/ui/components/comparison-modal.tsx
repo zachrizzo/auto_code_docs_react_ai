@@ -177,14 +177,15 @@ export function ComparisonModal({
     // If the similarity score is already 100%, no need to check
     if (initialSimilarityScore >= 100 || initialSimilarityScore === 1) return;
 
-    // If there are no differences, the components are identical
+    // Only override the similarity score if we can clearly detect identical code
+    // This preserves the original semantic similarity calculation from the backend
     if (diffCount === 0) {
       console.log('No differences detected, setting similarity score to 100%');
       setSimilarityScore(100);
       return;
     }
 
-    // Try a more robust comparison:
+    // Try a more robust comparison for truly identical code:
     // 1. Normalize whitespace (replace all whitespace with a single space)
     // 2. Remove comments
     // 3. Trim each line
@@ -203,9 +204,15 @@ export function ComparisonModal({
     const normalizedCode1 = normalize(processedCode1);
     const normalizedCode2 = normalize(processedCode2);
 
+    // Only override if code is truly identical after normalization
     if (normalizedCode1 === normalizedCode2) {
       console.log('Components detected as identical after normalization, setting similarity score to 100%');
       setSimilarityScore(100);
+    } else {
+      // Preserve the original semantic similarity score from the backend
+      // This represents AI-calculated functional similarity, not just text similarity
+      console.log(`Preserving original semantic similarity score: ${initialSimilarityScore}%`);
+      setSimilarityScore(initialSimilarityScore);
     }
   }, [processedCode1, processedCode2, initialSimilarityScore, diffCount]);
 
@@ -239,10 +246,14 @@ export function ComparisonModal({
               >
                 {similarityScore >= 100
                   ? "Identical Components"
-                  : `${Math.round(similarityScore)}% Similar ${diffCount > 0
-                    ? `• ${diffCount} Differences`
+                  : `${Math.round(similarityScore)}% Similar${
+                      similarityScore === initialSimilarityScore 
+                        ? " (Semantic)" 
+                        : ""
+                    }${diffCount > 0
+                    ? ` • ${diffCount} Text Differences`
                     : similarityScore < 100 && similarityScore < 1
-                      ? "• Semantic differences detected"
+                      ? " • Semantic differences detected"
                       : ""}`}
               </Badge>
             </div>

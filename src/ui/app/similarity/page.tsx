@@ -38,7 +38,7 @@ interface ComponentData {
 }
 
 export default function SimilarityPage() {
-  const [threshold, setThreshold] = useState([50])
+  const [threshold, setThreshold] = useState([90])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [componentsData, setComponentsData] = useState<(ComponentData & { _uniqueId: string })[]>([])

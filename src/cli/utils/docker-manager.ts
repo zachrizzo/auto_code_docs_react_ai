@@ -61,6 +61,7 @@ export class DockerManager {
     // Look for LangFlow config in multiple locations (in order of preference)
     const possiblePaths = [
       this.options.langflowConfigPath, // Explicitly provided path
+      path.join(this.options.projectRoot, 'configs', 'langflow-config.json'), // Configs directory (preferred)
       path.join(this.options.projectRoot, 'langflow-config.json'), // Project root
       path.join(this.options.projectRoot, 'Codey-ai.json'), // Your existing config
       path.join(process.cwd(), 'langflow-config.json'), // Current directory

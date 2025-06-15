@@ -8,6 +8,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
     "resolveJsonModule": true,
     "jsx": "react",
     "lib": ["es2020", "dom"],

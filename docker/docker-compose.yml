@@ -13,7 +13,7 @@ services:
       - OLLAMA_HOST=http://host.docker.internal:11434
       - VECTOR_DB_PATH=/app/data/vector_db
     volumes:
-      - ./langflow-config.json:/app/langflow-config.json:ro
+      - ../configs/langflow-config.json:/app/langflow-config.json:ro
       - codey-vector-data:/app/data
     networks:
       - codey-network

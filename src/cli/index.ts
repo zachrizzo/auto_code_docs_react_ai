@@ -1418,3 +1418,121 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+program
+  .command("start")
+  .description("Starts the documentation server with live updates and AI features.")
+  .option("-p, --port <port>", "Port to run the server on", "3001")
+  .option("--docs-dir <path>", "Directory containing documentation data", "docs-data")
+  .option("--root-dir <path>", "Root directory of the source code to watch", ".")
+  .option("--no-ai", "Disable AI-powered description generation")
+  .option("--keep-environment", "Do not clean up the generated environment on exit")
+  .action(async (options: { port: string, docsDir: string, rootDir: string, ai?: boolean, noAi?: boolean, keepEnvironment?: boolean }) => {
+    try {
+      console.log("Starting Codey server...");
+      
+      const config = loadConfig();
+      const finalRootDir = path.resolve(options.rootDir || config.rootDir || ".");
+      const docsDir = path.resolve(options.docsDir || config.docsDir || "docs-data");
+      const noAi = options.noAi === true || config.noAi === true;
+      const keepEnvironment = options.keepEnvironment === true;
+      
+      // LangFlow is now a required service
+      let langflowManager: LangFlowManager | undefined;
+      
+      console.log("Initializing LangFlow service...");
+      langflowManager = new LangFlowManager({ 
+        projectRoot: finalRootDir,
+        langflowConfigPath: config.langflowConfig 
+      });
+      
+      const result = await langflowManager.start();
+      
+      if (!result.success) {
+        console.error("❌ Failed to start LangFlow. The documentation server requires LangFlow to run.");
+        console.error("Please check your Docker or Python environment and try again.");
+        process.exit(1);
+      }
+      
+      // Set environment variables for the Next.js app
+      process.env.USE_LANGFLOW = "true";
+      process.env.LANGFLOW_URL = result.url;
+      
+      const doCleanup = !keepEnvironment;
+      
+      // Set up shutdown handler
+      const shutdownHandler = async () => {
+        console.log("\nGracefully shutting down...");
+        if (langflowManager) {
+          await langflowManager!.stop(doCleanup);
+        }
+        // The Next.js server child process will be killed by this exit
+        process.exit(0);
+      };
+      
+      process.on("SIGINT", shutdownHandler);
+      process.on("SIGTERM", shutdownHandler);
+      
+      console.log("Starting documentation UI server...");
+      await startNextJsServer(options.port, docsDir, finalRootDir, noAi, langflowManager);
+      
+      if (langflowManager) {
+        const envInfo = await langflowManager.getEnvironmentInfo();
+        const status = await langflowManager.getStatus();
+        console.log("\n✅ LangFlow Environment Details:");
+        console.log(`   - Service Type: ${envInfo.service}`);
+        console.log(`   - Status: ${status.isRunning ? 'Running' : 'Stopped'}`);
+        console.log(`   - URL: ${result.url}`); // Use result.url as it's guaranteed to be there
+        if (envInfo.service === 'embedded') {
+          console.log(`   - Python Env Size: ${envInfo.size}`);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error starting the server:", error);
+      process.exit(1);
+    }
+  });
+
+async function startNextJsServer(port: string, docsDir: string, rootDir: string, noAi: boolean, langflowManager?: LangFlowManager) {
+  const nextAppDir = path.join(__dirname, '..', '..', 'src', 'ui');
+  
+  if (!fs.existsSync(nextAppDir) || !fs.existsSync(path.join(nextAppDir, 'package.json'))) {
+    console.error(`Next.js app not found at ${nextAppDir}`);
+    console.error("Please ensure the UI has been built correctly.");
+    process.exit(1);
+  }
+  
+  // Set environment variables for the Next.js process
+  const env = {
+    ...process.env,
+    PORT: port,
+    DOCS_DIR: docsDir,
+    ROOT_DIR: rootDir,
+    NO_AI: String(noAi),
+    USE_LANGFLOW: process.env.USE_LANGFLOW || "false",
+    LANGFLOW_URL: process.env.LANGFLOW_URL || ""
+  };
+
+  console.log(`Starting Next.js server from: ${nextAppDir}`);
+  
+  const child = spawn('npm', ['run', 'dev'], {
+    cwd: nextAppDir,
+    stdio: 'inherit',
+    env: env
+  });
+
+  child.on('error', (err) => {
+    console.error('Failed to start Next.js server:', err);
+    process.exit(1);
+  });
+
+  child.on('exit', (code) => {
+    console.log(`Next.js server exited with code ${code}`);
+    // If the server exits, we should also shut down the langflow manager
+    if (langflowManager) {
+        langflowManager.stop(true); // Assuming cleanup should happen
+    }
+    process.exit(code || 0);
+  });
+}

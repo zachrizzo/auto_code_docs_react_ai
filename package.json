@@ -13,6 +13,7 @@
     "docker",
     "python-server",
     "scripts",
+    "configs",
     "generate-and-run-docs.sh",
     "generate_docs_helper.sh",
     "README.md",
