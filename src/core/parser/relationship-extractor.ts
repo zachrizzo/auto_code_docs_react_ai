@@ -193,12 +193,46 @@ export function extractMethodCalls(
     ]);
     
     const builtInFunctions = new Set([
+      // JavaScript built-ins
       'parseInt', 'parseFloat', 'setTimeout', 'setInterval', 'clearTimeout', 
       'clearInterval', 'require', 'import', 'eval', 'isNaN', 'isFinite',
       'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
       'alert', 'confirm', 'prompt', 'toString', 'valueOf', 'hasOwnProperty',
-      'propertyIsEnumerable', 'isPrototypeOf', 'toLocaleString'
+      'propertyIsEnumerable', 'isPrototypeOf', 'toLocaleString',
+      
+      // React hooks
+      'useState', 'useEffect', 'useContext', 'useReducer', 'useCallback', 
+      'useMemo', 'useRef', 'useImperativeHandle', 'useLayoutEffect', 
+      'useDebugValue', 'useDeferredValue', 'useTransition', 'useId',
+      
+      // Web APIs
+      'fetch', 'Response', 'Request', 'Headers', 'AbortController',
+      'URLSearchParams', 'URL', 'Blob', 'File', 'FileReader',
+      'FormData', 'XMLHttpRequest', 'WebSocket',
+      
+      // Node.js built-ins
+      'Buffer', 'process', 'global', '__dirname', '__filename',
+      
+      // Common utility functions that shouldn't be tracked
+      'console', 'log', 'error', 'warn', 'info', 'debug'
     ]);
+
+    // Function to check if a function name looks like a React state setter or similar pattern
+    const isReactStateSetterOrBuiltIn = (functionName: string): boolean => {
+      // React state setters (set + CapitalizedName)
+      if (/^set[A-Z][a-zA-Z0-9]*$/.test(functionName)) return true;
+      
+      // Common variable/parameter names that shouldn't be tracked as function calls
+      if (/^(data|result|response|error|err|event|e|evt|props|state|ref|node|element|target|source|item|index|key|value|id|name|type|component|comp|func|fn|callback|cb|handler|resolve|reject)$/i.test(functionName)) return true;
+      
+      // JSON methods
+      if (/^(json|parse|stringify)$/.test(functionName)) return true;
+      
+      // Common async/promise patterns
+      if (/^(then|catch|finally|all|race|resolve|reject|async|await)$/.test(functionName)) return true;
+      
+      return false;
+    };
 
     function visit(node: ts.Node) {
       // Look for call expressions
@@ -208,16 +242,56 @@ export function extractMethodCalls(
         
         // Handle property access expressions (e.g., object.method())
         if (ts.isPropertyAccessExpression(node.expression)) {
-          const objectName = node.expression.expression.getText(sourceFile).trim();
+          // Get the base object name (handles complex expressions better)
+          let objectName = '';
+          if (ts.isIdentifier(node.expression.expression)) {
+            objectName = node.expression.expression.getText(sourceFile).trim();
+          } else {
+            // Skip complex property access chains for now
+            return;
+          }
+          
           targetMethodName = node.expression.name.getText(sourceFile).trim();
           
-          // Skip built-in methods, local variables, and common patterns
-          if (!builtInObjects.has(objectName) && 
-              !objectName.startsWith('_') && // Skip private variables
-              !/^[a-z]/.test(objectName) && // Skip camelCase variables (likely local)
-              objectName.length > 1) {
+          // Skip built-in methods and focus on user-defined objects
+          const commonBuiltInMethods = [
+            // Array methods
+            'map', 'filter', 'reduce', 'forEach', 'find', 'sort', 'join', 
+            'push', 'pop', 'slice', 'splice', 'concat', 'includes', 'indexOf', 
+            'reverse', 'shift', 'unshift', 'some', 'every', 'findIndex',
             
-            // Convert PascalCase component names to slug format
+            // Object methods
+            'hasOwnProperty', 'toString', 'valueOf', 'keys', 'values', 'entries',
+            
+            // String methods
+            'charAt', 'charCodeAt', 'substring', 'substr', 'split', 'replace',
+            'trim', 'toLowerCase', 'toUpperCase', 'match', 'search',
+            
+            // Promise/Response methods
+            'then', 'catch', 'finally', 'json', 'text', 'blob', 'arrayBuffer',
+            
+            // Set methods
+            'add', 'delete', 'has', 'clear',
+            
+            // Map methods  
+            'get', 'set', 'delete', 'has', 'clear',
+            
+            // Common property names that aren't function calls
+            'length', 'size', 'name', 'value', 'id', 'type', 'src', 'href'
+          ];
+          
+          // Only track calls to user-defined components/classes (PascalCase) or known component instances
+          if (!builtInObjects.has(objectName) && 
+              !commonBuiltInMethods.includes(targetMethodName) &&
+              !objectName.startsWith('_') && // Skip private variables
+              objectName.length > 1 &&
+              // Focus on PascalCase (components/classes) or known user patterns
+              (/^[A-Z][A-Za-z0-9]*$/.test(objectName) || // PascalCase components
+               (availableEntities && availableEntities.has(objectName.toLowerCase()))) && // Known entities
+              // Exclude obvious local variables and built-ins
+              !/^(this|super|window|document|console|process|global|require|module|exports|props|state|event|e|evt|data|result|response|error|err)$/i.test(objectName)) {
+            
+            // Convert to slug format
             targetEntitySlug = objectName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
           }
         }
@@ -225,11 +299,19 @@ export function extractMethodCalls(
         else if (ts.isIdentifier(node.expression)) {
           const functionName = node.expression.getText(sourceFile).trim();
           
-          // Only consider PascalCase function names (likely components/classes)
+          // Only consider user-defined functions (avoid common variable names and built-ins)
           if (!builtInFunctions.has(functionName) && 
-              /^[A-Z][A-Za-z0-9]*$/.test(functionName) && 
-              functionName.length > 1) {
+              !isReactStateSetterOrBuiltIn(functionName) &&
+              /^[A-Za-z][A-Za-z0-9]*$/.test(functionName) && 
+              functionName.length > 2 && // At least 3 characters to avoid single letters
+              // Focus on actual function patterns
+              (/^[A-Z][A-Za-z0-9]*$/.test(functionName) || // PascalCase (components)
+               /^[a-z][a-zA-Z0-9]*[A-Z]/.test(functionName) || // camelCase with capitals (likely functions)
+               (availableEntities && availableEntities.has(functionName.toLowerCase()))) && // Known entities
+              // Exclude common variable names and keywords
+              !/^(require|import|export|const|let|var|function|class|if|for|while|return|throw|new|delete|typeof|instanceof|in|of|try|catch|finally|break|continue|switch|case|default|with|debugger|do|else|true|false|null|undefined|void|this|super|arguments|yield|async|await|get|set|static|extends|implements|interface|type|enum|namespace|module|declare|abstract|readonly|public|private|protected|override)$/i.test(functionName)) {
             
+            // Convert to slug format - handle both PascalCase and camelCase
             targetEntitySlug = functionName.toLowerCase().replace(/([A-Z])/g, '-$1').replace(/^-/, '');
             targetMethodName = functionName;
           }

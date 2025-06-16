@@ -9,11 +9,11 @@ import { Relationship } from "./types"
 
 interface GroupData {
   id: string
-  name: string
-  nodeCount: number
+  name?: string
+  nodeCount?: number
   nodes: any[]
   types: string[]
-  externalConnections: Relationship[]
+  externalConnections: Relationship[] | number
 }
 
 interface GroupDetailsPanelProps {
@@ -158,10 +158,10 @@ export function GroupDetailsPanel({
         {/* Group Summary */}
         <div className="mb-4 p-3 bg-amber-100/80 dark:bg-amber-800/80 rounded-lg">
           <div className="text-sm text-amber-600 dark:text-amber-400 font-mono break-words">
-            📁 Group: {selectedGroupData.name}
+            📁 Group: {selectedGroupData.name || selectedGroupData.id}
           </div>
           <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-            {selectedGroupData.nodeCount} components • {selectedGroupData.externalConnections.length} external connections
+            {selectedGroupData.nodes.length} components • {Array.isArray(selectedGroupData.externalConnections) ? selectedGroupData.externalConnections.length : selectedGroupData.externalConnections} external connections
           </div>
         </div>
         
@@ -182,30 +182,43 @@ export function GroupDetailsPanel({
 
         {/* External Connections */}
         <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-            External Connections ({selectedGroupData.externalConnections.length})
-          </h4>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {selectedGroupData.externalConnections.slice(0, 5).map((rel: any, index: number) => {
-              const isOutgoing = selectedGroupData.nodes.some((n: any) => n.id === rel.source)
-              const externalNode = isOutgoing ? rel.target : rel.source
-              return (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <Badge className={`${getRelationshipColor(rel.type)} text-xs`}>
-                    {getRelationshipLabel(rel.type)}
-                  </Badge>
-                  <span className="text-slate-600 dark:text-slate-400 truncate ml-2 flex-1">
-                    {isOutgoing ? '→' : '←'} {externalNode}
-                  </span>
+          {Array.isArray(selectedGroupData.externalConnections) ? (
+            <>
+              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                External Connections ({selectedGroupData.externalConnections.length})
+              </h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {selectedGroupData.externalConnections.slice(0, 5).map((rel: any, index: number) => {
+                  const isOutgoing = selectedGroupData.nodes.some((n: any) => n.id === rel.source)
+                  const externalNode = isOutgoing ? rel.target : rel.source
+                  return (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <Badge className={`${getRelationshipColor(rel.type)} text-xs`}>
+                        {getRelationshipLabel(rel.type)}
+                      </Badge>
+                      <span className="text-slate-600 dark:text-slate-400 truncate ml-2 flex-1">
+                        {isOutgoing ? '→' : '←'} {externalNode}
+                      </span>
                 </div>
               )
             })}
-            {selectedGroupData.externalConnections.length > 5 && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
-                +{selectedGroupData.externalConnections.length - 5} more...
+                {selectedGroupData.externalConnections.length > 5 && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                    +{selectedGroupData.externalConnections.length - 5} more...
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                External Connections ({selectedGroupData.externalConnections})
+              </h4>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Connection details not available
+              </div>
+            </>
+          )}
         </div>
 
         {/* Group Actions */}

@@ -56,6 +56,7 @@ export function ChatBubble() {
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [currentModel, setCurrentModel] = useState<string>("")
   const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({})
+  const [isStreaming, setIsStreaming] = useState(false)
 
   useEffect(() => {
     // Fetch available models when the component mounts
@@ -91,14 +92,26 @@ export function ChatBubble() {
     if (!input.trim() || isLoading) return
 
     // Add user message to chat
-    setMessages([...messages, { text: input, isUser: true, role: "user" }])
+    const newMessages: ChatMessage[] = [...messages, { text: input, isUser: true, role: "user" as const }]
+    setMessages(newMessages)
     const userQuery = input
     setInput("")
     setIsLoading(true)
+    setIsStreaming(true)
+
+    // Add placeholder message for streaming response
+    const placeholderMessage: ChatMessage = { 
+      text: "", 
+      isUser: false, 
+      role: "assistant",
+      thinking: null,
+    }
+    setMessages(prev => [...prev, placeholderMessage])
+    const responseIndex = newMessages.length // Index of the streaming response message
 
     try {
-      // Make API request to chat endpoint
-      const response = await fetch("/api/chat", {
+      // Make streaming API request
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -115,80 +128,132 @@ export function ChatBubble() {
         throw new Error(`API request failed with status ${response.status}`)
       }
 
-      const data = await response.json()
-      
-      let responseText = data.response
-      let thinkingData = null
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("No response body reader available")
+      }
 
-      const thinkingMatch = responseText.match(/<thinking>([\s\S]*?)<\/thinking>/)
-      
-      if (thinkingMatch && thinkingMatch[1]) {
-        try {
-          const thinkingDetails = JSON.parse(thinkingMatch[1])
-          thinkingData = {
-            title: "Thinking Process",
-            details: thinkingDetails,
-          }
-        } catch (e) {
-          thinkingData = {
-            title: "Thinking Process",
-            details: thinkingMatch[1],
-          }
-        }
-        responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/, "").trim()
-      } else if (data.metadata && data.metadata.intermediate_steps) {
-        thinkingData = {
-          title: "Thinking Process",
-          details: data.metadata.intermediate_steps,
-        }
-      } else {
-        // Fallback heuristic for models that prepend thinking without tags
-        const parts = responseText.split(/\n\n+/)
-        if (parts.length > 1) {
-          const firstPart = parts[0].trim()
-          // Consider it "thinking" if it's a substantial block of text
-          // and doesn't start with common markdown elements.
-          const seemsLikeThinking =
-            firstPart.length > 80 &&
-            !firstPart.startsWith("#") &&
-            !firstPart.startsWith("*") &&
-            !firstPart.startsWith("-") &&
-            !firstPart.startsWith("```")
+      const decoder = new TextDecoder()
+      let buffer = ""
+      let fullResponse = ""
 
-          if (seemsLikeThinking) {
-            thinkingData = {
-              title: "Thinking Process",
-              details: firstPart,
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              console.log('Received streaming data:', data) // Debug log
+              
+              if (data.content) {
+                fullResponse += data.content
+                console.log('Updated fullResponse:', fullResponse) // Debug log
+                
+                // Update the streaming message in real-time
+                setMessages(prev => {
+                  const updated = [...prev]
+                  if (updated[responseIndex]) {
+                    updated[responseIndex] = {
+                      ...updated[responseIndex],
+                      text: fullResponse
+                    }
+                  }
+                  return updated
+                })
+              } else if (data.error) {
+                console.error('Streaming error received:', data.error) // Debug log
+                throw new Error(data.error)
+              } else if (data.done) {
+                console.log('Streaming completed, final response:', fullResponse) // Debug log
+                // Process thinking data from complete response if available
+                let responseText = fullResponse
+                let thinkingData = null
+
+                const thinkingMatch = responseText.match(/<thinking>([\s\S]*?)<\/thinking>/)
+                
+                if (thinkingMatch && thinkingMatch[1]) {
+                  try {
+                    const thinkingDetails = JSON.parse(thinkingMatch[1])
+                    thinkingData = {
+                      title: "Thinking Process",
+                      details: thinkingDetails,
+                    }
+                  } catch (e) {
+                    thinkingData = {
+                      title: "Thinking Process",
+                      details: thinkingMatch[1],
+                    }
+                  }
+                  responseText = responseText.replace(/<thinking>[\s\S]*?<\/thinking>/, "").trim()
+                } else {
+                  // Fallback heuristic for models that prepend thinking without tags
+                  const parts = responseText.split(/\n\n+/)
+                  if (parts.length > 1) {
+                    const firstPart = parts[0].trim()
+                    // Consider it "thinking" if it's a substantial block of text
+                    // and doesn't start with common markdown elements.
+                    const seemsLikeThinking =
+                      firstPart.length > 80 &&
+                      !firstPart.startsWith("#") &&
+                      !firstPart.startsWith("*") &&
+                      !firstPart.startsWith("-") &&
+                      !firstPart.startsWith("```")
+
+                    if (seemsLikeThinking) {
+                      thinkingData = {
+                        title: "Thinking Process",
+                        details: firstPart,
+                      }
+                      responseText = parts.slice(1).join("\n\n").trim()
+                    }
+                  }
+                }
+
+                // Final update with thinking data
+                setMessages(prev => {
+                  const updated = [...prev]
+                  if (updated[responseIndex]) {
+                    updated[responseIndex] = {
+                      ...updated[responseIndex],
+                      text: responseText,
+                      thinking: thinkingData
+                    }
+                  }
+                  return updated
+                })
+                setIsStreaming(false)
+                return
+              }
+            } catch (e) {
+              console.warn('Failed to parse SSE data:', line)
             }
-            responseText = parts.slice(1).join("\n\n").trim()
           }
         }
       }
-
-      // Add AI response to chat
-      setMessages(prev => [
-        ...prev,
-        { 
-          text: responseText, 
-          isUser: false, 
-          role: "assistant",
-          thinking: thinkingData,
-        },
-      ])
     } catch (error) {
       console.error("Error sending message:", error)
 
-      // Add error message to chat
-      setMessages(prev => [
-        ...prev,
-        {
-          text: "Sorry, I encountered an error. Please try again or check if the AI server is running properly.",
-          isUser: false,
-          role: "assistant"
-        },
-      ])
+      // Update the placeholder message with error
+      setMessages(prev => {
+        const updated = [...prev]
+        if (updated[responseIndex]) {
+          updated[responseIndex] = {
+            ...updated[responseIndex],
+            text: "Sorry, I encountered an error. Please try again or check if the AI server is running properly."
+          }
+        }
+        return updated
+      })
     } finally {
       setIsLoading(false)
+      setIsStreaming(false)
     }
   }
 
@@ -426,7 +491,12 @@ export function ChatBubble() {
                           onToggle={() => toggleThinking(i)}
                         />
                       )}
-                      <MarkdownMessage content={message.text} isUser={message.isUser} />
+                      <div className="relative">
+                        <MarkdownMessage content={message.text} isUser={message.isUser} />
+                        {isStreaming && i === messages.length - 1 && (
+                          <span className="inline-block w-2 h-4 bg-violet-500 animate-pulse ml-1 align-middle"></span>
+                        )}
+                      </div>
                     </div>
                     {message.isUser && (
                       <Avatar className="w-8 h-8 border-2 border-slate-300 dark:border-slate-600">
@@ -445,6 +515,7 @@ export function ChatBubble() {
                         <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"></div>
                         <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse delay-150"></div>
                         <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse delay-300"></div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">Streaming response...</span>
                       </div>
                     </div>
                   </div>

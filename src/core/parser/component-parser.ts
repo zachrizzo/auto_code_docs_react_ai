@@ -10,7 +10,7 @@ import * as ts from "typescript";
 import { ComponentDefinition, PropDefinition } from "../types";
 import { EntityDeclaration } from "../types/index";
 import { debug, extractImportedComponentPaths, shouldIncludeFile } from "./file-utils";
-import { extractComponentMethods, extractComponentSourceCode, extractEntityDeclarations } from "./ast-utils";
+import { extractComponentMethods, extractComponentSourceCode, extractEntityDeclarations, extractComponentPropsFromAST } from "./ast-utils";
 import { extractImports, extractComponentReferences, extractInheritance, extractMethodCalls, generateRelationships, extractEntityUsages, extractPropDrilling, detectCircularDependencies, PropDrillingInfo } from "./relationship-extractor";
 import { extractCodeBlocks, detectDuplicates, DuplicateCodeMatch } from "./duplicate-detector";
 
@@ -52,7 +52,7 @@ export function parseComponentFile(
       debug(`Processing component: ${componentName}`);
 
       // Convert props to our format
-      const props: PropDefinition[] = Object.entries(component.props || {}).map(
+      let props: PropDefinition[] = Object.entries(component.props || {}).map(
         ([name, propDef]) => {
           const prop = propDef as any;
           return {
@@ -64,6 +64,33 @@ export function parseComponentFile(
           };
         }
       );
+
+      // If react-docgen-typescript didn't extract props properly, try AST extraction as fallback
+      if (props.length === 0 || (props.length === 1 && props[0].name === "asChild")) {
+        debug(`Using AST fallback for props extraction for component: ${componentName}`);
+        const astProps = extractComponentPropsFromAST(fileContent, componentName);
+        
+        if (astProps.length > 0) {
+          // Convert AST props to our PropDefinition format
+          const astPropDefinitions: PropDefinition[] = astProps.map(astProp => ({
+            name: astProp.name,
+            type: astProp.type,
+            required: astProp.required,
+            defaultValue: astProp.defaultValue,
+            description: astProp.description,
+          }));
+          
+          // Merge with existing props, preferring AST props for conflicts
+          const existingPropNames = new Set(props.map(p => p.name));
+          astPropDefinitions.forEach(astProp => {
+            if (!existingPropNames.has(astProp.name)) {
+              props.push(astProp);
+            }
+          });
+          
+          debug(`Added ${astPropDefinitions.length} props from AST extraction`);
+        }
+      }
 
       // Extract methods using TypeScript AST
       const methods = extractComponentMethods(fileContent, componentName);

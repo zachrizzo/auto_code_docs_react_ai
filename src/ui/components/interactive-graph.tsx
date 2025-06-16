@@ -1337,7 +1337,7 @@ export function InteractiveGraph({
     })
 
     ctx.restore()
-  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers, groupFocusMode, focusedGroup, selectedNodeForMenu, selectedGroupForMenu, menuActionHover, animationTime, enableAnimation, edgeStyle])
+  }, [scale, offset, hoveredNode, selectedNode, filteredTypes, searchTerm, showConnectionsOnly, showLabels, groupingMode, showGroupContainers, groupFocusMode, focusedGroup, selectedNodeForMenu, selectedGroupForMenu, menuActionHover, animationTime, enableAnimation, edgeStyle, nodeSpacing, nodeSize])
 
   // Minimap component with proper viewport tracking
   const MinimapComponent = ({ nodes, edges, scale, offset, canvasRef, selectedNode }: {
@@ -2676,10 +2676,14 @@ export function InteractiveGraph({
       canvas.style.cursor = 'grabbing'
     } else if (isDragging) {
       // Dragging the canvas
-      setOffset({
+      const newOffset = {
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
-      })
+      }
+      // Only update if the offset has actually changed significantly
+      if (Math.abs(newOffset.x - offset.x) > 1 || Math.abs(newOffset.y - offset.y) > 1) {
+        setOffset(newOffset)
+      }
       canvas.style.cursor = 'grabbing'
     } else {
       // Check for hovered elements
@@ -2747,7 +2751,10 @@ export function InteractiveGraph({
         }
       }
 
-      setHoveredNode(hoveredElement)
+      // Only update hovered node if it actually changed
+      if (hoveredNode !== hoveredElement) {
+        setHoveredNode(hoveredElement)
+      }
       
       // Set cursor based on what's hovered
       if (hoveredElement?.startsWith('group-')) {

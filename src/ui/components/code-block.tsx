@@ -46,8 +46,6 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
     'code[class*="language-"]': {
       ...syntaxTheme['code[class*="language-"]'],
       fontFamily: 'var(--font-mono), monospace',
-      fontSize: '0.9rem',
-      lineHeight: '1.6',
     }
   };
 
@@ -88,23 +86,32 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
             )}
           </Button>
         </div>
-        <SyntaxHighlighter
-          language={language}
-          style={customizedTheme}
-          showLineNumbers={true}
-          wrapLines={true}
-          lineNumberStyle={{
-            minWidth: '2.5em',
-            paddingRight: '1em',
-            textAlign: 'right',
-            userSelect: 'none',
-            opacity: 0.5,
-            borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
-            marginRight: '1em',
-          }}
-        >
-          {code}
-        </SyntaxHighlighter>
+        <div className="overflow-x-auto">
+          <SyntaxHighlighter
+            language={language}
+            style={customizedTheme}
+            showLineNumbers={true}
+            wrapLines={false}
+            lineNumberStyle={{
+              minWidth: '2.5em',
+              paddingRight: '1em',
+              textAlign: 'right',
+              userSelect: 'none',
+              opacity: 0.5,
+              borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
+              marginRight: '1em',
+            }}
+            customStyle={{
+              fontSize: '0.8rem',
+              lineHeight: '1.5',
+              margin: 0,
+              padding: '1rem',
+              minWidth: 'max-content'
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
+        </div>
       </div>
     </div>
   )

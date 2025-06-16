@@ -116,6 +116,36 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         // Extract relationships from the loaded component data
         const relationshipsData: Relationship[] = []
         
+        // Add minimal synthetic relationships only for demonstration
+        // This is a temporary solution - proper relationships should come from AST analysis
+        const functionEntities = componentsData.filter(e => e.type === 'function')
+        const componentEntities = componentsData.filter(e => e.type === 'component')
+        
+        // Only add a few key relationships between components and their helper functions
+        componentEntities.forEach(component => {
+          // Find functions in the same file as this component
+          const relatedFunctions = functionEntities.filter(func => 
+            func.filePath === component.filePath &&
+            func.name.toLowerCase().includes(component.name.toLowerCase().split(/(?=[A-Z])/).pop() || '')
+          ).slice(0, 1) // Only 1 connection per component
+          
+          relatedFunctions.forEach(func => {
+            const existsAlready = relationshipsData.some(r => 
+              r.source === component.id && r.target === func.id
+            )
+            
+            if (!existsAlready) {
+              relationshipsData.push({
+                source: component.id,
+                target: func.id,
+                type: "uses",
+                weight: 1,
+                context: "helper function"
+              })
+            }
+          })
+        })
+        
         // Add parent-child relationships for actual methods (functions that belong to classes)
         searchData.items.forEach((entity: { slug: string; type: string; methods?: any[] }) => {
           // Only create "contains" relationships for actual methods of classes
@@ -197,6 +227,12 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
         console.log('- Methods:', componentsData.filter(c => c.type === 'method').length)
         console.log('Sample entities:', componentsData.slice(0, 5).map(c => ({ name: c.name, type: c.type })))
         console.log('Relationships loaded:', uniqueRelationships.length)
+        console.log('Sample relationships:', uniqueRelationships.slice(0, 10).map(r => ({ 
+          source: componentsData.find(c => c.id === r.source)?.name || r.source, 
+          target: componentsData.find(c => c.id === r.target)?.name || r.target, 
+          type: r.type, 
+          context: r.context 
+        })))
         
         setComponents(componentsData)
         setRelationships(uniqueRelationships)
@@ -320,16 +356,17 @@ export function CodeRelationships({ entityId }: CodeRelationshipsProps) {
 
   const handleGroupClick = (groupId: string, groupNodes: any[]) => {
     setSelectedGroupId(groupId)
+    const externalConnectionsArray = relationships.filter(rel => {
+      const groupNodeIds = new Set(groupNodes.map(n => n.id))
+      return (groupNodeIds.has(rel.source) && !groupNodeIds.has(rel.target)) ||
+             (groupNodeIds.has(rel.target) && !groupNodeIds.has(rel.source))
+    })
     setSelectedGroupData({
       id: groupId,
       nodes: groupNodes,
       types: [...new Set(groupNodes.map(n => n.type))],
-      // Calculate connections to nodes outside this group
-      externalConnections: relationships.filter(rel => {
-        const groupNodeIds = new Set(groupNodes.map(n => n.id))
-        return (groupNodeIds.has(rel.source) && !groupNodeIds.has(rel.target)) ||
-               (groupNodeIds.has(rel.target) && !groupNodeIds.has(rel.source))
-      }).length
+      // Store the actual array, not just the length
+      externalConnections: externalConnectionsArray
     })
     setIsMinimized(false)
     setSelectedNodeId(null)

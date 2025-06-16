@@ -139,3 +139,217 @@ Processing result: component_components_ui_avatar_avatar, name: Avatar, type: co
   Generated slug: components_ui_avatar_avatar for Avatar
 Link enhancement complete. Found 4 potential links
 INFO:     127.0.0.1:61544 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61681 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: ji
+  Result 1: component_components_ui_avatar_avatar (score: 1.4945204257965088)
+  Result 2: component_components_ui_avatar_avatarimage (score: 1.525613784790039)
+  Result 3: component_components_ui_avatar_avatarfallback (score: 1.5865750312805176)
+  Result 4: component_components_code-graph_zoomout (score: 1.6579101085662842)
+  Result 5: component_components_ui_card_card (score: 1.6602884531021118)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_avatar_avatar, name: Avatar, type: component
+  Generated slug: components_ui_avatar_avatar for Avatar
+Processing result: component_components_ui_avatar_avatarimage, name: AvatarImage, type: component
+  Generated slug: components_ui_avatar_avatarimage for AvatarImage
+Processing result: component_components_ui_avatar_avatarfallback, name: AvatarFallback, type: component
+  Generated slug: components_ui_avatar_avatarfallback for AvatarFallback
+Processing result: component_components_code-graph_zoomout, name: zoomOut, type: component
+  Generated slug: components_code-graph_zoomout for zoomOut
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 5 potential links
+INFO:     127.0.0.1:61681 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61777 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: tell me about the zach function
+  Result 1: component_components_ui_card_zach (score: 1.376367449760437)
+  Result 2: method_components_ui_card_card_zach (score: 1.5040934085845947)
+  Result 3: component_components_ui_card_card (score: 1.6516809463500977)
+  Result 4: method_components_code-graph_codegraph_zoomIn (score: 1.6859345436096191)
+  Result 5: component_lib_utils_cn (score: 1.697003960609436)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: method_components_code-graph_codegraph_zoomIn, name: zoomIn, type: method
+  Generated slug: components_code-graph_codegraph for zoomIn
+Processing result: component_lib_utils_cn, name: cn, type: component
+  Generated slug: lib_utils_cn for cn
+Link enhancement complete. Found 4 potential links
+INFO:     127.0.0.1:61777 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62093 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: tell me about the zach function
+  Result 1: component_components_ui_card_zach (score: 1.376367449760437)
+  Result 2: method_components_ui_card_card_zach (score: 1.5040934085845947)
+  Result 3: component_components_ui_card_card (score: 1.6516809463500977)
+  Result 4: method_components_code-graph_codegraph_zoomIn (score: 1.6859345436096191)
+  Result 5: component_lib_utils_cn (score: 1.697003960609436)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: method_components_code-graph_codegraph_zoomIn, name: zoomIn, type: method
+  Generated slug: components_code-graph_codegraph for zoomIn
+Processing result: component_lib_utils_cn, name: cn, type: component
+  Generated slug: lib_utils_cn for cn
+Link enhancement complete. Found 4 potential links
+INFO:     127.0.0.1:62093 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62320 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62320 - "POST /documents/batch HTTP/1.1" 200 OK
+Found 5 search results for query: tell me about the zach function
+  Result 1: component_components_ui_card_zach (score: 1.376367449760437)
+  Result 2: component_components_ui_card_zach (score: 1.376367449760437)
+  Result 3: method_components_ui_card_card_zach (score: 1.5040934085845947)
+  Result 4: method_components_ui_card_card_zach (score: 1.5040934085845947)
+  Result 5: component_components_ui_card_card (score: 1.6516809463500977)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: method_components_ui_card_card_zach, name: zach, type: method
+  Generated slug: components_ui_card_card for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:62320 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62675 - "POST /chat/stream HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62774 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62811 - "POST /chat/stream HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62990 - "POST /chat/stream HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63061 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63131 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63526 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63526 - "POST /documents/batch HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63528 - "POST /chat/stream HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63741 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 3: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 4: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 5: component_components_ui_card_card (score: 1.7205967903137207)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:63743 - "POST /chat?stream=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63895 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 3: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 4: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 5: component_components_ui_card_card (score: 1.7205967903137207)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:63897 - "POST /chat?stream=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64064 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 3: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 4: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 5: component_components_ui_card_card (score: 1.7205967903137207)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:64066 - "POST /chat?stream=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64394 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hiu
+  Result 1: component_components_ui_card_zach (score: 1.655200481414795)
+  Result 2: component_components_ui_card_zach (score: 1.655200481414795)
+  Result 3: component_components_ui_card_zach (score: 1.655200481414795)
+  Result 4: component_components_ui_card_card (score: 1.6999599933624268)
+  Result 5: component_components_ui_card_card (score: 1.6999599933624268)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:64396 - "POST /chat?stream=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64558 - "GET /health HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 3: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 4: component_components_ui_card_card (score: 1.7205967903137207)
+  Result 5: component_components_ui_card_card (score: 1.7205967903137207)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:64560 - "POST /chat?stream=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64605 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64913 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64960 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64960 - "POST /documents/batch HTTP/1.1" 200 OK
+Found 5 search results for query: hi
+  Result 1: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 2: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 3: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 4: component_components_ui_card_zach (score: 1.6127328872680664)
+  Result 5: component_components_ui_card_card (score: 1.7205967903137207)
+Enhancing response with links from 5 search results
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_zach, name: zach, type: component
+  Generated slug: components_ui_card_zach for zach
+Processing result: component_components_ui_card_card, name: Card, type: component
+  Generated slug: components_ui_card_card for Card
+Link enhancement complete. Found 2 potential links
+INFO:     127.0.0.1:64969 - "POST /chat?stream=true HTTP/1.1" 200 OK

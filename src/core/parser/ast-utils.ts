@@ -112,6 +112,137 @@ export function extractComponentSourceCode(
 }
 
 /**
+ * Extract props from a React component using TypeScript AST parsing
+ * This is used as a fallback when react-docgen-typescript doesn't extract props properly
+ * 
+ * @param fileContent - The content of the file
+ * @param componentName - The name of the component to extract props from
+ * @returns Array of prop definitions
+ */
+export function extractComponentPropsFromAST(
+  fileContent: string,
+  componentName: string
+): Array<{
+  name: string;
+  type: string;
+  required: boolean;
+  defaultValue?: string;
+  description: string;
+}> {
+  const props: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    defaultValue?: string;
+    description: string;
+  }> = [];
+
+  try {
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      fileContent,
+      ts.ScriptTarget.Latest,
+      true
+    );
+
+    let componentNode: ts.Node | undefined;
+
+    // Find the component node
+    function findComponentNode(node: ts.Node) {
+      if (componentNode) return;
+
+      // Function declaration
+      if (
+        ts.isFunctionDeclaration(node) &&
+        node.name &&
+        node.name.text === componentName
+      ) {
+        componentNode = node;
+        return;
+      }
+
+      // Variable declaration with arrow function or function expression
+      if (ts.isVariableStatement(node)) {
+        for (const declaration of node.declarationList.declarations) {
+          if (
+            declaration.name &&
+            ts.isIdentifier(declaration.name) &&
+            declaration.name.text === componentName &&
+            declaration.initializer &&
+            (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+          ) {
+            componentNode = declaration.initializer;
+            return;
+          }
+        }
+      }
+
+      ts.forEachChild(node, findComponentNode);
+    }
+
+    ts.forEachChild(sourceFile, findComponentNode);
+
+    if (componentNode && (ts.isFunctionDeclaration(componentNode) || ts.isArrowFunction(componentNode) || ts.isFunctionExpression(componentNode))) {
+      const functionNode = componentNode as ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression;
+      
+      // Check if it has parameters
+      if (functionNode.parameters.length > 0) {
+        const firstParam = functionNode.parameters[0];
+        
+        // Check if it's a destructuring pattern
+        if (ts.isObjectBindingPattern(firstParam.name)) {
+          for (const element of firstParam.name.elements) {
+            if (ts.isBindingElement(element)) {
+              if (element.dotDotDotToken) {
+                // Rest props like ...props
+                let restName = "props";
+                if (element.name && ts.isIdentifier(element.name)) {
+                  restName = element.name.text;
+                }
+                props.push({
+                  name: `...${restName}`,
+                  type: "object",
+                  required: false,
+                  description: "Additional props passed to the underlying component",
+                });
+              } else if (ts.isIdentifier(element.name)) {
+                // Regular destructured prop like { className }
+                props.push({
+                  name: element.name.text,
+                  type: "string", // Default type, could be improved with more analysis
+                  required: !element.initializer,
+                  defaultValue: element.initializer ? element.initializer.getText(sourceFile) : undefined,
+                  description: "",
+                });
+              }
+            }
+          }
+        }
+        // Check if it's a regular identifier with type annotation
+        else if (ts.isIdentifier(firstParam.name) && firstParam.type) {
+          // For cases like (props: ComponentProps) - we'd need more complex type analysis
+          const typeText = firstParam.type.getText(sourceFile);
+          if (typeText.includes("ComponentProps") || typeText.includes("Props")) {
+            // Add a generic props entry
+            props.push({
+              name: "props",
+              type: typeText,
+              required: true,
+              description: "Component props",
+            });
+          }
+        }
+      }
+    }
+
+    return props;
+  } catch (error) {
+    debug("Error extracting props from AST:", error);
+    return [];
+  }
+}
+
+/**
  * Extract methods from a component using TypeScript AST parsing
  * 
  * @param fileContent - The content of the file
@@ -228,10 +359,16 @@ export function extractAllTopLevelCodeItems(fileContent: string): Array<{
           }>;
         } = { name, kind: 'function', code };
         
-        // Try to find props for this component
+        // Try to find props for this component using AST extraction
         const propsTypeName = findPropsTypeForComponent(node, sourceFile);
         if (propsTypeName && interfaces[propsTypeName]) {
           componentResult.props = interfaces[propsTypeName];
+        } else {
+          // Fallback to AST props extraction for inline destructured props
+          const astProps = extractComponentPropsFromAST(fileContent, name);
+          if (astProps.length > 0) {
+            componentResult.props = astProps;
+          }
         }
         
         results.push(componentResult);
@@ -252,10 +389,16 @@ export function extractAllTopLevelCodeItems(fileContent: string): Array<{
           }>;
         } = { name, kind: 'class', code };
         
-        // Try to find props for this component
+        // Try to find props for this component using AST extraction
         const propsTypeName = findPropsTypeForComponent(node, sourceFile);
         if (propsTypeName && interfaces[propsTypeName]) {
           componentResult.props = interfaces[propsTypeName];
+        } else {
+          // Fallback to AST props extraction for inline destructured props
+          const astProps = extractComponentPropsFromAST(fileContent, name);
+          if (astProps.length > 0) {
+            componentResult.props = astProps;
+          }
         }
         
         results.push(componentResult);
@@ -283,10 +426,16 @@ export function extractAllTopLevelCodeItems(fileContent: string): Array<{
               }>;
             } = { name, kind: 'function', code };
             
-            // Try to find props for this component
+            // Try to find props for this component using AST extraction
             const propsTypeName = findPropsTypeForComponent(declaration.initializer, sourceFile);
             if (propsTypeName && interfaces[propsTypeName]) {
               componentResult.props = interfaces[propsTypeName];
+            } else {
+              // Fallback to AST props extraction for inline destructured props
+              const astProps = extractComponentPropsFromAST(fileContent, name);
+              if (astProps.length > 0) {
+                componentResult.props = astProps;
+              }
             }
             
             results.push(componentResult);
